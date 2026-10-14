@@ -9,7 +9,12 @@ import { ANIMATION, LAYOUT } from '../../constants';
 import { useAtomStore } from '../../stores/useAtomStore';
 import { ChatList } from './ChatList';
 
-export function ChatLayer() {
+interface ChatLayerProps {
+  /** ระยะขอบล่างของรายการแชท — MainScreen ดันขึ้นเมื่อช่องพิมพ์สูงขึ้นหรือคีย์บอร์ดเปิด */
+  bottom?: number;
+}
+
+export function ChatLayer({ bottom = LAYOUT.chat.bottomPadding }: ChatLayerProps) {
   const isConversation = useAtomStore((s) => s.uiMode === 'conversation');
   const progress = useSharedValue(isConversation ? 1 : 0);
 
@@ -31,7 +36,7 @@ export function ChatLayer() {
           left: 0,
           right: 0,
           top: LAYOUT.chat.topPadding,
-          bottom: LAYOUT.chat.bottomPadding,
+          bottom,
           zIndex: 5,
         },
         style,

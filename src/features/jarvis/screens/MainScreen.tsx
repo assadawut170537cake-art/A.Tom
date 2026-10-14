@@ -1,9 +1,11 @@
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
+import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
+import { ChatInput } from '../components/chat/ChatInput';
 import { ChatLayer } from '../components/chat/ChatLayer';
 import { BackgroundGradient } from '../components/layout/BackgroundGradient';
 import { Header } from '../components/layout/Header';
@@ -14,74 +16,90 @@ import { BottomTabs } from '../components/navigation/BottomTabs';
 import { IdleGreeting } from '../components/orb/IdleGreeting';
 import { ListeningIndicator } from '../components/orb/ListeningIndicator';
 import { OrbLayer } from '../components/orb/OrbLayer';
-import { LAYOUT, PERSONA_GREETINGS } from '../constants';
+import { LAYOUT, PERSONAS } from '../constants';
+import { useAIKeyStatus } from '../hooks/useAIKeyStatus';
+import { useKeyboardOverlap } from '../hooks/useKeyboardOverlap';
+import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
 
 const GREETING_TOP = LAYOUT.dropdown.top + 58;
+/** แถว ActionBar สูงเท่าปุ่มกลาง (คอมพิวเตอร์ 60px) */
+const ACTION_BAR_HEIGHT = 60;
+const GAP = 8;
+/** ช่องพิมพ์วางเหนือ ActionBar ตอนคีย์บอร์ดปิด (ไม่แก้ค่า LAYOUT ที่ lock ไว้) */
+const COMPOSER_BOTTOM = LAYOUT.actionBar.bottom + ACTION_BAR_HEIGHT + 12;
 
-/**
- * Stand-in until STT input lands: walks the orb through
- * listening → thinking → speaking, pushes (and speaks) the persona's greeting and
- * switches to conversation mode.
- */
-function useDemoGreeting() {
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-
-  const cancel = useCallback(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    voiceOrchestrator.stop();
-  }, []);
-
-  useEffect(() => cancel, [cancel]);
-
-  const greet = useCallback(() => {
-    cancel();
-    const { activePersona: persona, setMood, setUIMode, pushMessage } = useAtomStore.getState();
-    const later = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
-
-    setMood('listening');
-    later(1400, () => setMood('thinking'));
-    later(2600, () => {
-      setMood('speaking');
-      pushMessage({ role: 'assistant', content: PERSONA_GREETINGS[persona], persona });
-      setUIMode('conversation');
-      // Spoken with the persona's mapped voice (falls back to on-device Expo Speech)
-      voiceOrchestrator.speak(PERSONA_GREETINGS[persona], persona).catch(() => {});
-    });
-    later(5600, () => setMood('idle'));
-  }, [cancel]);
-
-  return { greet, cancel };
+interface AtomTabProps {
+  /** คีย์บอร์ดบังขอบล่างของพื้นที่หน้าจออยู่กี่ px */
+  keyboardOverlap: number;
 }
 
-function AtomTab() {
+function AtomTab({ keyboardOverlap }: AtomTabProps) {
+  const navigation = useNavigation();
   const isIdle = useAtomStore((s) => s.uiMode === 'idle');
   const dropdownOpen = useAtomStore((s) => s.dropdownOpen);
   const closeDropdown = useAtomStore((s) => s.closeDropdown);
-  const { greet, cancel } = useDemoGreeting();
+  // ส่งได้เฉพาะตอนผู้ช่วยว่าง — conversation.sendMessage เป็นคนเดิน mood thinking → speaking → idle
+  const busy = useAtomStore((s) => s.mood === 'thinking' || s.mood === 'speaking');
+  const persona = PERSONAS[useAtomStore((s) => s.activePersona)];
+  const keyStatus = useAIKeyStatus();
+
+  const inputRef = useRef<TextInput>(null);
+  const [composerHeight, setComposerHeight] = useState(0);
+  const focusInput = useCallback(() => inputRef.current?.focus(), []);
+
+  const enterConversation = useCallback(() => {
+    const { uiMode, setUIMode, closeDropdown: close } = useAtomStore.getState();
+    close();
+    if (uiMode === 'idle') setUIMode('conversation');
+  }, []);
 
   const onOrbPress = useCallback(() => {
-    const { uiMode, setUIMode, setMood, closeDropdown: close } = useAtomStore.getState();
-    close();
-    if (uiMode === 'idle') {
-      greet();
+    if (useAtomStore.getState().uiMode === 'idle') {
+      // เข้าโหมดคุยแล้วเปิดช่องพิมพ์ — ไม่มีข้อความทักทาย demo แล้ว (คำทักทายใช้เฉพาะตอนสั่งสลับ persona)
+      enterConversation();
+      focusInput();
     } else {
-      // Mini orb → back to idle so the persona can be switched
-      cancel();
-      setMood('idle');
-      setUIMode('idle');
+      // Orb เล็ก → กลับหน้าเลือกผู้ช่วย; หยุดเสียงที่พูดค้าง แล้ว sendMessage จะคืน mood เป็น idle เอง
+      voiceOrchestrator.stop();
+      Keyboard.dismiss();
+      useAtomStore.getState().setUIMode('idle');
     }
-  }, [greet, cancel]);
+  }, [enterConversation, focusInput]);
+
+  const onSend = useCallback((text: string) => {
+    // sendMessage จับ error ทุกกรณีเองแล้วแสดงเป็นข้อความ ⚠️ ในแชท — ไม่ reject
+    void sendMessage(text);
+  }, []);
+
+  const composerBottom = keyboardOverlap > 0 ? keyboardOverlap + GAP : COMPOSER_BOTTOM;
+  const chatBottom = Math.max(LAYOUT.chat.bottomPadding, composerBottom + composerHeight + GAP);
 
   return (
     <>
-      <ChatLayer />
+      <ChatLayer bottom={chatBottom} />
       <OrbLayer onPress={onOrbPress} />
       {isIdle && <IdleGreeting top={GREETING_TOP} />}
       <ListeningIndicator />
-      <ActionBar onComputer={onOrbPress} />
+      <ActionBar onComputer={onOrbPress} onKeyboard={focusInput} />
+      <View
+        className="absolute left-4 right-4"
+        style={{ bottom: composerBottom, zIndex: 13 }}
+        onLayout={(e) => setComposerHeight(e.nativeEvent.layout.height)}
+      >
+        {keyStatus === 'missing' && (
+          <ApiKeyNotice onPress={() => navigation.navigate('AISettings')} />
+        )}
+        <ChatInput
+          ref={inputRef}
+          onSend={onSend}
+          disabled={busy}
+          onFocus={enterConversation}
+          placeholder={`พิมพ์ข้อความถึง${persona.name}…`}
+          accentColor={persona.color}
+        />
+      </View>
       {dropdownOpen && (
         <Pressable
           accessibilityLabel="ปิดเมนู"
@@ -111,14 +129,20 @@ export function MainScreen() {
   const insets = useSafeAreaInsets();
   const activeTab = useTabsStore((s) => s.activeTab);
   const navigation = useNavigation();
+  const containerRef = useRef<View>(null);
+  const { overlap, onContainerLayout } = useKeyboardOverlap(containerRef);
 
   return (
     <View className="flex-1 bg-black">
       <BackgroundGradient />
-      <View style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}>
+      <View
+        ref={containerRef}
+        onLayout={onContainerLayout}
+        style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}
+      >
         <Header onSettings={() => navigation.navigate('Settings')} />
         <OfflineBanner />
-        {activeTab === 'atom' && <AtomTab />}
+        {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
         {activeTab === 'memory' && <ComingSoon label="Memory" />}
         <BottomTabs />

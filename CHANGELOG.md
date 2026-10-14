@@ -13,11 +13,15 @@
 ## [Unreleased]
 
 ### Added
+- **Chat UI จริง:** `ChatInput` (พิมพ์ได้หลายบรรทัด สูงสุด 4 บรรทัด, ปุ่มส่งสีตาม persona) ต่อเข้ากับ `sendMessage()` · ปุ่ม ⌨️ โฟกัสช่องพิมพ์ · แถบเตือน "ยังไม่ได้ตั้งค่า API key" แตะแล้วไปหน้า AI Providers
 - **Phase 4 scaffold — Shared Memory** (`src/core/memory/`): `MemoryStore` interface, `LocalMemoryAdapter` (AsyncStorage `atom.memory.v1.<scope>.<key>`, fallback ในหน่วยความจำ), `RemoteMemoryAdapter` (stub), `SyncQueue` (skeleton offline-first)
 - **Phase 4 scaffold — Module System** (`src/core/modules/`): `AtomModule`, `ModuleRegistry` (init ตาม dependency, dispose ย้อนลำดับ), `loader.ts` (stub)
 - Hook: `ChatHandler` รับ `memoryStore` แล้วแนบ facts ต่อท้าย system prompt (ไม่ส่ง = เหมือนเดิม)
 - Hook: `PCCommandHandler` เรียก module `pc-bridge` เมื่อมี (ไม่มี = ตอบ "Phase 4 ครับ" เหมือนเดิม)
 - ADR-011 Phase 4: Shared Memory + Module System
+
+### Removed
+- Demo greeting ของ Phase 2 (`useDemoGreeting`): แตะ Orb จะเข้าโหมดคุยแล้วเปิดช่องพิมพ์แทน ไม่ push คำทักทายอัตโนมัติอีก (`PERSONA_GREETINGS` ยังใช้ตอนสั่งสลับ persona)
 - เอกสาร: `README.md` (เขียนใหม่), `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`
 - JSDoc หัวไฟล์ของ `request.ts`, `ChatHistoryStorage.ts`, `IntentRouter.ts`, `Orchestrator.ts`, `VoiceOrchestrator.ts`
 

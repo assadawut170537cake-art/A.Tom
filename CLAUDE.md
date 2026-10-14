@@ -161,6 +161,10 @@
 - Error Message: ผ่าน `redactSecrets()` ก่อน save
 - Pattern: `sk-...`, `AIza...`, `AKIA...`
 
+### Keyboard (หน้าหลัก)
+- ทุกอย่างบน MainScreen เป็น absolute → ไม่ใช้ KeyboardAvoidingView; ใช้ `useKeyboardOverlap()` (measureInWindow เทียบ keyboard screenY) ยกเฉพาะช่องพิมพ์ + รายการแชท
+- ไม่แก้ค่า `LAYOUT` ที่ lock — ตำแหน่งช่องพิมพ์คำนวณใน MainScreen
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
