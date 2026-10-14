@@ -255,6 +255,57 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
     expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai', 'openrouter.ai']);
   });
 
+  describe('lastGood sticky behaviour (429)', () => {
+    test('Gemini 429 → OpenRouter; the next call goes to OpenRouter first, Gemini is skipped', async () => {
+      const { hosts } = mockFetch([
+        [GEMINI, () => httpError(429, 'Resource has been exhausted')],
+        [OPENROUTER, () => openRouterText('จาก OpenRouter')],
+      ]);
+      const orch = new Orchestrator();
+
+      const first = await orch.chat({ messages: MESSAGES });
+      expect(first.providerId).toBe('openrouter');
+      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai']);
+
+      const second = await orch.chat({ messages: MESSAGES });
+      expect(second.providerId).toBe('openrouter');
+      expect(hosts().slice(2)).toEqual(['openrouter.ai']); // sticky: no Gemini attempt
+      expect((await orch.pickProvider())?.config.id).toBe('openrouter');
+    });
+
+    test('sticky provider wins over the saved priority until it fails, then priority resumes', async () => {
+      await ProviderSettings.setPriority(['gemini', 'openrouter']);
+      let openRouterDown = false;
+      const { hosts } = mockFetch([
+        [GEMINI, () => (openRouterDown ? geminiText('Gemini กลับมาแล้ว') : httpError(429))],
+        [OPENROUTER, () => (openRouterDown ? httpError(429) : openRouterText('ok'))],
+      ]);
+      const orch = new Orchestrator();
+      await orch.chat({ messages: MESSAGES }); // gemini 429 → openrouter (sticky)
+      await orch.chat({ messages: MESSAGES }); // openrouter first despite priority
+      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai', 'openrouter.ai']);
+
+      openRouterDown = true;
+      const res = await orch.chat({ messages: MESSAGES }); // sticky fails → back to priority order
+      expect(res).toMatchObject({ providerId: 'gemini', content: 'Gemini กลับมาแล้ว' });
+      expect(hosts().slice(3)).toEqual(['openrouter.ai', 'generativelanguage.googleapis.com']);
+      expect((await orch.pickProvider())?.config.id).toBe('gemini'); // new sticky provider
+    });
+
+    test('a 429 retried successfully (retries=1) keeps the same provider sticky', async () => {
+      await ProviderSettings.setAdvanced({ retries: 1 });
+      let geminiCalls = 0;
+      const { hosts } = mockFetch([
+        [GEMINI, () => (++geminiCalls === 1 ? httpError(429) : geminiText('ok'))],
+        [OPENROUTER, () => openRouterText('should not be used')],
+      ]);
+      const orch = new Orchestrator();
+      await expect(orch.chat({ messages: MESSAGES })).resolves.toMatchObject({ providerId: 'gemini' });
+      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com']);
+      expect((await orch.pickProvider())?.config.id).toBe('gemini');
+    });
+  });
+
   test('a genuine 400 (bad request) stops the chain', async () => {
     const { hosts } = mockFetch([[GEMINI, () => httpError(400, 'model not found')]]);
     await expect(

@@ -250,6 +250,43 @@ describe('IntentRouter pipeline', () => {
     expect((await router.route({ text: 'อืม' })).provider).toBe('llm');
   });
 
+  describe(`confidence boundary (JEV_MIN_CONFIDENCE = ${JEV_MIN_CONFIDENCE})`, () => {
+    test('exactly 0.7 → Jev decides, LLM never called', async () => {
+      const llm = stubClassifier(chatOut('llm', 0.99));
+      const out = await new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.7)), llm }).route({
+        text: 'อืม',
+      });
+      expect(out).toEqual({ intent: 'chat', confidence: 0.7, provider: 'jev' });
+      expect(llm.calls).toBe(0);
+    });
+
+    test('just below 0.7 (0.6999) → LLM decides', async () => {
+      const llm = stubClassifier(chatOut('llm', 0.8));
+      const out = await new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.6999)), llm }).route({
+        text: 'อืม',
+      });
+      expect(out.provider).toBe('llm');
+      expect(llm.calls).toBe(1);
+    });
+
+    test('end to end: TypeSafe answers with confidence 0.7 → routed by Jev, Gemini untouched', async () => {
+      await ProviderSettings.setEnabled('jev', true);
+      const { hosts } = mockFetch([[JEV, () => jevChoice('pc_command', 0.7)]]);
+      const out = await new IntentRouter().route({ text: 'ช่วยรันโปรแกรมให้ที' });
+      expect(out).toEqual({ intent: 'pc_command', confidence: 0.7, provider: 'jev' });
+      expect(hosts()).toEqual(['api.typesafe.ai']);
+    });
+
+    test('end to end: confidence 0.7 taken from probabilities when confidence is absent', async () => {
+      await ProviderSettings.setEnabled('jev', true);
+      mockFetch([[JEV, () => jevChoice('chat', undefined, { chat: 0.7 })]]);
+      await expect(new IntentRouter().route({ text: 'อืม' })).resolves.toMatchObject({
+        provider: 'jev',
+        confidence: 0.7,
+      });
+    });
+  });
+
   test('Jev errors / no opinion fall through to the LLM', async () => {
     const llm = stubClassifier(chatOut('llm', 0.8));
     expect(
