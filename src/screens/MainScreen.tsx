@@ -15,12 +15,13 @@ import { OrbLayer } from '../features/jarvis/components/orb/OrbLayer';
 import { LAYOUT, PERSONA_GREETINGS } from '../features/jarvis/constants';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { useTabsStore } from '../features/jarvis/stores/useTabsStore';
+import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 
 const GREETING_TOP = LAYOUT.dropdown.top + 58;
 
 /**
- * Phase 2 stand-in for STT/LLM/TTS: walks the orb through
- * listening → thinking → speaking, pushes the persona's greeting and
+ * Stand-in until STT input lands: walks the orb through
+ * listening → thinking → speaking, pushes (and speaks) the persona's greeting and
  * switches to conversation mode.
  */
 function useDemoGreeting() {
@@ -29,6 +30,7 @@ function useDemoGreeting() {
   const cancel = useCallback(() => {
     timers.current.forEach(clearTimeout);
     timers.current = [];
+    voiceOrchestrator.stop();
   }, []);
 
   useEffect(() => cancel, [cancel]);
@@ -44,6 +46,8 @@ function useDemoGreeting() {
       setMood('speaking');
       pushMessage({ role: 'assistant', content: PERSONA_GREETINGS[persona], persona });
       setUIMode('conversation');
+      // Spoken with the persona's mapped voice (falls back to on-device Expo Speech)
+      voiceOrchestrator.speak(PERSONA_GREETINGS[persona], persona).catch(() => {});
     });
     later(5600, () => setMood('idle'));
   }, [cancel]);

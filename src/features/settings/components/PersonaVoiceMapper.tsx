@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 
 import { ProviderSettings, type PersonaVoice } from '../../../core/storage/ProviderSettings';
 import { PERSONA_IDS, PERSONAS } from '../../jarvis/constants';
+import { useAtomStore } from '../../jarvis/stores/useAtomStore';
 import type { Persona } from '../../jarvis/types';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
 import type { TTSProviderId, Voice } from '../../voice/core/types';
@@ -106,20 +107,26 @@ export function PersonaVoiceMapper() {
     };
   }, []);
 
-  const toggleSame = (value: boolean) => {
+  // The active persona's voice lives in the store; re-resolve it after every change
+  const refreshActiveVoice = () => useAtomStore.getState().refreshVoice();
+
+  const toggleSame = async (value: boolean) => {
     setSame(value);
-    ProviderSettings.setSameVoiceForAll(value);
-    if (value) ProviderSettings.setSharedVoice(shared);
+    await ProviderSettings.setSameVoiceForAll(value);
+    if (value) await ProviderSettings.setSharedVoice(shared);
+    await refreshActiveVoice();
   };
 
-  const updateShared = (voice: PersonaVoice) => {
+  const updateShared = async (voice: PersonaVoice) => {
     setShared(voice);
-    ProviderSettings.setSharedVoice(voice);
+    await ProviderSettings.setSharedVoice(voice);
+    await refreshActiveVoice();
   };
 
-  const updatePersona = (persona: Persona, voice: PersonaVoice) => {
+  const updatePersona = async (persona: Persona, voice: PersonaVoice) => {
     setByPersona((m) => ({ ...m, [persona]: voice }));
-    ProviderSettings.setTTSFor(persona, voice);
+    await ProviderSettings.setTTSFor(persona, voice);
+    await refreshActiveVoice();
   };
 
   if (!loaded) return null;

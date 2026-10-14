@@ -1,5 +1,6 @@
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
+import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
 import { DEFAULT_PERSONA } from '../../jarvis/constants';
 import type { Persona } from '../../jarvis/types';
 import type { HandlerResult, IntentHandler, RouterInput } from '../core/types';
@@ -9,11 +10,11 @@ const MAX_HISTORY = 20;
 
 export type SystemPromptFor = (persona: Persona) => string | undefined;
 
-/** Forwards the conversation to the AI Orchestrator (with the persona's system prompt, if any). */
+/** Forwards the conversation to the AI Orchestrator with the active persona's system prompt. */
 export class ChatHandler implements IntentHandler {
   constructor(
     private readonly orchestrator: Orchestrator = aiOrchestrator,
-    private readonly systemPromptFor: SystemPromptFor = () => undefined
+    private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt
   ) {}
 
   async handle(input: RouterInput): Promise<HandlerResult> {
