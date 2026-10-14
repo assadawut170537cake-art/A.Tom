@@ -24,7 +24,8 @@
     "backgroundColor": "#05060a",
     "plugins": [
       "expo-secure-store",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ]
   }
 }

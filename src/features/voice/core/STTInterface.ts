@@ -1,6 +1,7 @@
 import { File } from 'expo-file-system';
 
 import { ProviderError, testWith } from '../../../core/http/errors';
+import { sleep } from '../../../core/http/request';
 import { ProviderSettings } from '../../../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../../../core/storage/SecureKeyStore';
 import type { STTProvider, STTProviderId } from './types';
@@ -61,6 +62,22 @@ export abstract class BaseCloudSTT implements STTProvider {
     const file = new File(audioUri);
     if (!file.exists) throw new ProviderError(this.id, 'bad_request', `ไม่พบไฟล์เสียง: ${audioUri}`);
     return file;
+  }
+
+  /** Polls an async job until `check` returns a value (or throws), up to `timeoutMs`. */
+  protected async poll<T>(
+    check: () => Promise<T | undefined>,
+    { intervalMs = 1500, timeoutMs = 120_000 } = {}
+  ): Promise<T> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const result = await check();
+      if (result !== undefined) return result;
+      if (Date.now() > deadline) {
+        throw new ProviderError(this.id, 'timeout', `ถอดเสียงนานเกิน ${timeoutMs / 1000}s`);
+      }
+      await sleep(intervalMs);
+    }
   }
 
   /** Throws a non-fallback error when the provider returned no text. */

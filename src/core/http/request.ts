@@ -31,10 +31,12 @@ export async function request(
     clearTimeout(timer);
   }
 
-  if (!res.ok && !acceptStatus?.includes(res.status)) {
+  if (!res.ok) {
+    // Reading the body consumes it; accepted error statuses are only used by key probes
     const { detail, raw } = await readErrorDetail(res);
     // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
     const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
+    if (kind !== 'auth' && acceptStatus?.includes(res.status)) return res;
     throw new ProviderError(
       providerId,
       kind,
@@ -78,7 +80,11 @@ async function readErrorDetail(res: Response): Promise<{ detail: string; raw: st
   if (!raw) return { detail: '', raw };
   try {
     const body = JSON.parse(raw) as Record<string, unknown>;
-    const msg = messageOf(body.error) ?? messageOf(body.detail) ?? messageOf(body.message);
+    const msg =
+      messageOf(body.error) ??
+      messageOf(body.detail) ??
+      messageOf(body.message) ??
+      messageOf(body.title);
     if (msg) return { detail: msg.slice(0, 200), raw };
   } catch {
     // not JSON — fall through to raw text
