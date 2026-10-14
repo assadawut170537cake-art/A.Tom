@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MemoryScreen } from '../../memory/screens/MemoryScreen';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -144,7 +145,7 @@ export function MainScreen() {
         <OfflineBanner />
         {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
-        {activeTab === 'memory' && <ComingSoon label="Memory" />}
+        {activeTab === 'memory' && <MemoryScreen />}
         <BottomTabs />
       </View>
     </View>

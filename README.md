@@ -92,6 +92,7 @@ src/
 │
 ├── features/                  # 🧩 module ตามโดเมน
 │   ├── jarvis/                #   หน้าจอหลัก: Orb · แชท · store · conversation service
+│   ├── memory/                #   แท็บ Memory: ดู/เพิ่ม/แก้/ลบความจำ (Shared Memory)
 │   ├── router/                #   Intent Router: classifiers (Rule/Jev/LLM) + handlers
 │   ├── ai/                    #   LLM: adapters · registry · Orchestrator · persona prompts
 │   ├── voice/                 #   TTS 9 + STT 8 · registry · VoiceOrchestrator

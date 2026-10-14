@@ -10,19 +10,12 @@
 
 import { DevSettings } from 'react-native';
 
-import type { MemoryFact, MemoryStore, MemoryTarget } from '../core/memory/types';
-import { PERSONA_IDS } from '../core/types/persona';
+import { ALL_MEMORY_TARGETS, type MemoryFact, type MemoryStore, type MemoryTarget } from '../core/memory/types';
 
 /** fact ทดสอบ: global 1 ตัว + เฉพาะอะตอม 1 ตัว (ถามแล้วควรตอบตามนี้) */
 export const DEV_TEST_FACTS: readonly { target: MemoryTarget; key: string; value: string }[] = [
   { target: { scope: 'global' }, key: 'dev_drink', value: 'บอสชอบกาแฟดำ ไม่ใส่น้ำตาล' },
   { target: { scope: 'persona', persona: 1 }, key: 'dev_atom_nickname', value: 'อะตอมเรียกบอสว่า "ลูกพี่เค้ก"' },
-];
-
-/** global + ทุก persona */
-export const ALL_MEMORY_TARGETS: readonly MemoryTarget[] = [
-  { scope: 'global' },
-  ...PERSONA_IDS.map((persona): MemoryTarget => ({ scope: 'persona', persona })),
 ];
 
 export async function seedTestFacts(memory: MemoryStore): Promise<void> {

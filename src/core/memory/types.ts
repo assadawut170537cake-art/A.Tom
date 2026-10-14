@@ -15,7 +15,7 @@
  * @see ../../../docs/DECISIONS.md — ADR-011
  */
 
-import type { Persona } from '../types/persona';
+import { PERSONA_IDS, type Persona } from '../types/persona';
 
 export type MemoryScope = 'global' | 'persona';
 
@@ -66,3 +66,9 @@ export const MEMORY_KEY_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 export function scopeSegment(target: MemoryTarget): string {
   return target.scope === 'global' ? 'global' : `persona.${target.persona}`;
 }
+
+/** ทุกขอบเขตที่มี: global + แต่ละ persona (ใช้ตอนไล่อ่าน fact ทั้งหมด เช่น Memory UI / boot) */
+export const ALL_MEMORY_TARGETS: readonly MemoryTarget[] = [
+  { scope: 'global' },
+  ...PERSONA_IDS.map((persona): MemoryTarget => ({ scope: 'persona', persona })),
+];

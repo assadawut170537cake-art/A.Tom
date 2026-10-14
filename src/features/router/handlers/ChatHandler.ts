@@ -10,7 +10,8 @@ import type { HandlerResult, IntentHandler, RouterInput } from '../core/types';
 const MAX_HISTORY = 20;
 /** Most recently updated memory facts appended to the system prompt. */
 export const MAX_MEMORY_FACTS = 20;
-const MAX_FACT_LENGTH = 200;
+/** ค่าของ fact ยาวสุดที่ส่งเข้า prompt — Memory UI ใช้ค่าเดียวกันเป็น maxLength */
+export const MAX_FACT_LENGTH = 200;
 
 /**
  * อักขระขึ้นบรรทัดใหม่ทุกแบบที่ LLM อาจตีความเป็นบรรทัดใหม่ — รวม \v \f NEL (U+0085)

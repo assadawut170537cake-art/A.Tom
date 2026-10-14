@@ -54,6 +54,7 @@
         ├── voice/      ← 17 providers (9 TTS + 8 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
+        ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
         └── settings/   ← screens, components
 
 ### Dependency Direction
@@ -175,7 +176,9 @@
 - **Memory facts ถูกแนบใน system prompt แล้วตั้งแต่ boot** — แอปใช้ `getAppRouter()` (features/router/appRouter.ts) ซึ่งส่ง `localMemory` เข้า ChatHandler
 - ห้ามสร้าง `new IntentRouter()` เปล่า ๆ ในโค้ดแอป (จะไม่มี memory) — ใช้ `getAppRouter()`; test สร้างเปล่าได้
 - memory อ่านไม่ได้ → ChatHandler log แล้วตอบโดยไม่มี facts · `bootApp()` ไม่ reject (module/memory ล้มแค่ log)
-- ทดสอบด้วยมือ: dev menu "A.T.O.M.: เพิ่ม fact ทดสอบ" หรือ DevTools console `atomDev.seed()` / `atomDev.list()` / `atomDev.clear()`
+- ทดสอบด้วยมือ: แท็บ Memory (4.5.2) หรือ dev menu "A.T.O.M.: เพิ่ม fact ทดสอบ" / DevTools console `atomDev.seed()`
+- Memory UI: key ตาม `MEMORY_KEY_PATTERN` · value ≤ `MAX_FACT_LENGTH` (200, export จาก ChatHandler) · key ซ้ำในขอบเขตเดียวกัน = ปฏิเสธ (ไม่ทับเงียบ ๆ)
+- ไม่มี swipe-to-delete เพราะต้องเพิ่ม react-native-gesture-handler (ต้องขอ Boss) → ใช้ long-press
 
 ### Network
 - `isOffline()` fail-open
@@ -197,7 +200,7 @@
 4. Remote Memory Adapter
 5. SyncQueue.flush() + persist
 6. Module `pc-bridge` จริง
-7. UI Memory
+7. ✅ UI Memory (4.5.2) — แท็บ Memory: list + filter + เพิ่ม/แก้ (แตะ) / ลบ (กดค้าง หรือปุ่มในฟอร์ม)
 8. UI Module Manager
 
 ### หลัง Phase 4.5
@@ -270,5 +273,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (4.5.1: wire localMemory → ChatHandler + boot sequence)
+**Last updated:** 2026-10-15 (4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

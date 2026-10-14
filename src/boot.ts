@@ -11,10 +11,10 @@
  */
 
 import { localMemory } from './core/memory/LocalMemoryAdapter';
-import type { MemoryStore } from './core/memory/types';
+import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
 import { moduleRegistry } from './core/modules/ModuleRegistry';
 import type { InitReport } from './core/modules/types';
-import { ALL_MEMORY_TARGETS, installMemoryDevTools } from './dev/memoryDevTools';
+import { installMemoryDevTools } from './dev/memoryDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
 

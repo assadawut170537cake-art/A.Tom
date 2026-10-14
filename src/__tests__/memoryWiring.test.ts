@@ -4,8 +4,8 @@ import { bootApp, startServices } from '../boot';
 import { localMemory } from '../core/memory/LocalMemoryAdapter';
 import type { MemoryStore } from '../core/memory/types';
 import { ModuleRegistry } from '../core/modules/ModuleRegistry';
+import { ALL_MEMORY_TARGETS } from '../core/memory/types';
 import {
-  ALL_MEMORY_TARGETS,
   DEV_TEST_FACTS,
   installMemoryDevTools,
   type AtomDevTools,
