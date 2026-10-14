@@ -55,6 +55,25 @@ describe('B1 — API keys are redacted from error text', () => {
     expect(redactSecrets('task-runner risk-free sk-')).toBe('task-runner risk-free sk-');
   });
 
+  test('AWS access key ids (AKIA + 16) are redacted; look-alikes are not', () => {
+    expect(redactSecrets('Credential=AKIAIOSFODNN7EXAMPLE/20150830/us-east-1/polly/aws4_request')).toBe(
+      'Credential=[REDACTED]/20150830/us-east-1/polly/aws4_request'
+    );
+    expect(redactSecrets('key AKIAIOSFODNN7EXAMPLE')).toBe('key [REDACTED]');
+    expect(redactSecrets('AKIA123 · akiaiosfodnn7example · XAKIAIOSFODNN7EXAMPLE')).toBe(
+      'AKIA123 · akiaiosfodnn7example · XAKIAIOSFODNN7EXAMPLE'
+    );
+  });
+
+  test('Polly SigV4 errors echoing the access key id are redacted end to end', async () => {
+    mockFetch([
+      [/polly/, () => json({ message: 'The request signature we calculated does not match. Credential=AKIAIOSFODNN7EXAMPLE/20150830' }, 403)],
+    ]);
+    const err = (await request('polly', 'https://polly.us-east-1.amazonaws.com/v1/voices').catch((e: unknown) => e)) as Error;
+    expect(err.message).toContain('Credential=[REDACTED]/20150830');
+    expect(err.message).not.toContain('AKIAIOSFODNN7EXAMPLE');
+  });
+
   test('provider error bodies echoing the key are redacted before they reach the message', async () => {
     mockFetch([
       [/a\.test/, () => httpError(401, 'Incorrect API key provided: sk-proj-SECRET123')],

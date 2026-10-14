@@ -12,6 +12,20 @@ const MAX_HISTORY = 20;
 export const MAX_MEMORY_FACTS = 20;
 const MAX_FACT_LENGTH = 200;
 
+/**
+ * อักขระขึ้นบรรทัดใหม่ทุกแบบที่ LLM อาจตีความเป็นบรรทัดใหม่ — รวม \v \f NEL (U+0085)
+ * LINE/PARAGRAPH SEPARATOR (U+2028/2029) ไม่ใช่แค่ \r\n
+ */
+const LINE_BREAKS = /[\r\n\v\f\u0085\u2028\u2029]+/g;
+
+/**
+ * บีบ fact ให้อยู่บรรทัดเดียว: fact ที่มี "\n\nSystem: ..." จะสร้างบรรทัดที่หน้าตาเหมือนคำสั่งระบบใน prompt ไม่ได้
+ * (กันได้แค่การปลอมโครงสร้าง — เนื้อหาในบรรทัดเดียวกันยังเป็นข้อความจากผู้ใช้ ดู ADR-011)
+ */
+export function toPromptLine(text: string, max: number = MAX_FACT_LENGTH): string {
+  return text.replace(LINE_BREAKS, ' ').trim().slice(0, max);
+}
+
 type SystemPromptFor = (persona: Persona) => string | undefined;
 
 /**
@@ -57,7 +71,8 @@ export class ChatHandler implements IntentHandler<'chat'> {
     }
     if (!facts.length) return '';
     const recent = facts.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_MEMORY_FACTS);
-    const lines = recent.map((f) => `- ${f.key}: ${f.value.replace(/[\r\n]+/g, ' ').trim().slice(0, MAX_FACT_LENGTH)}`);
+    // key ก็บีบด้วย: LocalMemoryAdapter ตรวจรูปแบบ key แล้ว แต่ MemoryStore ตัวอื่น (เช่น remote) อาจไม่ตรวจ
+    const lines = recent.map((f) => `- ${toPromptLine(f.key, 64)}: ${toPromptLine(f.value)}`);
     return [`สิ่งที่จำได้เกี่ยวกับ${USER_NAME}:`, ...lines].join('\n');
   }
 }

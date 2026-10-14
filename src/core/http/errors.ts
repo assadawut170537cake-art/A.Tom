@@ -73,8 +73,11 @@ export function userAdvice(kind: ProviderErrorKind): string {
   return USER_ADVICE[kind];
 }
 
-/** API keys that providers sometimes echo back in error bodies (OpenAI/OpenRouter sk-…, Google AIza…). */
-const SECRET_PATTERN = /\b(?:sk-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+)/g;
+/**
+ * API keys that providers sometimes echo back in error bodies (OpenAI/OpenRouter sk-…, Google AIza…)
+ * และ AWS access key id (AKIA + 16 ตัว) ที่ Amazon Polly ส่งกลับมาใน `Credential=` ของ error SigV4
+ */
+const SECRET_PATTERN = /\b(?:sk-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+|AKIA[0-9A-Z]{16})/g;
 
 /** Masks API keys so error text is safe to show and to persist in chat history. */
 export function redactSecrets(text: string): string {
