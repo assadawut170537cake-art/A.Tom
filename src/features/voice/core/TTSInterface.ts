@@ -1,0 +1,101 @@
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { File, Paths } from 'expo-file-system';
+
+import { ProviderError, testWith } from '../../../core/http/errors';
+import { ProviderSettings } from '../../../core/storage/ProviderSettings';
+import { SecureKeyStore, secretKey } from '../../../core/storage/SecureKeyStore';
+import type { SpeakOptions, TTSProvider, TTSProviderId, Voice } from './types';
+
+export type { TTSProvider } from './types';
+
+/** Default speech language for the app. */
+export const TTS_LANGUAGE = 'th-TH';
+
+export interface SynthesizedAudio {
+  /** Raw bytes, or base64 when the API returns JSON-wrapped audio (e.g. Google). */
+  data: Uint8Array | { base64: string };
+  /** File extension the player should see, e.g. 'mp3'. */
+  ext: string;
+}
+
+/**
+ * Base for HTTP TTS providers: subclasses return audio from synthesize(); this class writes it to
+ * the cache directory and plays it with expo-audio. speak() resolves when playback ends or stop() is called.
+ */
+export abstract class BaseCloudTTS implements TTSProvider {
+  abstract readonly id: TTSProviderId;
+  abstract readonly name: string;
+
+  private player: AudioPlayer | null = null;
+  private finish: (() => void) | null = null;
+
+  protected abstract synthesize(text: string, opts: SpeakOptions): Promise<SynthesizedAudio>;
+  protected abstract fetchVoices(): Promise<Voice[]>;
+  /** Cheapest authenticated request that proves the credentials work. */
+  protected probe(): Promise<unknown> {
+    return this.fetchVoices();
+  }
+
+  async speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+    if (!text.trim()) return;
+    this.stop();
+    const audio = await this.synthesize(text, opts);
+
+    const file = new File(Paths.cache, `tts-${this.id}-${Date.now()}.${audio.ext}`);
+    if (audio.data instanceof Uint8Array) file.write(audio.data);
+    else file.write(audio.data.base64, { encoding: 'base64' });
+
+    await new Promise<void>((resolve, reject) => {
+      const player = createAudioPlayer(file.uri);
+      this.player = player;
+      this.finish = () => {
+        sub.remove();
+        player.remove();
+        if (this.player === player) this.player = null;
+        this.finish = null;
+        try {
+          file.delete();
+        } catch {
+          // cache cleanup is best-effort
+        }
+        resolve();
+      };
+      const sub = player.addListener('playbackStatusUpdate', (status) => {
+        if (status.didJustFinish) this.finish?.();
+      });
+      try {
+        player.play();
+      } catch (e) {
+        this.finish();
+        reject(new ProviderError(this.id, 'unsupported', `เล่นเสียงไม่ได้: ${String(e)}`));
+      }
+    });
+  }
+
+  stop(): void {
+    this.player?.pause();
+    this.finish?.();
+  }
+
+  getVoices(): Promise<Voice[]> {
+    return this.fetchVoices();
+  }
+
+  testConnection(): Promise<{ ok: boolean; error?: string }> {
+    return testWith(this.id, () => this.probe());
+  }
+
+  protected async secret(field?: string): Promise<string> {
+    const value = await SecureKeyStore.get(secretKey('tts', this.id, field));
+    if (!value) {
+      throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${field ?? 'API key'}`);
+    }
+    return value;
+  }
+
+  protected async option(name: string, fallback?: string): Promise<string> {
+    const value = (await ProviderSettings.getOption(`tts.${this.id}`, name)) ?? fallback;
+    if (!value) throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${name}`);
+    return value;
+  }
+}
