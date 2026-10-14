@@ -57,7 +57,7 @@ export class ChatHandler implements IntentHandler<'chat'> {
     }
     if (!facts.length) return '';
     const recent = facts.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_MEMORY_FACTS);
-    const lines = recent.map((f) => `- ${f.key}: ${f.value.slice(0, MAX_FACT_LENGTH)}`);
+    const lines = recent.map((f) => `- ${f.key}: ${f.value.replace(/[\r\n]+/g, ' ').trim().slice(0, MAX_FACT_LENGTH)}`);
     return [`สิ่งที่จำได้เกี่ยวกับ${USER_NAME}:`, ...lines].join('\n');
   }
 }
