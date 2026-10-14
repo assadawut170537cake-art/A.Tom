@@ -1,21 +1,7 @@
-export type TTSProviderId =
-  | 'expo'
-  | 'openai'
-  | 'elevenlabs'
-  | 'google'
-  | 'azure'
-  | 'polly'
-  | 'playht'
-  | 'custom';
-export type STTProviderId =
-  | 'expo'
-  | 'whisper'
-  | 'deepgram'
-  | 'google'
-  | 'azure'
-  | 'assemblyai'
-  | 'revai'
-  | 'custom';
+import type { STTProviderId, TTSProviderId } from '../../../core/types/voiceProvider';
+
+// ย้ายไป core/types แล้ว — re-export ไว้ให้ไฟล์ใน features/voice import จากที่เดิมได้
+export type { STTProviderId, TTSProviderId } from '../../../core/types/voiceProvider';
 
 export interface TTSProvider {
   id: TTSProviderId;

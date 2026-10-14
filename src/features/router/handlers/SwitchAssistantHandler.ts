@@ -1,6 +1,6 @@
-import { DEFAULT_PERSONA, PERSONA_GREETINGS, PERSONAS } from '../../jarvis/constants';
+import { DEFAULT_PERSONA, type Persona } from '../../../core/types/persona';
+import { PERSONA_GREETINGS, PERSONAS } from '../../jarvis/constants';
 import { useAtomStore } from '../../jarvis/stores/useAtomStore';
-import type { Persona } from '../../jarvis/types';
 import { findPersona } from '../classifiers/RuleClassifier';
 import type { HandlerResult, IntentHandler, RouteOf, RouterInput } from '../core/types';
 

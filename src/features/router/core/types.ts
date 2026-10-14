@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../../ai/core/types';
-import type { Persona } from '../../jarvis/types';
+import type { Persona } from '../../../core/types/persona';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant'] as const;
 export type Intent = (typeof INTENTS)[number];
@@ -13,7 +13,7 @@ export type PersonaEntity = `${Persona}`;
 export interface RouterInput {
   text: string;
   context?: {
-    activePersona?: 1 | 2 | 3 | 4;
+    activePersona?: Persona;
     recentMessages?: string[];
     /** Full role-tagged history for the active persona, used by ChatHandler. */
     history?: ChatMessage[];

@@ -15,8 +15,7 @@
  * @see ../../../docs/DECISIONS.md — ADR-011
  */
 
-// NOTE(arch, 2026-10-14): type-only import from features/, same trade-off as core/storage.
-import type { Persona } from '../../features/jarvis/types';
+import type { Persona } from '../types/persona';
 
 export type MemoryScope = 'global' | 'persona';
 

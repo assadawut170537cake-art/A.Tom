@@ -19,7 +19,7 @@ import {
   type PersonaVoice,
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
-import type { Persona } from '../../jarvis/types';
+import type { Persona } from '../../../core/types/persona';
 import { ensureMicPermission } from './permissions';
 import { voiceRegistry, type VoiceRegistry } from './VoiceRegistry';
 import type { SpeakOptions, STTProvider, TTSProvider, TTSProviderId } from './types';

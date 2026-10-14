@@ -1,5 +1,5 @@
 import { USER_NAME } from '../../jarvis/constants';
-import type { Persona } from '../../jarvis/types';
+import type { Persona } from '../../../core/types/persona';
 
 /** Character of each assistant (Boss-approved wording). */
 export const PERSONA_PROMPTS: Record<Persona, string> = {

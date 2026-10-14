@@ -15,11 +15,9 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// NOTE(arch, 2026-10-14): core/ imports *types* from features/ (type-only, no runtime cycle).
-// Moving Persona/Message/provider-id types into core/ would make the dependency one-way; deferred
-// because it touches most feature files — revisit before Phase 4 adds more storage.
-import type { Message, Persona } from '../../features/jarvis/types';
 import { isArray, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
+import { MESSAGE_ROLES, type Message } from '../types/message';
+import { PERSONA_IDS, isPersona, type Persona } from '../types/persona';
 
 /**
  * Chat history persistence: one AsyncStorage key per persona so histories stay separate and a
@@ -28,8 +26,6 @@ import { isArray, isOneOf, isRecord, isString, parseJSON } from '../types/guards
  */
 
 const KEY_PREFIX = 'atom.history.v1.';
-const PERSONAS = [1, 2, 3, 4] as const satisfies readonly Persona[];
-const ROLES = ['user', 'assistant', 'system'] as const satisfies readonly Message['role'][];
 
 /** Newest messages kept per persona (keeps AsyncStorage well under Android's size limit). */
 export const MAX_STORED_MESSAGES = 500;
@@ -42,7 +38,7 @@ function isMessage(value: unknown, persona: Persona): value is Message {
     isString(value.id) &&
     isString(value.content) &&
     typeof value.createdAt === 'number' &&
-    isOneOf(ROLES, value.role) &&
+    isOneOf(MESSAGE_ROLES, value.role) &&
     value.persona === persona
   );
 }
@@ -75,14 +71,14 @@ export const ChatHistoryStorage = {
     const histories: Record<Persona, Message[]> = { 1: [], 2: [], 3: [], 4: [] };
     let entries: readonly (readonly [string, string | null])[];
     try {
-      entries = await AsyncStorage.multiGet(PERSONAS.map(historyKey));
+      entries = await AsyncStorage.multiGet(PERSONA_IDS.map(historyKey));
     } catch (e) {
       console.error('[history] อ่านประวัติแชทไม่ได้ — เริ่มใหม่ในหน่วยความจำ', e);
       return { ok: false, histories };
     }
     for (const [key, raw] of entries) {
       const persona = Number(key.slice(KEY_PREFIX.length));
-      if (!isOneOf(PERSONAS, persona)) continue;
+      if (!isPersona(persona)) continue;
       if (raw == null) continue;
       // Corrupt entry → that persona starts fresh; invalid messages are dropped
       const parsed = parseJSON(raw, isArray);

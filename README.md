@@ -86,7 +86,7 @@ src/
 │   ├── memory/                #   Shared Memory: MemoryStore · LocalMemoryAdapter · remote/sync stubs (Phase 4)
 │   ├── modules/               #   Module System: AtomModule · ModuleRegistry · loader stub (Phase 4)
 │   ├── crypto/                #   SigV4 (สำหรับ Amazon Polly)
-│   └── types/                 #   runtime type guards
+│   └── types/                 #   shared primitives (Persona, Message, provider ids) + runtime type guards
 │
 ├── features/                  # 🧩 module ตามโดเมน
 │   ├── jarvis/                #   หน้าจอหลัก: Orb · แชท · store · conversation service

@@ -1,4 +1,8 @@
-export type AIProviderId = 'gemini' | 'openrouter' | 'jev' | 'custom';
+import type { AIProviderId } from '../../../core/types/aiProvider';
+
+// ย้ายไป core/types แล้ว — re-export ไว้ให้ไฟล์ใน features/ai import จากที่เดิมได้
+export type { AIProviderId } from '../../../core/types/aiProvider';
+
 export type AIProviderType = 'openai-compatible' | 'gemini' | 'systemone' | 'custom';
 
 export interface AIProviderConfig {

@@ -2,8 +2,8 @@ import type { MemoryFact, MemoryStore } from '../../../core/memory/types';
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
-import { DEFAULT_PERSONA, USER_NAME } from '../../jarvis/constants';
-import type { Persona } from '../../jarvis/types';
+import { DEFAULT_PERSONA, type Persona } from '../../../core/types/persona';
+import { USER_NAME } from '../../jarvis/constants';
 import type { HandlerResult, IntentHandler, RouterInput } from '../core/types';
 
 /** Keep prompts small: the last N turns of the persona's own history. */

@@ -1,4 +1,4 @@
-import type { Persona } from '../../jarvis/types';
+import type { Persona } from '../../../core/types/persona';
 import type { Classifier, RouterInput, RouterOutput } from '../core/types';
 
 /** Persona names (Thai + English, incl. common misspellings) → id, for findPersona(). */

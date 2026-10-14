@@ -7,14 +7,10 @@ import {
   keysOf,
   type Guard,
 } from '../types/guards';
+import type { AIProviderId } from '../types/aiProvider';
+import type { Persona } from '../types/persona';
+import type { STTProviderId, TTSProviderId } from '../types/voiceProvider';
 import { readJSON, writeJSON } from './jsonStorage';
-
-// NOTE(arch, 2026-10-14): core/ imports *types* from features/ (type-only, no runtime cycle).
-// Moving Persona/Message/provider-id types into core/ would make the dependency one-way; deferred
-// because it touches most feature files — revisit before Phase 4 adds more storage.
-import type { AIProviderId } from '../../features/ai/core/types';
-import type { STTProviderId, TTSProviderId } from '../../features/voice/core/types';
-import type { Persona } from '../../features/jarvis/types';
 
 /**
  * Non-secret provider preferences (AsyncStorage). API keys go in SecureKeyStore instead.

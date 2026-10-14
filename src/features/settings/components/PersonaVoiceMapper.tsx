@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { ProviderSettings, type PersonaVoice } from '../../../core/storage/ProviderSettings';
-import { PERSONA_IDS, PERSONAS } from '../../jarvis/constants';
+import { PERSONA_IDS, type Persona } from '../../../core/types/persona';
+import { PERSONAS } from '../../jarvis/constants';
 import { useAtomStore } from '../../jarvis/stores/useAtomStore';
-import type { Persona } from '../../jarvis/types';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
 import type { Voice } from '../../voice/core/types';
 import { TTS_PROVIDERS } from '../../voice/voice.config';

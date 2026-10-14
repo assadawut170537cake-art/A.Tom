@@ -1,7 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
 import { moduleRegistry, type ModuleRegistry } from '../../../core/modules/ModuleRegistry';
 import { isCommandModule } from '../../../core/modules/types';
-import { DEFAULT_PERSONA } from '../../jarvis/constants';
+import { DEFAULT_PERSONA } from '../../../core/types/persona';
 import type { HandlerResult, IntentHandler, RouteOf, RouterInput } from '../core/types';
 
 export const PC_BRIDGE_MODULE_ID = 'pc-bridge';

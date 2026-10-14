@@ -70,10 +70,21 @@
 3. **test ง่าย** — `core/` เป็นฟังก์ชันล้วน mock แค่ `fetch` กับ AsyncStorage ก็ทดสอบได้ครบ
 4. **กันวงจร import** — dependency ไหลทางเดียว `features → core`
 
-### ข้อยกเว้นที่รู้อยู่แล้ว
+### Shared types อยู่ใน `core/types/`
 
-`core/storage/ProviderSettings.ts` และ `ChatHistoryStorage.ts` import **type เท่านั้น** (เช่น `Persona`, `AIProviderId`) จาก `features/` ไม่มี runtime dependency จึงไม่เกิดวงจร
-มี `NOTE(arch)` ในไฟล์บันทึกไว้ว่าควรย้าย type เหล่านี้ลง `core/` ก่อน Phase 4
+primitive ที่หลาย feature ใช้ร่วมกันอยู่ใน `core/types/` — core จึงไม่ต้อง import อะไรจาก `features/` เลย
+(มี test `architecture.test.ts` คอยตรวจ ถ้ามีไฟล์ใน core import จาก features จะ fail)
+
+| ไฟล์ | เนื้อหา |
+|------|---------|
+| `core/types/persona.ts` | `Persona`, `PERSONA_IDS`, `DEFAULT_PERSONA`, `isPersona` |
+| `core/types/message.ts` | `Message`, `MessageRole`, `MESSAGE_ROLES` |
+| `core/types/aiProvider.ts` | `AIProviderId` |
+| `core/types/voiceProvider.ts` | `TTSProviderId`, `STTProviderId` |
+| `core/types/guards.ts` | runtime type guards |
+
+type module เดิมของ feature (`jarvis/types`, `ai/core/types`, `voice/core/types`) re-export ของเหล่านี้ไว้ ไฟล์ภายใน feature จึง import จากที่เดิมได้
+ส่วนข้อมูลแสดงผลของ persona (ชื่อ สี คำทักทาย `USER_NAME`) ยังอยู่ที่ `features/jarvis/constants`
 
 ### ภายใน feature module
 

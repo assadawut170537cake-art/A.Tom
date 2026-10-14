@@ -1,20 +1,15 @@
-export type Persona = 1 | 2 | 3 | 4;
+import type { Persona } from '../../../core/types/persona';
+
+// ย้ายไป core/types แล้ว — re-export ไว้ให้ไฟล์ใน jarvis import จากที่เดิมได้
+export type { Persona } from '../../../core/types/persona';
+export type { Message, MessageRole } from '../../../core/types/message';
+
 export type OrbMood = 'idle' | 'listening' | 'thinking' | 'speaking';
 export type UIMode = 'idle' | 'conversation';
 export type TabKey = 'atom' | 'today' | 'memory';
-export type MessageRole = 'user' | 'assistant' | 'system';
 
 /** State names understood by the Orb HTML bridge (window.setOrbState). */
 export type OrbBridgeState = 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING';
-
-export interface Message {
-  id: string;
-  persona: Persona;
-  role: MessageRole;
-  content: string;
-  /** epoch ms */
-  createdAt: number;
-}
 
 export interface PersonaMeta {
   id: Persona;

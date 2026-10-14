@@ -1,6 +1,10 @@
 import { Platform } from 'react-native';
 
-import type { OrbBridgeState, OrbMood, Persona, PersonaMeta, TabMeta } from '../types';
+import type { Persona } from '../../../core/types/persona';
+import type { OrbBridgeState, OrbMood, PersonaMeta, TabMeta } from '../types';
+
+// ย้ายไป core/types/persona แล้ว — re-export ไว้ให้ import จากที่เดิมได้
+export { DEFAULT_PERSONA, PERSONA_IDS } from '../../../core/types/persona';
 
 export const PERSONAS: Record<Persona, PersonaMeta> = {
   1: { id: 1, name: 'อะตอม', nameEn: 'ATOM', color: '#d35400', desc: 'นักเลง 2499' },
@@ -8,10 +12,6 @@ export const PERSONAS: Record<Persona, PersonaMeta> = {
   3: { id: 3, name: 'ไฟรเดย์', nameEn: 'FRIDAY', color: '#00d4ff', desc: 'เนี๊ยบ ไร้ที่ติ' },
   4: { id: 4, name: 'อัลตรอน', nameEn: 'ULTRON', color: '#ff0033', desc: 'ดุดัน พร้อมบวก' },
 };
-
-export const PERSONA_IDS: Persona[] = [1, 2, 3, 4];
-
-export const DEFAULT_PERSONA: Persona = 1;
 
 export const TABS: TabMeta[] = [
   { key: 'atom', label: 'Atom' },
