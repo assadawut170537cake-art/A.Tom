@@ -1,3 +1,18 @@
+/**
+ * @file Voice Orchestrator — เลือก TTS / STT provider และ fallback อัตโนมัติ
+ *
+ * - **TTS** `speak(text, persona)`: เสียงของ persona (หรือเสียงรวม) → TTS priority → ลำดับลงทะเบียน
+ *   → **Expo Speech เป็นตัวสุดท้ายเสมอ** (บนเครื่อง ไม่ต้องใช้ key) — ผู้ช่วยไม่เงียบ
+ * - **STT** `listen(uri)`: STT ที่เลือก → STT priority → ที่เหลือที่เปิดอยู่
+ * - **ไมค์** `requestMicrophone()`: เรียกก่อนบันทึกเสียง ไม่ได้สิทธิ์ → error `permission` (ไม่ fallback)
+ *
+ * ใช้เงื่อนไข fallback เดียวกับ AI (`ProviderError.shouldFallback`)
+ * ล้มทุกตัว → ProviderError เดียว ("ผู้ให้บริการเสียงทุกรายล้มเหลว") ที่คง kind ร่วมไว้
+ *
+ * @see ../../../../docs/ARCHITECTURE.md — หัวข้อ 4 Orchestrator pattern
+ * @see ../../../../docs/DECISIONS.md — ADR-008 Expo Speech เป็น TTS สำรองสุดท้ายเสมอ
+ */
+
 import { ProviderError, commonKind, toProviderError } from '../../../core/http/errors';
 import {
   ProviderSettings,

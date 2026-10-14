@@ -1,3 +1,18 @@
+/**
+ * @file เก็บประวัติแชทถาวร แยกต่อ persona (AsyncStorage)
+ *
+ * - หนึ่ง key ต่อ persona: `atom.history.v1.<1-4>` → บันทึกเฉพาะ persona ที่เปลี่ยน
+ * - เก็บล่าสุดไม่เกิน {@link MAX_STORED_MESSAGES} ข้อความต่อ persona
+ * - คิวการเขียนต่อ persona → บันทึกถี่ ๆ ก็ลงตามลำดับ ไม่ทับกัน
+ * - **ไม่ throw ใส่ผู้เรียก**: เขียนไม่ได้ → `save()` คืน `false` · อ่านไม่ได้ → `loadAll()` คืน `ok: false`
+ *   (store จะตั้ง `historyPersisted = false` และทำงานในหน่วยความจำต่อ)
+ * - ข้อมูลเสีย (JSON พัง / ไม่ใช่ array / ข้อความผิดรูปแบบ) → ตัดทิ้งพร้อม `console.error`
+ *
+ * ผู้ใช้หลัก: `useAtomStore` (`pushMessage` → `save`, `loadHistory` → `loadAll`)
+ *
+ * @see ../../../docs/DECISIONS.md — ADR-003 ประวัติแชทแยกต่อ persona และเก็บถาวร
+ */
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // NOTE(arch, 2026-10-14): core/ imports *types* from features/ (type-only, no runtime cycle).

@@ -1,3 +1,29 @@
+/**
+ * @file Intent Router — ตัดสินว่าข้อความของบอส "ต้องการอะไร" แล้วส่งให้ handler ที่ถูกตัว
+ *
+ * ลำดับการจำแนก (หยุดที่ขั้นแรกที่ได้คำตอบ):
+ *
+ * ```
+ * RuleClassifier (regex, ฟรี, ใช้ได้แม้ออฟไลน์)
+ *   → JevClassifier (เฉพาะเมื่อเปิด Jev, confidence ≥ 0.7)
+ *     → LLMClassifier (ถาม AI Orchestrator ให้ตอบ JSON)
+ *       → default: chat
+ * ```
+ *
+ * classifier ที่ล้มหรือตอบ intent ที่ไม่รู้จัก จะตกไปขั้นถัดไปเสมอ — ข้อความทุกข้อความได้คำตอบ
+ *
+ * | intent             | handler                  |
+ * |--------------------|--------------------------|
+ * | `chat`             | `ChatHandler` → AI Orchestrator |
+ * | `switch_assistant` | `SwitchAssistantHandler` |
+ * | `pc_command`       | `PCCommandHandler` (stub จนถึง Phase 4) |
+ *
+ * classifier และ handler ทุกตัวฉีดผ่าน constructor ได้ (ใช้ใน test)
+ *
+ * @see ../../../../docs/ARCHITECTURE.md — หัวข้อ 5 Intent Router
+ * @see ../../../../docs/DECISIONS.md — ADR-005, ADR-006
+ */
+
 import { JevClassifier } from '../classifiers/JevClassifier';
 import { LLMClassifier } from '../classifiers/LLMClassifier';
 import { RuleClassifier } from '../classifiers/RuleClassifier';

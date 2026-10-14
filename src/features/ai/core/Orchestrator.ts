@@ -1,3 +1,24 @@
+/**
+ * @file AI Orchestrator — เลือก LLM provider และ fallback อัตโนมัติ
+ *
+ * ลำดับการลอง: pinned → lastGood (sticky) → priority ของบอส → ลำดับลงทะเบียน
+ * (เฉพาะ provider ที่เปิดอยู่และ `purpose = 'llm'` — Jev ไม่อยู่ในสายนี้)
+ *
+ * | error                                   | retry ตัวเดิม | fallback |
+ * |-----------------------------------------|:------------:|:--------:|
+ * | 429 / 5xx / timeout / network           | ✅ (ตาม Advanced) | ✅ |
+ * | 401 / 403 (auth), ไม่มี key, unsupported | ❌           | ✅ |
+ * | 400 อื่น ๆ, ตอบกลับผิดรูปแบบ              | ❌           | ❌ (โยนทันที) |
+ *
+ * key ที่ถูกปฏิเสธระหว่างที่ตัวถัดไปตอบได้ จะเก็บไว้ให้ `takeNotices()` เพื่อแจ้งบอส
+ * ล้มทุกตัว → ProviderError เดียวที่รวมสาเหตุของทุกเจ้า
+ *
+ * `aiOrchestrator` คือ instance ที่แอปใช้ร่วมกัน · test สร้าง `new Orchestrator(registry, settings)` เอง
+ *
+ * @see ../../../../docs/ARCHITECTURE.md — หัวข้อ 4 Orchestrator pattern
+ * @see ../../../../docs/DECISIONS.md — ADR-007 AI fallback chain แบบ sticky
+ */
+
 import {
   ProviderError,
   commonKind,

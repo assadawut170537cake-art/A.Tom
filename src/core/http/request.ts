@@ -1,3 +1,22 @@
+/**
+ * @file HTTP client กลางของทุก provider (AI 3 + TTS 8 + STT 8)
+ *
+ * ทุกการเรียก API ต้องผ่าน `request()` / `requestJson()` / `requestBytes()` ในไฟล์นี้
+ * เพื่อให้ได้พฤติกรรมเดียวกันทั้งแอป:
+ *
+ * - **Timeout** ด้วย AbortController (ค่าเริ่มต้น 30 วินาที, ปรับได้ใน Advanced) → `timeout`
+ * - **HTTP status → ProviderError.kind**: 401/403 → `auth`, 429 → `rate_limit`, 5xx → `server`,
+ *   4xx อื่น → `bad_request` (Google ตอบ key ผิดเป็น 400 `API_KEY_INVALID` → นับเป็น `auth`)
+ * - **fetch ล้ม** (ออฟไลน์, DNS) → `network` พร้อมข้อความไทย
+ * - **Redaction**: API key (`sk-…`, `AIza…`) ใน error body ถูกแทนด้วย `[REDACTED]`
+ *   ก่อนตัดเหลือ 200 ตัวอักษร เพราะข้อความ error ถูกบันทึกลงประวัติแชท
+ *
+ * Orchestrator ใช้ `kind` ที่ได้จากที่นี่ตัดสินใจ retry / fallback
+ *
+ * @see ../../../docs/ARCHITECTURE.md — หัวข้อ 8 Error handling
+ * @see ../../../docs/DECISIONS.md — ADR-001 (fetch ตรง ไม่ใช้ SDK)
+ */
+
 import { isRecord, parseJSON } from '../types/guards';
 import { ProviderError, describeKind, kindForStatus, redactSecrets } from './errors';
 
