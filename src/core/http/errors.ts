@@ -50,8 +50,8 @@ const STATUS_TEXT: Partial<Record<ProviderErrorKind, string>> = {
   server: 'เซิร์ฟเวอร์ผู้ให้บริการขัดข้อง',
 };
 
-export function describeStatus(status: number): string {
-  return STATUS_TEXT[kindForStatus(status)] ?? `คำขอไม่ถูกต้อง`;
+export function describeKind(kind: ProviderErrorKind): string {
+  return STATUS_TEXT[kind] ?? 'คำขอไม่ถูกต้อง';
 }
 
 export function toProviderError(providerId: string, e: unknown): ProviderError {

@@ -1,4 +1,4 @@
-import { ProviderError, describeStatus, kindForStatus } from './errors';
+import { ProviderError, describeKind, kindForStatus } from './errors';
 
 export const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -24,7 +24,7 @@ export async function request(
     res = await fetch(url, { ...init, signal: controller.signal });
   } catch (e) {
     if (controller.signal.aborted) {
-      throw new ProviderError(providerId, 'timeout', `หมดเวลา (${Math.round(timeoutMs / 1000)}s)`);
+      throw new ProviderError(providerId, 'timeout', `หมดเวลา (${timeoutMs / 1000}s)`);
     }
     throw new ProviderError(providerId, 'network', e instanceof Error ? e.message : String(e));
   } finally {
@@ -32,11 +32,13 @@ export async function request(
   }
 
   if (!res.ok && !acceptStatus?.includes(res.status)) {
-    const detail = await readErrorDetail(res);
+    const { detail, raw } = await readErrorDetail(res);
+    // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
+    const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
     throw new ProviderError(
       providerId,
-      kindForStatus(res.status),
-      `HTTP ${res.status}: ${describeStatus(res.status)}${detail ? ` — ${detail}` : ''}`,
+      kind,
+      `HTTP ${res.status}: ${describeKind(kind)}${detail ? ` — ${detail}` : ''}`,
       res.status
     );
   }
@@ -65,25 +67,33 @@ export async function requestBytes(
   return new Uint8Array(await res.arrayBuffer());
 }
 
-async function readErrorDetail(res: Response): Promise<string> {
+/** Pulls a human-readable message out of the common error body shapes. */
+async function readErrorDetail(res: Response): Promise<{ detail: string; raw: string }> {
+  let raw = '';
   try {
-    const text = (await res.text()).trim();
-    if (!text) return '';
-    try {
-      const body = JSON.parse(text) as Record<string, unknown>;
-      const err = body.error as Record<string, unknown> | string | undefined;
-      const msg =
-        (typeof err === 'string' ? err : (err?.message as string | undefined)) ??
-        (body.message as string | undefined) ??
-        (body.detail as string | undefined);
-      if (msg) return String(msg).slice(0, 200);
-    } catch {
-      // not JSON — fall through to raw text
-    }
-    return text.slice(0, 200);
+    raw = (await res.text()).trim();
   } catch {
-    return '';
+    return { detail: '', raw };
   }
+  if (!raw) return { detail: '', raw };
+  try {
+    const body = JSON.parse(raw) as Record<string, unknown>;
+    const msg = messageOf(body.error) ?? messageOf(body.detail) ?? messageOf(body.message);
+    if (msg) return { detail: msg.slice(0, 200), raw };
+  } catch {
+    // not JSON — fall through to raw text
+  }
+  return { detail: raw.slice(0, 200), raw };
+}
+
+function messageOf(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return messageOf(value[0]);
+  if (value && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    return messageOf(obj.message) ?? messageOf(obj.msg);
+  }
+  return undefined;
 }
 
 export const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
