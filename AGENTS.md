@@ -25,9 +25,12 @@ Run lint and typecheck before declaring any task done.
 
 ## Navigation & Routing
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
+This project does **not** use Expo Router (see ADR-009 in `docs/DECISIONS.md`).
+
+- Navigation uses **`@react-navigation/native-stack`** (v7). The single stack lives in `src/navigation/RootNavigator.tsx`; route names and params are typed in `src/navigation/types.ts` (`RootStackParamList`, registered globally so `useNavigation()` is typed without generics).
+- To add a screen: create it inside its feature (`src/features/<feature>/screens/`), add the route to `RootStackParamList`, then register it in `RootNavigator`.
+- Navigate with `useNavigation()` / `navigation.navigate('<Route>')` from `@react-navigation/native`. Do not import from `expo-router`, and do not create `src/app/` (that folder is Expo Router's route directory).
+- Docs: https://reactnavigation.org/docs/native-stack-navigator
 
 ## Building with EAS
 

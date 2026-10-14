@@ -84,9 +84,11 @@ src/
 │   ├── storage/               #   SecureKeyStore · ProviderSettings · ChatHistoryStorage · jsonStorage
 │   ├── network/               #   isOffline()
 │   ├── memory/                #   Shared Memory: MemoryStore · LocalMemoryAdapter · remote/sync stubs (Phase 4)
-│   ├── modules/               #   Module System: AtomModule · ModuleRegistry · loader stub (Phase 4)
+│   ├── modules/               #   Module System: AtomModule · ModuleRegistry (Phase 4)
 │   ├── crypto/                #   SigV4 (สำหรับ Amazon Polly)
 │   └── types/                 #   shared primitives (Persona, Message, provider ids) + runtime type guards
+│
+├── modules/                   # loader ของ module (stub) — ระดับแอป เพราะต้อง import จาก features/
 │
 ├── features/                  # 🧩 module ตามโดเมน
 │   ├── jarvis/                #   หน้าจอหลัก: Orb · แชท · store · conversation service

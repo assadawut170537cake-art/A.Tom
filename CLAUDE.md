@@ -41,9 +41,11 @@
     │   ├── crypto/     ← sigv4, hashing
     │   ├── http/       ← errors, request, redaction
     │   ├── storage/    ← ProviderSettings, ChatHistoryStorage, jsonStorage
-    │   ├── types/      ← shared primitives (Persona, AIProviderId, guards)
+    │   ├── types/      ← shared primitives (Persona, Message, AIProviderId, TTS/STT ids) + guards
     │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (stub)
-    │   └── modules/    ← AtomModule, ModuleRegistry, loader (stub)
+    │   └── modules/    ← AtomModule, ModuleRegistry
+    │
+    ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
@@ -54,7 +56,8 @@
 
 ### Dependency Direction
 - ✅ `features/` → `core/` (ถูก)
-- ❌ `core/` → `features/` (ผิด — ยกเว้น import type ที่มี NOTE(arch))
+- ❌ `core/` → `features/` (ผิดทั้งหมด รวมถึง `import type` — `architecture.test.ts` ตรวจให้)
+- type ที่หลาย feature ใช้ร่วม → `core/types/`; type module เดิมของ feature re-export ไว้ (import จากที่เดิมได้)
 
 ### Patterns
 1. Registry Pattern (ProviderRegistry, VoiceRegistry, ModuleRegistry)
@@ -159,7 +162,8 @@
 ### Security
 - API Key: SecureStore เท่านั้น
 - Error Message: ผ่าน `redactSecrets()` ก่อน save
-- Pattern: `sk-...`, `AIza...`, `AKIA...`
+- Pattern: `sk-...`, `AIza...`, `AKIA...` (AKIA + 16 ตัว)
+- Memory fact → prompt: ผ่าน `toPromptLine()` (บีบทุกแบบของการขึ้นบรรทัดใหม่ให้เหลือบรรทัดเดียว)
 
 ### Keyboard (หน้าหลัก)
 - ทุกอย่างบน MainScreen เป็น absolute → ไม่ใช้ KeyboardAvoidingView; ใช้ `useKeyboardOverlap()` (measureInWindow เทียบ keyboard screenY) ยกเฉพาะช่องพิมพ์ + รายการแชท
@@ -176,9 +180,10 @@
 ## 9. PARKING LOT (ก่อน Phase 4.5)
 
 ### ต้องทำก่อน
-1. ย้าย shared types (`Persona`, `AIProviderId`) → `core/types/`
-2. Prompt injection guard (ADR-011)
-3. ย้าย `loader.ts` → app-level
+1. ✅ ย้าย shared types (`Persona`, `AIProviderId`) → `core/types/` — รวม `Message` + TTS/STT ids, core ไม่ import features แล้ว
+2. ✅ Prompt injection guard (ADR-011) — ขั้นแรก: `toPromptLine()` บีบ fact เป็นบรรทัดเดียว (กันปลอมบรรทัด "System:")
+   ⚠️ ยังไม่กรอง/ครอบ *เนื้อหา* ในบรรทัด — ทบทวนอีกครั้งก่อนเปิดให้ module เขียน memory ได้
+3. ✅ ย้าย `loader.ts` → app-level (`src/modules/loader.ts`)
 
 ### ระหว่าง Phase 4.5
 4. Remote Memory Adapter
@@ -192,8 +197,15 @@
 10. Module อื่นๆ
 
 ### Nice to Have
-11. `SECRET_PATTERN` เพิ่ม `|AKIA[0-9A-Z]{16}`
-12. `AGENTS.md` อัปเดตให้ตรง ADR-009
+11. ✅ `SECRET_PATTERN` เพิ่ม `|AKIA[0-9A-Z]{16}`
+12. ✅ `AGENTS.md` อัปเดตให้ตรง ADR-009
+
+### Findings จาก Boss test (emulator) — ยังไม่ได้แก้
+13. **Voice Persona Map default** — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
+    (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
+14. **Orb แยก shape/animation** — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
+15. **สี Atom vs Ultron ต่างชัด** — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
+    (ค่า `PERSONAS` ถูก lock ไว้ตั้งแต่ Phase 2 — เปลี่ยนต้องให้ Boss อนุมัติ)
 
 ---
 
@@ -214,7 +226,8 @@
 - Voice Orchestrator: `src/features/voice/core/VoiceOrchestrator.ts`
 - Intent Router: `src/features/router/core/IntentRouter.ts`
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
-- Module: `src/core/modules/ModuleRegistry.ts`
+- Module: `src/core/modules/ModuleRegistry.ts` · loader: `src/modules/loader.ts`
+- Shared types: `src/core/types/`
 
 ### Fallback
 - AI: Priority → lastGood → notice user
@@ -248,5 +261,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (หลัง Q6 — Phase 4 scaffold)
+**Last updated:** 2026-10-15 (Parking Lot ก่อน Phase 4.5: shared types, AKIA, loader, docs)
 **Version:** 1.0

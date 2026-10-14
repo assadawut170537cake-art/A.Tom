@@ -63,6 +63,7 @@
     },
     "collectCoverageFrom": [
       "src/core/**/*.ts",
+      "src/modules/**/*.ts",
       "src/features/ai/**/*.ts",
       "src/features/voice/**/*.ts",
       "src/features/router/**/*.ts",

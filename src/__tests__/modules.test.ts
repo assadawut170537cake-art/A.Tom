@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LocalMemoryAdapter } from '../core/memory/LocalMemoryAdapter';
 import type { MemoryStore } from '../core/memory/types';
-import { loadModule } from '../core/modules/loader';
+import { loadModule } from '../modules/loader';
 import { ModuleRegistry, consoleLogger, moduleRegistry } from '../core/modules/ModuleRegistry';
 import { isCommandModule, type AtomModule, type CommandModule, type ModuleContext } from '../core/modules/types';
 import { Orchestrator } from '../features/ai/core/Orchestrator';

@@ -1,17 +1,20 @@
 /**
  * @file โหลด module ตาม id แบบ lazy — **STUB** (ยังไม่มี module ให้โหลด)
  *
+ * อยู่ระดับแอป (`src/modules/`) ไม่ใช่ `core/modules/` เพราะตาราง loader ต้อง import module จริง
+ * จาก `features/` — ถ้าอยู่ใน core จะผิดทิศทาง dependency (core → features)
+ * ส่วนสัญญา (`AtomModule`) และ `ModuleRegistry` ยังอยู่ใน core
+ *
  * Metro (React Native bundler) resolve ได้เฉพาะ `import('...')` ที่เป็น string คงที่
  * จึงต้องลงทะเบียน factory ของแต่ละ id ไว้ใน {@link MODULE_LOADERS} ล่วงหน้า แทนการต่อ path เอง
  *
  * TODO(phase-4.5):
- *   - เพิ่ม `'pc-bridge': () => import('../../features/pc-bridge').then((m) => m.default)`
- *     เมื่อ module แรกพร้อม (และพิจารณาย้ายตาราง loader ไปไว้ระดับแอป เพราะ core ไม่ควร import features)
+ *   - เพิ่ม `'pc-bridge': () => import('../features/pc-bridge').then((m) => m.default)` เมื่อ module แรกพร้อม
  *   - โหลด module ที่บอสเปิดไว้ตอนเปิดแอป แล้วเรียก moduleRegistry.initAll()
  */
 
-import { moduleRegistry, type ModuleRegistry } from './ModuleRegistry';
-import type { AtomModule } from './types';
+import { moduleRegistry, type ModuleRegistry } from '../core/modules/ModuleRegistry';
+import type { AtomModule } from '../core/modules/types';
 
 export type ModuleFactory = () => Promise<AtomModule>;
 

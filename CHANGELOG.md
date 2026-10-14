@@ -13,12 +13,20 @@
 ## [Unreleased]
 
 ### Added
+- `src/core/types/`: `persona.ts`, `message.ts`, `aiProvider.ts`, `voiceProvider.ts` — shared primitives ย้ายมาจาก features · `architecture.test.ts` กัน core import จาก features
 - **Chat UI จริง:** `ChatInput` (พิมพ์ได้หลายบรรทัด สูงสุด 4 บรรทัด, ปุ่มส่งสีตาม persona) ต่อเข้ากับ `sendMessage()` · ปุ่ม ⌨️ โฟกัสช่องพิมพ์ · แถบเตือน "ยังไม่ได้ตั้งค่า API key" แตะแล้วไปหน้า AI Providers
 - **Phase 4 scaffold — Shared Memory** (`src/core/memory/`): `MemoryStore` interface, `LocalMemoryAdapter` (AsyncStorage `atom.memory.v1.<scope>.<key>`, fallback ในหน่วยความจำ), `RemoteMemoryAdapter` (stub), `SyncQueue` (skeleton offline-first)
-- **Phase 4 scaffold — Module System** (`src/core/modules/`): `AtomModule`, `ModuleRegistry` (init ตาม dependency, dispose ย้อนลำดับ), `loader.ts` (stub)
+- **Phase 4 scaffold — Module System** (`src/core/modules/`): `AtomModule`, `ModuleRegistry` (init ตาม dependency, dispose ย้อนลำดับ), `src/modules/loader.ts` (stub, ระดับแอป)
 - Hook: `ChatHandler` รับ `memoryStore` แล้วแนบ facts ต่อท้าย system prompt (ไม่ส่ง = เหมือนเดิม)
 - Hook: `PCCommandHandler` เรียก module `pc-bridge` เมื่อมี (ไม่มี = ตอบ "Phase 4 ครับ" เหมือนเดิม)
 - ADR-011 Phase 4: Shared Memory + Module System
+
+### Changed
+- core ไม่ import อะไรจาก `features/` แล้ว (ลบ `NOTE(arch)`); type module เดิมของ feature re-export จาก `core/types`
+- ย้าย `loader.ts` จาก `src/core/modules/` → `src/modules/` · `AGENTS.md` ใช้ `@react-navigation/native-stack` ตาม ADR-009
+
+### Security
+- `redactSecrets` ปิดบัง AWS access key id (`AKIA` + 16) ด้วย · memory fact ผ่าน `toPromptLine()` (บีบ `\r \n \v \f` U+0085 U+2028 U+2029 ให้เป็นบรรทัดเดียว ทั้ง key และ value)
 
 ### Removed
 - Demo greeting ของ Phase 2 (`useDemoGreeting`): แตะ Orb จะเข้าโหมดคุยแล้วเปิดช่องพิมพ์แทน ไม่ push คำทักทายอัตโนมัติอีก (`PERSONA_GREETINGS` ยังใช้ตอนสั่งสลับ persona)
