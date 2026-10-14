@@ -7,7 +7,7 @@
  *   พร้อมเหตุผล ไม่ทำให้ module อื่นหรือแอปล้มตาม (`console.error` ผ่าน logger)
  * - `disable()` dispose module นั้นและทุก module ที่พึ่งมันอยู่
  *
- * ยังไม่ต่อ UI — TODO(phase-4.5): หน้าตั้งค่าเปิด/ปิด module และเรียก initAll() ตอนเปิดแอป
+ * `initAll()` ถูกเรียกตอนเปิดแอปใน src/boot.ts · TODO(phase-4.5): หน้าตั้งค่าเปิด/ปิด module
  */
 
 import { localMemory } from '../memory/LocalMemoryAdapter';
@@ -183,5 +183,5 @@ export const consoleLogger: ModuleLogger = {
   error: (msg, error) => console.error(msg, error),
 };
 
-/** App-wide registry. TODO(phase-4.5): register modules + call initAll() at startup. */
+/** App-wide registry (initAll ตอน boot). TODO(phase-4.5): ลงทะเบียน module จริงผ่าน src/modules/loader.ts */
 export const moduleRegistry = new ModuleRegistry({ memory: localMemory, logger: consoleLogger });

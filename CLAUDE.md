@@ -46,6 +46,8 @@
     │   └── modules/    ← AtomModule, ModuleRegistry
     │
     ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
+    ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools — ติดตั้งเฉพาะ __DEV__)
+    ├── boot.ts         ← ลำดับเปิดแอป: register providers → initAll modules → นับ memory facts
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
@@ -169,6 +171,12 @@
 - ทุกอย่างบน MainScreen เป็น absolute → ไม่ใช้ KeyboardAvoidingView; ใช้ `useKeyboardOverlap()` (measureInWindow เทียบ keyboard screenY) ยกเฉพาะช่องพิมพ์ + รายการแชท
 - ไม่แก้ค่า `LAYOUT` ที่ lock — ตำแหน่งช่องพิมพ์คำนวณใน MainScreen
 
+### Shared Memory (4.5.1)
+- **Memory facts ถูกแนบใน system prompt แล้วตั้งแต่ boot** — แอปใช้ `getAppRouter()` (features/router/appRouter.ts) ซึ่งส่ง `localMemory` เข้า ChatHandler
+- ห้ามสร้าง `new IntentRouter()` เปล่า ๆ ในโค้ดแอป (จะไม่มี memory) — ใช้ `getAppRouter()`; test สร้างเปล่าได้
+- memory อ่านไม่ได้ → ChatHandler log แล้วตอบโดยไม่มี facts · `bootApp()` ไม่ reject (module/memory ล้มแค่ log)
+- ทดสอบด้วยมือ: dev menu "A.T.O.M.: เพิ่ม fact ทดสอบ" หรือ DevTools console `atomDev.seed()` / `atomDev.list()` / `atomDev.clear()`
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -228,6 +236,7 @@
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
 - Module: `src/core/modules/ModuleRegistry.ts` · loader: `src/modules/loader.ts`
 - Shared types: `src/core/types/`
+- Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`
 
 ### Fallback
 - AI: Priority → lastGood → notice user
@@ -261,5 +270,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (Parking Lot ก่อน Phase 4.5: shared types, AKIA, loader, docs)
+**Last updated:** 2026-10-15 (4.5.1: wire localMemory → ChatHandler + boot sequence)
 **Version:** 1.0

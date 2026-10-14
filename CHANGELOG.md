@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **4.5.1 Shared Memory ใช้งานจริง:** `getAppRouter()` ส่ง `localMemory` เข้า ChatHandler → facts แนบใน system prompt ทุกครั้งที่คุย · `src/boot.ts` (`bootApp()`): register providers → `moduleRegistry.initAll()` + นับ facts แบบ async ไม่บล็อก UI และไม่ crash · `src/dev/memoryDevTools.ts`: เมนู dev + `atomDev.seed()/list()/clear()` สำหรับทดสอบ
 - **ลิงก์ "🔗 สร้าง API Key"** ใต้ช่อง API key ในหน้าตั้งค่า AI / Voice (`settings/constants/providerLinks.ts`) — Gemini, OpenRouter, OpenAI, ElevenLabs, Google Cloud, Azure, Polly
 - **Gemini TTS** (`voice/tts/GeminiTTS.ts`): TTS ตัวที่ 9 ผ่าน `generateContent` (AUDIO) · 30 prebuilt voices · ใช้ key เดียวกับ Gemini LLM (ใส่ key แยกในการ์ด TTS ได้) · model ตั้งได้ (ค่าเริ่มต้น `gemini-3.8-flash-tts`) · PCM ดิบของรุ่น 2.5/3.1 ห่อเป็น WAV (`voice/core/wav.ts`)
 - `src/core/types/`: `persona.ts`, `message.ts`, `aiProvider.ts`, `voiceProvider.ts` — shared primitives ย้ายมาจาก features · `architecture.test.ts` กัน core import จาก features

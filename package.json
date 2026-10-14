@@ -64,6 +64,8 @@
     "collectCoverageFrom": [
       "src/core/**/*.ts",
       "src/modules/**/*.ts",
+      "src/dev/**/*.ts",
+      "src/boot.ts",
       "src/features/ai/**/*.ts",
       "src/features/voice/**/*.ts",
       "src/features/router/**/*.ts",

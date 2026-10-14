@@ -5,14 +5,13 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { registerAIProviders } from './features/ai';
+import { bootApp } from './boot';
 import { useAtomStore } from './features/jarvis/stores/useAtomStore';
 import { useTabsStore } from './features/jarvis/stores/useTabsStore';
-import { registerVoiceProviders } from './features/voice';
 import { RootNavigator } from './navigation/RootNavigator';
 
-registerAIProviders();
-registerVoiceProviders();
+// providers ลงทะเบียนทันที; module init + memory ทำงาน async ไม่บล็อก render และไม่ reject
+void bootApp();
 
 const allHydrated = () =>
   useAtomStore.persist.hasHydrated() &&

@@ -2,13 +2,10 @@ import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/e
 import { isOffline } from '../../../core/network/connectivity';
 import { aiOrchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
-import { IntentRouter } from '../../router/core/IntentRouter';
+import { getAppRouter } from '../../router/appRouter';
 import type { RouterOutput } from '../../router/core/types';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { useAtomStore } from '../stores/useAtomStore';
-
-let router: IntentRouter | null = null;
-const getRouter = () => (router ??= new IntentRouter());
 
 /** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
 let activeTurn = 0;
@@ -40,7 +37,8 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
   store.setMood('thinking');
 
   try {
-    const { route, result } = await getRouter().handle({
+    // router ของแอป: ChatHandler มี Shared Memory (facts ถูกแนบใน system prompt)
+    const { route, result } = await getAppRouter().handle({
       text: content,
       context: {
         activePersona: persona,

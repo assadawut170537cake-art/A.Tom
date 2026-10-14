@@ -190,5 +190,5 @@ export class LocalMemoryAdapter implements MemoryStore {
   }
 }
 
-/** App-wide instance. TODO(phase-4.5): pass to ChatHandler once a UI can add/edit facts. */
+/** App-wide instance — ChatHandler ของแอปใช้ตัวนี้ (ประกอบใน features/router/appRouter.ts) */
 export const localMemory = new LocalMemoryAdapter();
