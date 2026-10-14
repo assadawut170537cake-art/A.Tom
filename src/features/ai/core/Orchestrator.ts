@@ -1,10 +1,15 @@
-import { ProviderError, toProviderError } from '../../../core/http/errors';
+import { ProviderError, toProviderError, type ProviderErrorKind } from '../../../core/http/errors';
+import { sleep } from '../../../core/http/request';
 import {
   ProviderSettings,
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry, type ProviderRegistry } from './ProviderRegistry';
 import type { AIProvider, AIProviderId, ChatRequest, ChatResponse } from './types';
+
+/** Failures worth retrying on the same provider (auth/missing key never fix themselves). */
+const RETRYABLE = new Set<ProviderErrorKind>(['rate_limit', 'server', 'timeout', 'network']);
+const RETRY_DELAY_MS = 800;
 
 export interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
   /** Pin a provider; it is tried first, the rest of the chain is still used as fallback. */
@@ -17,6 +22,7 @@ export interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
  * Routes chat requests across LLM providers in priority order:
  * last successful provider → user priority (ProviderSettings) → registration order.
  * Falls back on 401/403/429/5xx/timeout/network/missing key; other errors (e.g. 400) are thrown.
+ * Advanced settings: timeoutMs per request, retries on the same provider, fallback on/off.
  */
 export class Orchestrator {
   private lastGood: AIProviderId | null = null;
@@ -33,22 +39,30 @@ export class Orchestrator {
       throw new ProviderError('orchestrator', 'missing_key', 'ไม่มีผู้ให้บริการ AI ที่เปิดใช้งาน');
     }
 
+    const { timeoutMs, retries, fallback } = await this.settings.getAdvanced();
     const failures: string[] = [];
-    for (const provider of chain) {
+    for (const provider of fallback ? chain : chain.slice(0, 1)) {
       const id = provider.config.id;
       const model =
         (id === pinned && pinnedModel) ||
         (await this.settings.getModelFor(id)) ||
         provider.config.defaultModel;
-      try {
-        const res = await provider.chat({ ...rest, model });
-        this.lastGood = id;
-        return res;
-      } catch (e) {
-        const err = toProviderError(id, e);
-        if (!err.shouldFallback) throw err;
-        if (this.lastGood === id) this.lastGood = null;
-        failures.push(err.message);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const res = await provider.chat({ timeoutMs, ...rest, model });
+          this.lastGood = id;
+          return res;
+        } catch (e) {
+          const err = toProviderError(id, e);
+          if (!err.shouldFallback) throw err;
+          if (attempt < retries && RETRYABLE.has(err.kind)) {
+            await sleep(RETRY_DELAY_MS * (attempt + 1));
+            continue;
+          }
+          if (this.lastGood === id) this.lastGood = null;
+          failures.push(err.message);
+          break;
+        }
       }
     }
     throw new ProviderError(

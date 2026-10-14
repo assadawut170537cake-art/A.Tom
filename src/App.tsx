@@ -5,9 +5,14 @@ import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { registerAIProviders } from './features/ai';
 import { useAtomStore } from './features/jarvis/stores/useAtomStore';
 import { useTabsStore } from './features/jarvis/stores/useTabsStore';
-import { MainScreen } from './screens/MainScreen';
+import { registerVoiceProviders } from './features/voice';
+import { RootNavigator } from './navigation/RootNavigator';
+
+registerAIProviders();
+registerVoiceProviders();
 
 const allHydrated = () => useAtomStore.persist.hasHydrated() && useTabsStore.persist.hasHydrated();
 
@@ -35,7 +40,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      {hydrated ? <MainScreen /> : <View style={{ flex: 1, backgroundColor: '#05060a' }} />}
+      {hydrated ? <RootNavigator /> : <View style={{ flex: 1, backgroundColor: '#05060a' }} />}
     </SafeAreaProvider>
   );
 }

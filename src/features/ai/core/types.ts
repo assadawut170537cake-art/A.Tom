@@ -22,6 +22,8 @@ export interface ChatRequest {
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  /** Per-request timeout; adapters fall back to the HTTP default when omitted. */
+  timeoutMs?: number;
 }
 
 export interface ChatResponse {

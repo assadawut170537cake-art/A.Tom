@@ -34,6 +34,7 @@ export class GeminiAdapter extends BaseAIProvider {
       {
         method: 'POST',
         headers: await this.headers(),
+        timeoutMs: req.timeoutMs,
         body: JSON.stringify({
           contents,
           ...(system.length && { systemInstruction: { parts: [{ text: system.join('\n\n') }] } }),

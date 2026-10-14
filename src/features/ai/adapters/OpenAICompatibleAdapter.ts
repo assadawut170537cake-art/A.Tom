@@ -35,6 +35,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
       {
         method: 'POST',
         headers: await this.headers(),
+        timeoutMs: req.timeoutMs,
         body: JSON.stringify({
           model: req.model,
           messages: req.messages,

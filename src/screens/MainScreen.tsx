@@ -1,3 +1,4 @@
+import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -100,12 +101,13 @@ function ComingSoon({ label }: { label: string }) {
 export function MainScreen() {
   const insets = useSafeAreaInsets();
   const activeTab = useTabsStore((s) => s.activeTab);
+  const navigation = useNavigation();
 
   return (
     <View className="flex-1 bg-black">
       <BackgroundGradient />
       <View style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}>
-        <Header />
+        <Header onSettings={() => navigation.navigate('Settings')} />
         {activeTab === 'atom' && <AtomTab />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
         {activeTab === 'memory' && <ComingSoon label="Memory" />}

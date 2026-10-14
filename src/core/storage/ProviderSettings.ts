@@ -18,17 +18,46 @@ export interface PersonaVoice {
   pitch?: number;
 }
 
+export interface AdvancedSettings {
+  /** Per-request timeout for AI calls. */
+  timeoutMs: number;
+  /** Extra attempts on the same provider after a retryable failure (429/5xx/timeout/network). */
+  retries: number;
+  /** Try the next provider in priority order when one fails. */
+  fallback: boolean;
+}
+
+export const DEFAULT_ADVANCED: AdvancedSettings = { timeoutMs: 30_000, retries: 0, fallback: true };
+
+export type VoiceKind = 'tts' | 'stt';
+
 interface SettingsData {
   enabled: Partial<Record<AIProviderId, boolean>>;
   priority: AIProviderId[];
   models: Partial<Record<AIProviderId, string>>;
   ttsByPersona: Partial<Record<Persona, PersonaVoice>>;
+  /** When true every persona speaks with sharedVoice. */
+  sameVoiceForAll: boolean;
+  sharedVoice?: PersonaVoice;
   stt?: STTProviderId;
+  advanced: AdvancedSettings;
+  voiceEnabled: { tts: Partial<Record<TTSProviderId, boolean>>; stt: Partial<Record<STTProviderId, boolean>> };
+  voicePriority: { tts: TTSProviderId[]; stt: STTProviderId[] };
   /** Per-provider non-secret options, e.g. options['tts.azure'].region */
   options: Record<string, Record<string, string>>;
 }
 
-const EMPTY: SettingsData = { enabled: {}, priority: [], models: {}, ttsByPersona: {}, options: {} };
+const empty = (): SettingsData => ({
+  enabled: {},
+  priority: [],
+  models: {},
+  ttsByPersona: {},
+  sameVoiceForAll: false,
+  options: {},
+  advanced: { ...DEFAULT_ADVANCED },
+  voiceEnabled: { tts: {}, stt: {} },
+  voicePriority: { tts: [], stt: [] },
+});
 
 let cache: SettingsData | null = null;
 let writeChain: Promise<void> = Promise.resolve();
@@ -37,9 +66,17 @@ async function load(): Promise<SettingsData> {
   if (cache) return cache;
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    cache = raw ? { ...EMPTY, ...(JSON.parse(raw) as Partial<SettingsData>) } : { ...EMPTY };
+    const saved = raw ? (JSON.parse(raw) as Partial<SettingsData>) : {};
+    const base = empty();
+    cache = {
+      ...base,
+      ...saved,
+      advanced: { ...base.advanced, ...saved.advanced },
+      voiceEnabled: { ...base.voiceEnabled, ...saved.voiceEnabled },
+      voicePriority: { ...base.voicePriority, ...saved.voicePriority },
+    };
   } catch {
-    cache = { ...EMPTY };
+    cache = empty();
   }
   return cache;
 }
@@ -89,6 +126,60 @@ export const ProviderSettings = {
   setTTSFor(persona: Persona, voice: PersonaVoice): Promise<void> {
     return update((d) => {
       d.ttsByPersona[persona] = voice;
+    });
+  },
+
+  async getSameVoiceForAll(): Promise<boolean> {
+    return (await load()).sameVoiceForAll;
+  },
+  setSameVoiceForAll(value: boolean): Promise<void> {
+    return update((d) => {
+      d.sameVoiceForAll = value;
+    });
+  },
+  async getSharedVoice(): Promise<PersonaVoice | undefined> {
+    return (await load()).sharedVoice;
+  },
+  setSharedVoice(voice: PersonaVoice): Promise<void> {
+    return update((d) => {
+      d.sharedVoice = voice;
+    });
+  },
+  /** The voice a persona actually speaks with (shared voice wins when enabled). */
+  async resolveVoiceFor(persona: Persona): Promise<PersonaVoice | undefined> {
+    const d = await load();
+    return d.sameVoiceForAll ? d.sharedVoice : d.ttsByPersona[persona];
+  },
+
+  async getAdvanced(): Promise<AdvancedSettings> {
+    return { ...(await load()).advanced };
+  },
+  setAdvanced(patch: Partial<AdvancedSettings>): Promise<void> {
+    return update((d) => {
+      d.advanced = { ...d.advanced, ...patch };
+    });
+  },
+
+  /** Voice providers are enabled unless the user switched them off. */
+  async getVoiceEnabled(kind: VoiceKind, id: TTSProviderId | STTProviderId): Promise<boolean> {
+    const map = (await load()).voiceEnabled[kind] as Partial<Record<string, boolean>>;
+    return map[id] ?? true;
+  },
+  setVoiceEnabled(kind: VoiceKind, id: TTSProviderId | STTProviderId, enabled: boolean): Promise<void> {
+    return update((d) => {
+      (d.voiceEnabled[kind] as Partial<Record<string, boolean>>)[id] = enabled;
+    });
+  },
+  async getVoicePriority<K extends VoiceKind>(
+    kind: K
+  ): Promise<K extends 'tts' ? TTSProviderId[] : STTProviderId[]> {
+    return [...(await load()).voicePriority[kind]] as K extends 'tts'
+      ? TTSProviderId[]
+      : STTProviderId[];
+  },
+  setVoicePriority(kind: VoiceKind, list: (TTSProviderId | STTProviderId)[]): Promise<void> {
+    return update((d) => {
+      (d.voicePriority[kind] as string[]) = [...new Set(list)];
     });
   },
 

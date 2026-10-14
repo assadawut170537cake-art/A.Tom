@@ -1,19 +1,20 @@
 import { ProviderError, toProviderError } from '../../../core/http/errors';
 import {
   ProviderSettings,
+  type PersonaVoice,
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import type { Persona } from '../../jarvis/types';
 import { voiceRegistry, type VoiceRegistry } from './VoiceRegistry';
-import type { STTProvider, STTProviderId, TTSProvider, TTSProviderId } from './types';
+import type { SpeakOptions, STTProvider, TTSProvider, TTSProviderId } from './types';
 
-const DEFAULT_TTS: TTSProviderId = 'expo';
-const DEFAULT_STT: STTProviderId = 'expo';
+/** On-device and keyless, so it is always the last TTS resort even if switched off. */
+const LAST_RESORT_TTS: TTSProviderId = 'expo';
 
 /**
  * Picks voice providers and falls back when one fails (401/403/429/5xx/timeout/network/no key).
- * TTS: the persona's configured provider → on-device Expo Speech.
- * STT: the user's chosen provider → every other registered provider.
+ * TTS: the persona's voice (or the shared voice) → TTS priority list (enabled) → Expo Speech.
+ * STT: STT priority list (enabled) → remaining enabled providers.
  */
 export class VoiceOrchestrator {
   private speaking: TTSProvider | null = null;
@@ -24,22 +25,25 @@ export class VoiceOrchestrator {
   ) {}
 
   async speak(text: string, personaId: Persona): Promise<void> {
-    const voice = await this.settings.getTTSFor(personaId);
-    const preferred = voice?.providerId ?? DEFAULT_TTS;
-    const chain = unique([preferred, DEFAULT_TTS])
-      .map((id) => this.registry.getTTS(id))
-      .filter((p): p is TTSProvider => !!p);
+    const voice = await this.settings.resolveVoiceFor(personaId);
+    const ids = unique([
+      ...(voice ? [voice.providerId] : []),
+      ...(await this.settings.getVoicePriority('tts')),
+      ...this.registry.listTTS().map((p) => p.id),
+    ]);
+    const chain: TTSProvider[] = [];
+    for (const id of ids) {
+      const tts = this.registry.getTTS(id);
+      if (tts && (await this.settings.getVoiceEnabled('tts', id))) chain.push(tts);
+    }
+    const lastResort = this.registry.getTTS(LAST_RESORT_TTS);
+    if (lastResort && !chain.includes(lastResort)) chain.push(lastResort);
 
     await this.runChain(chain, async (tts) => {
       this.stop();
       this.speaking = tts;
-      // Voice/speed/pitch belong to the persona's chosen provider; fallbacks use their defaults
-      const opts =
-        tts.id === preferred
-          ? { voiceId: voice?.voiceId, speed: voice?.speed, pitch: voice?.pitch }
-          : { speed: voice?.speed, pitch: voice?.pitch };
       try {
-        await tts.speak(text, opts);
+        await tts.speak(text, await this.optionsFor(tts.id, voice));
       } finally {
         if (this.speaking === tts) this.speaking = null;
       }
@@ -53,13 +57,27 @@ export class VoiceOrchestrator {
 
   /** Transcribes a recorded audio file (record with expo-audio, then pass recorder.uri). */
   async listen(audioUri: string): Promise<string> {
-    const preferred = (await this.settings.getSTT()) ?? DEFAULT_STT;
-    const chain = [
-      this.registry.getSTT(preferred),
-      ...this.registry.listSTT().filter((p) => p.id !== preferred),
-    ].filter((p): p is STTProvider => !!p);
-
+    const preferred = await this.settings.getSTT();
+    const ids = unique([
+      ...(preferred ? [preferred] : []),
+      ...(await this.settings.getVoicePriority('stt')),
+      ...this.registry.listSTT().map((p) => p.id),
+    ]);
+    const chain: STTProvider[] = [];
+    for (const id of ids) {
+      const stt = this.registry.getSTT(id);
+      if (stt && (await this.settings.getVoiceEnabled('stt', id))) chain.push(stt);
+    }
     return this.runChain(chain, (stt) => stt.transcribe(audioUri));
+  }
+
+  /** The persona's voice settings apply to its own provider; fallbacks use their default voice. */
+  private async optionsFor(id: TTSProviderId, voice?: PersonaVoice): Promise<SpeakOptions> {
+    const voiceId =
+      voice?.providerId === id
+        ? voice.voiceId
+        : await this.settings.getOption(`tts.${id}`, 'voiceId');
+    return { voiceId, speed: voice?.speed, pitch: voice?.pitch };
   }
 
   private async runChain<P extends { id: string }, R>(
@@ -67,7 +85,7 @@ export class VoiceOrchestrator {
     run: (provider: P) => Promise<R>
   ): Promise<R> {
     if (!chain.length) {
-      throw new ProviderError('voice', 'unsupported', 'ยังไม่ได้ลงทะเบียนผู้ให้บริการเสียง');
+      throw new ProviderError('voice', 'unsupported', 'ไม่มีผู้ให้บริการเสียงที่เปิดใช้งาน');
     }
     const failures: string[] = [];
     for (const provider of chain) {
