@@ -43,7 +43,8 @@ export const ChatHistoryStorage = {
       try {
         await AsyncStorage.setItem(historyKey(persona), snapshot);
         return true;
-      } catch {
+      } catch (e) {
+        console.error(`[history] บันทึกประวัติแชทของ persona ${persona} ไม่ได้ — เก็บไว้ในหน่วยความจำ`, e);
         return false;
       }
     });
@@ -60,15 +61,25 @@ export const ChatHistoryStorage = {
     let entries: readonly (readonly [string, string | null])[];
     try {
       entries = await AsyncStorage.multiGet(PERSONAS.map(historyKey));
-    } catch {
+    } catch (e) {
+      console.error('[history] อ่านประวัติแชทไม่ได้ — เริ่มใหม่ในหน่วยความจำ', e);
       return { ok: false, histories };
     }
     for (const [key, raw] of entries) {
       const persona = Number(key.slice(KEY_PREFIX.length));
       if (!isOneOf(PERSONAS, persona)) continue;
-      // Missing/corrupt entry → that persona starts fresh; invalid messages are dropped
+      if (raw == null) continue;
+      // Corrupt entry → that persona starts fresh; invalid messages are dropped
       const parsed = parseJSON(raw, isArray);
-      if (parsed) histories[persona] = parsed.filter((m) => isMessage(m, persona));
+      if (!parsed) {
+        console.error(`[history] ${key}: ข้อมูลเสีย — ตัดทิ้งทั้งชุด`);
+        continue;
+      }
+      const valid = parsed.filter((m) => isMessage(m, persona));
+      if (valid.length < parsed.length) {
+        console.error(`[history] ${key}: ตัดข้อความที่เสียทิ้ง ${parsed.length - valid.length} รายการ`);
+      }
+      histories[persona] = valid;
     }
     return { ok: true, histories };
   },

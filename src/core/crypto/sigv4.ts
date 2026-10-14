@@ -23,7 +23,8 @@ const utf8 = (s: string) => new TextEncoder().encode(s);
  */
 const at = (arr: Uint32Array | Uint8Array, i: number): number => arr[i] ?? 0;
 
-function sha256(data: Uint8Array): Uint8Array {
+/** SHA-256 digest (exported for the known-answer tests; signV4 is the public API). */
+export function sha256(data: Uint8Array): Uint8Array {
   const len = data.length;
   const padded = new Uint8Array(((len + 9 + 63) >> 6) << 6);
   padded.set(data);
@@ -78,7 +79,8 @@ function sha256(data: Uint8Array): Uint8Array {
   return out;
 }
 
-function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
+/** HMAC-SHA256 per RFC 2104: keys longer than the 64-byte block are hashed first (exported for tests). */
+export function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
   const block = new Uint8Array(64);
   block.set(key.length > 64 ? sha256(key) : key);
   const inner = new Uint8Array(64 + data.length);

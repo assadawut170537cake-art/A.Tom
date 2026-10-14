@@ -1,10 +1,11 @@
-import { ProviderError, toProviderError } from '../../../core/http/errors';
+import { ProviderError, commonKind, toProviderError } from '../../../core/http/errors';
 import {
   ProviderSettings,
   type PersonaVoice,
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import type { Persona } from '../../jarvis/types';
+import { ensureMicPermission } from './permissions';
 import { voiceRegistry, type VoiceRegistry } from './VoiceRegistry';
 import type { SpeakOptions, STTProvider, TTSProvider, TTSProviderId } from './types';
 
@@ -55,6 +56,11 @@ export class VoiceOrchestrator {
     this.speaking = null;
   }
 
+  /** Call before recording: rejects with a Thai `permission` error when the mic is denied. */
+  requestMicrophone(): Promise<void> {
+    return ensureMicPermission();
+  }
+
   /** Transcribes a recorded audio file (record with expo-audio, then pass recorder.uri). */
   async listen(audioUri: string): Promise<string> {
     const preferred = await this.settings.getSTT();
@@ -87,17 +93,21 @@ export class VoiceOrchestrator {
     if (!chain.length) {
       throw new ProviderError('voice', 'unsupported', 'ไม่มีผู้ให้บริการเสียงที่เปิดใช้งาน');
     }
-    const failures: string[] = [];
+    const failures: ProviderError[] = [];
     for (const provider of chain) {
       try {
         return await run(provider);
       } catch (e) {
         const err = toProviderError(provider.id, e);
         if (!err.shouldFallback) throw err;
-        failures.push(err.message);
+        failures.push(err);
       }
     }
-    throw new ProviderError('voice', 'server', `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.join('\n')}`);
+    throw new ProviderError(
+      'voice',
+      commonKind(failures),
+      `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
+    );
   }
 }
 

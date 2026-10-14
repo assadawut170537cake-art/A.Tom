@@ -43,6 +43,14 @@ jest.mock('expo-audio', () => ({
     pause: jest.fn(),
     remove: jest.fn(),
   })),
+  getRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+  requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+}));
+
+const ONLINE = { type: 'WIFI', isConnected: true, isInternetReachable: true };
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(async () => ONLINE),
+  useNetworkState: jest.fn(() => ONLINE),
 }));
 
 // Mirrors the real expo-file-system File (which implements Blob) closely enough for uploads

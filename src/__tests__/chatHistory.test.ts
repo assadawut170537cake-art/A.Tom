@@ -242,6 +242,8 @@ describe('Persistence: chat history (save / load)', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
     useAtomStore.setState({ historyLoaded: true, historyPersisted: true });
+    // Corrupt/failed-storage cases log by design (asserted in storage.test.ts); keep output clean
+    jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   test('saves after every message, one key per persona', async () => {

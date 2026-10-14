@@ -1,4 +1,10 @@
-import { ProviderError, toProviderError, type ProviderErrorKind } from '../../../core/http/errors';
+import {
+  ProviderError,
+  commonKind,
+  toProviderError,
+  userAdvice,
+  type ProviderErrorKind,
+} from '../../../core/http/errors';
 import { sleep } from '../../../core/http/request';
 import {
   ProviderSettings,
@@ -22,10 +28,14 @@ interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
  * Routes chat requests across LLM providers in priority order:
  * last successful provider → user priority (ProviderSettings) → registration order.
  * Falls back on 401/403/429/5xx/timeout/network/missing key; other errors (e.g. 400) are thrown.
+ * 401/403 are never retried; when a later provider answers, the rejected key is kept for
+ * takeNotices() so the user still learns it needs fixing.
  * Advanced settings: timeoutMs per request, retries on the same provider, fallback on/off.
  */
 export class Orchestrator {
   private lastGood: AIProviderId | null = null;
+  /** Rejected keys (401/403) that fallback hid behind a successful reply; see takeNotices(). */
+  private readonly notices = new Set<string>();
 
   constructor(
     private readonly registry: ProviderRegistry = aiRegistry,
@@ -40,7 +50,7 @@ export class Orchestrator {
     }
 
     const { timeoutMs, retries, fallback } = await this.settings.getAdvanced();
-    const failures: string[] = [];
+    const failures: ProviderError[] = [];
     for (const provider of fallback ? chain : chain.slice(0, 1)) {
       const id = provider.config.id;
       const model =
@@ -51,6 +61,7 @@ export class Orchestrator {
         try {
           const res = await provider.chat({ timeoutMs, ...rest, model });
           this.lastGood = id;
+          this.rememberAuthFailures(failures);
           return res;
         } catch (e) {
           const err = toProviderError(id, e);
@@ -60,16 +71,32 @@ export class Orchestrator {
             continue;
           }
           if (this.lastGood === id) this.lastGood = null;
-          failures.push(err.message);
+          failures.push(err);
           break;
         }
       }
     }
     throw new ProviderError(
       'orchestrator',
-      'server',
-      `ผู้ให้บริการทุกรายล้มเหลว:\n${failures.join('\n')}`
+      commonKind(failures),
+      `ผู้ให้บริการทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
     );
+  }
+
+  /**
+   * Warnings about keys that were rejected while another provider answered, collected across every
+   * call (chat and intent classification alike) since the last take. Returned once, then cleared.
+   */
+  takeNotices(): string[] {
+    const list = [...this.notices];
+    this.notices.clear();
+    return list;
+  }
+
+  private rememberAuthFailures(failures: ProviderError[]): void {
+    for (const f of failures) {
+      if (f.kind === 'auth') this.notices.add(`${f.message} — ${userAdvice('auth')}`);
+    }
   }
 
   /** First provider that would be tried right now, or undefined if none is enabled. */

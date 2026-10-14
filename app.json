@@ -24,7 +24,7 @@
     "backgroundColor": "#05060a",
     "plugins": [
       "expo-secure-store",
-      "expo-audio",
+      ["expo-audio", { "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง" }],
       "expo-asset"
     ]
   }

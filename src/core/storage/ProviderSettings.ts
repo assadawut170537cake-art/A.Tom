@@ -143,11 +143,16 @@ const FIELD_GUARDS: { [K in keyof StoredSettings]: Guard<StoredSettings[K]> } = 
 /** Keep every stored field that has the right shape; drop the rest (defaults fill the gaps). */
 function validFields(stored: Record<string, unknown>): Partial<SettingsData> {
   const out: Partial<StoredSettings> = {};
+  const dropped: string[] = [];
   const keep = <K extends keyof StoredSettings>(key: K) => {
     const value = stored[key];
     if (FIELD_GUARDS[key](value)) out[key] = value;
+    else if (value !== undefined) dropped.push(key);
   };
   keysOf(FIELD_GUARDS).forEach(keep);
+  if (dropped.length) {
+    console.error(`[settings] ข้อมูลตั้งค่าเสีย ตัดทิ้งแล้วใช้ค่าเริ่มต้นแทน: ${dropped.join(', ')}`);
+  }
   // The single trust boundary: stored provider ids are plain strings that this module wrote from
   // the id unions. They are only ever looked up by known ids, so an unknown id is inert.
   return out as Partial<SettingsData>;
@@ -155,6 +160,8 @@ function validFields(stored: Record<string, unknown>): Partial<SettingsData> {
 
 let cache: SettingsData | null = null;
 let writeChain: Promise<void> = Promise.resolve();
+/** False after a storage read/write failed: settings still work, but only in memory. */
+let persistent = true;
 
 async function load(): Promise<SettingsData> {
   if (cache) return cache;
@@ -169,23 +176,40 @@ async function load(): Promise<SettingsData> {
       voiceEnabled: { ...base.voiceEnabled, ...saved.voiceEnabled },
       voicePriority: { ...base.voicePriority, ...saved.voicePriority },
     };
-  } catch {
+  } catch (e) {
+    console.error('[settings] อ่านการตั้งค่าไม่ได้ — ใช้ค่าเริ่มต้นในหน่วยความจำแทน', e);
+    persistent = false;
     cache = empty();
   }
   return cache;
 }
 
-/** Serialised read-modify-write so concurrent setters never drop each other's changes. */
+/**
+ * Serialised read-modify-write so concurrent setters never drop each other's changes.
+ * The in-memory copy is always updated; a failed write only clears `persistent` (never rejects),
+ * so one storage error can't break the chain for every later setter or crash the settings UI.
+ */
 function update(mutate: (data: SettingsData) => void): Promise<void> {
   writeChain = writeChain.then(async () => {
     const data = await load();
     mutate(data);
-    await writeJSON(STORAGE_KEY, data);
+    try {
+      await writeJSON(STORAGE_KEY, data);
+      persistent = true;
+    } catch (e) {
+      console.error('[settings] บันทึกการตั้งค่าไม่ได้ — เก็บไว้ในหน่วยความจำชั่วคราว', e);
+      persistent = false;
+    }
   });
   return writeChain;
 }
 
 export const ProviderSettings = {
+  /** False while settings are memory-only (storage failed); they will be lost on restart. */
+  isPersistent(): boolean {
+    return persistent;
+  },
+
   /** undefined = user never toggled it; callers fall back to the provider config default. */
   async getEnabled(providerId: AIProviderId): Promise<boolean | undefined> {
     return (await load()).enabled[providerId];

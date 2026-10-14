@@ -7,6 +7,7 @@ import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ChatLayer } from '../components/chat/ChatLayer';
 import { BackgroundGradient } from '../components/layout/BackgroundGradient';
 import { Header } from '../components/layout/Header';
+import { OfflineBanner } from '../components/layout/OfflineBanner';
 import { TopSlot } from '../components/layout/TopSlot';
 import { ActionBar } from '../components/navigation/ActionBar';
 import { BottomTabs } from '../components/navigation/BottomTabs';
@@ -116,6 +117,7 @@ export function MainScreen() {
       <BackgroundGradient />
       <View style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}>
         <Header onSettings={() => navigation.navigate('Settings')} />
+        <OfflineBanner />
         {activeTab === 'atom' && <AtomTab />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
         {activeTab === 'memory' && <ComingSoon label="Memory" />}

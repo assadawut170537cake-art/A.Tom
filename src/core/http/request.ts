@@ -1,5 +1,5 @@
 import { isRecord, parseJSON } from '../types/guards';
-import { ProviderError, describeKind, kindForStatus } from './errors';
+import { ProviderError, describeKind, kindForStatus, redactSecrets } from './errors';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -27,7 +27,8 @@ export async function request(
     if (controller.signal.aborted) {
       throw new ProviderError(providerId, 'timeout', `หมดเวลา (${timeoutMs / 1000}s)`);
     }
-    throw new ProviderError(providerId, 'network', e instanceof Error ? e.message : String(e));
+    const reason = e instanceof Error ? e.message : String(e);
+    throw new ProviderError(providerId, 'network', `เชื่อมต่อเครือข่ายไม่ได้ (${redactSecrets(reason)})`);
   } finally {
     clearTimeout(timer);
   }
@@ -72,7 +73,11 @@ export async function requestBytes(
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Pulls a human-readable message out of the common error body shapes. */
+/**
+ * Pulls a human-readable message out of the common error body shapes. The detail ends up in
+ * ChatHistoryStorage via the conversation's error message, so echoed API keys are redacted
+ * (before truncating, so a key cut at the limit can't leak a prefix).
+ */
 async function readErrorDetail(res: Response): Promise<{ detail: string; raw: string }> {
   let raw = '';
   try {
@@ -88,7 +93,7 @@ async function readErrorDetail(res: Response): Promise<{ detail: string; raw: st
       messageOf(body.detail) ??
       messageOf(body.message) ??
       messageOf(body.title));
-  return { detail: (msg || raw).slice(0, 200), raw };
+  return { detail: redactSecrets(msg || raw).slice(0, 200), raw };
 }
 
 function messageOf(value: unknown): string | undefined {

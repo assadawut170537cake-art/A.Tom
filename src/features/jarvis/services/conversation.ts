@@ -1,4 +1,6 @@
-import { toProviderError } from '../../../core/http/errors';
+import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
+import { isOffline } from '../../../core/network/connectivity';
+import { aiOrchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { IntentRouter } from '../../router/core/IntentRouter';
 import type { RouterOutput } from '../../router/core/types';
@@ -48,6 +50,10 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     });
     // A switch moves the reply (the new persona's greeting) into the new persona's history
     useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    // Keys rejected along the way (e.g. Gemini 401 while OpenRouter answered) still need fixing
+    for (const notice of aiOrchestrator.takeNotices()) {
+      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${redactSecrets(notice)}`, persona: result.persona });
+    }
 
     if (opts.speak !== false && result.reply) {
       if (isLatest()) useAtomStore.getState().setMood('speaking');
@@ -57,8 +63,13 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     }
     return { route, reply: result.reply };
   } catch (e) {
-    const error = toProviderError('conversation', e).message;
-    useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${error}`, persona });
+    aiOrchestrator.takeNotices(); // already listed in the aggregated error below
+    const err = toProviderError('conversation', e);
+    const error = redactSecrets(err.message);
+    // A dead connection shows up as network errors or timeouts; say "offline" rather than blame providers
+    const offline = err.kind === 'network' || (await isOffline());
+    const advice = userAdvice(offline ? 'network' : err.kind);
+    useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${advice}\n${error}`, persona });
     return { route: null, reply: '', error };
   } finally {
     // An older turn finishing must not reset the mood of a newer one still in flight
