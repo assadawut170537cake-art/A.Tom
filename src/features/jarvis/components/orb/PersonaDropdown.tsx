@@ -30,7 +30,6 @@ export function PersonaDropdown() {
       >
         <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: active.color }} />
         <Text className="text-[15px] font-semibold text-white">{active.name}</Text>
-        <Text className="text-xs font-medium tracking-widest text-white/40">{active.nameEn}</Text>
         <View style={{ transform: [{ rotate: dropdownOpen ? '180deg' : '0deg' }] }}>
           <ChevronDown size={16} color="rgba(255,255,255,0.7)" />
         </View>
