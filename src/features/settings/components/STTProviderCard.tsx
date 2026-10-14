@@ -5,6 +5,7 @@ import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { STTProvider, STTProviderId } from '../../voice/core/types';
 import type { VoiceProviderMeta } from '../../voice/voice.config';
 import { whileMounted } from '../utils';
+import { keyUrlFor } from '../constants/providerLinks';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ProviderToggle } from './ProviderToggle';
 import { TestConnectionButton } from './TestConnectionButton';
@@ -38,7 +39,9 @@ export function STTProviderCard({ provider, meta }: STTProviderCardProps) {
         value={enabled}
         onChange={toggle}
       />
-      {meta.requiresKey && <ApiKeyInput storageKey={secretKey('stt', provider.id)} />}
+      {meta.requiresKey && (
+        <ApiKeyInput storageKey={secretKey('stt', provider.id)} keyUrl={keyUrlFor('stt', provider.id)} />
+      )}
       <VoiceExtraFields kind="stt" id={provider.id} />
       <TestConnectionButton test={() => provider.testConnection()} />
     </Card>

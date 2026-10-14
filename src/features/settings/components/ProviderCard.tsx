@@ -4,6 +4,7 @@ import { ProviderSettings } from '../../../core/storage/ProviderSettings';
 import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { AIProvider } from '../../ai/core/types';
 import { whileMounted } from '../utils';
+import { keyUrlFor } from '../constants/providerLinks';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ModelSelector, type SelectOption } from './ModelSelector';
 import { ProviderToggle } from './ProviderToggle';
@@ -63,7 +64,7 @@ export function ProviderCard({ provider, subtitle }: ProviderCardProps) {
   return (
     <Card>
       <ProviderToggle label={config.name} subtitle={subtitle} value={enabled} onChange={toggle} />
-      <ApiKeyInput storageKey={secretKey('ai', config.id)} />
+      <ApiKeyInput storageKey={secretKey('ai', config.id)} keyUrl={keyUrlFor('ai', config.id)} />
       <ModelSelector
         label="โมเดล"
         value={model}

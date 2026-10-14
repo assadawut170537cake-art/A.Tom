@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, Text, TextInput, View } from 'react-native';
 
 import { SecureKeyStore } from '../../../core/storage/SecureKeyStore';
 import { whileMounted } from '../utils';
@@ -10,11 +10,21 @@ interface ApiKeyInputProps {
   storageKey: string;
   label?: string;
   placeholder?: string | undefined;
+  /** หน้าเว็บสำหรับสร้าง key — มีค่าเมื่อไหร่จะแสดงลิงก์ "🔗 สร้าง API Key" ใต้ช่อง */
+  keyUrl?: string | undefined;
   onChange?: (hasKey: boolean) => void;
 }
 
+/** ชื่อเว็บสำหรับ accessibility hint (ไม่ใช้ `new URL().host` เพราะ URL ของ RN ไม่ได้ implement ทุก getter) */
+const hostOf = (url: string) => /^https?:\/\/([^/?#]+)/i.exec(url)?.[1] ?? url;
+
+function openKeyPage(url: string) {
+  // เปิดไม่ได้ (เช่น ไม่มีเบราว์เซอร์) ต้องไม่ทำให้หน้าตั้งค่าพัง
+  Linking.openURL(url).catch((e: unknown) => console.error('[settings] เปิดลิงก์สร้าง API key ไม่ได้', e));
+}
+
 /** Write-only secret field: the saved value is never read back into the UI, only its presence. */
-export function ApiKeyInput({ storageKey, label = 'API key', placeholder, onChange }: ApiKeyInputProps) {
+export function ApiKeyInput({ storageKey, label = 'API key', placeholder, keyUrl, onChange }: ApiKeyInputProps) {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -68,6 +78,18 @@ export function ApiKeyInput({ storageKey, label = 'API key', placeholder, onChan
           <SmallButton label="บันทึก" tone="primary" disabled={!draft.trim()} onPress={save} />
           {editing && <SmallButton label="ยกเลิก" onPress={() => setEditing(false)} />}
         </View>
+      )}
+      {keyUrl && (
+        <Pressable
+          onPress={() => openKeyPage(keyUrl)}
+          accessibilityRole="link"
+          accessibilityLabel="สร้าง API Key"
+          accessibilityHint={`เปิด ${hostOf(keyUrl)} ในเบราว์เซอร์`}
+          hitSlop={8}
+          className="mt-1.5 self-start"
+        >
+          <Text className="text-xs text-white/50 underline">🔗 สร้าง API Key</Text>
+        </Pressable>
       )}
     </View>
   );

@@ -6,6 +6,7 @@ import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { TTSProvider, TTSProviderId, Voice } from '../../voice/core/types';
 import type { VoiceProviderMeta } from '../../voice/voice.config';
 import { whileMounted } from '../utils';
+import { keyUrlFor } from '../constants/providerLinks';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ModelSelector } from './ModelSelector';
 import { ProviderToggle } from './ProviderToggle';
@@ -77,7 +78,11 @@ export function TTSProviderCard({ provider, meta }: TTSProviderCardProps) {
         onChange={toggle}
       />
       {meta.requiresKey && (
-        <ApiKeyInput storageKey={secretKey('tts', provider.id)} placeholder={meta.keyPlaceholder} />
+        <ApiKeyInput
+          storageKey={secretKey('tts', provider.id)}
+          placeholder={meta.keyPlaceholder}
+          keyUrl={keyUrlFor('tts', provider.id)}
+        />
       )}
       <VoiceExtraFields kind="tts" id={provider.id} />
       <ModelSelector
