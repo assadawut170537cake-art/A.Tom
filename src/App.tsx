@@ -14,9 +14,12 @@ import { RootNavigator } from './navigation/RootNavigator';
 registerAIProviders();
 registerVoiceProviders();
 
-const allHydrated = () => useAtomStore.persist.hasHydrated() && useTabsStore.persist.hasHydrated();
+const allHydrated = () =>
+  useAtomStore.persist.hasHydrated() &&
+  useTabsStore.persist.hasHydrated() &&
+  useAtomStore.getState().historyLoaded;
 
-/** Wait for persisted persona / uiMode / tab so the first frame is already correct. */
+/** Wait for persisted persona / uiMode / tab / chat history so the first frame is already correct. */
 function useStoresHydrated() {
   const [hydrated, setHydrated] = useState(allHydrated);
 
@@ -24,10 +27,15 @@ function useStoresHydrated() {
     const check = () => setHydrated(allHydrated());
     const unsubAtom = useAtomStore.persist.onFinishHydration(check);
     const unsubTabs = useTabsStore.persist.onFinishHydration(check);
+    const unsubHistory = useAtomStore.subscribe((s, prev) => {
+      if (s.historyLoaded !== prev.historyLoaded) check();
+    });
+    void useAtomStore.getState().loadHistory();
     check();
     return () => {
       unsubAtom();
       unsubTabs();
+      unsubHistory();
     };
   }, []);
 

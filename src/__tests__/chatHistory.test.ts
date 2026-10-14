@@ -1,12 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
 
+import {
+  ChatHistoryStorage,
+  MAX_STORED_MESSAGES,
+  historyKey,
+} from '../core/storage/ChatHistoryStorage';
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { PERSONA_PROMPTS } from '../features/ai/prompts/personaPrompts';
 import { PERSONA_GREETINGS } from '../features/jarvis/constants';
 import { sendMessage } from '../features/jarvis/services/conversation';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
-import type { Persona } from '../features/jarvis/types';
+import type { Message, Persona } from '../features/jarvis/types';
 import {
   GEMINI,
   JEV,
@@ -200,18 +205,158 @@ describe('Conversation: history goes to the right persona', () => {
   });
 });
 
-describe('Persistence (save / load)', () => {
-  test('saved: active persona + UI mode; chat history is in-memory only (current design)', async () => {
-    useAtomStore.getState().setActivePersona(3);
-    useAtomStore.getState().pushMessage({ role: 'user', content: 'ข้อความลับ' });
-    useAtomStore.getState().setUIMode('conversation');
+describe('Persistence: chat history (save / load)', () => {
+  const stored = async (p: Persona) =>
+    JSON.parse((await AsyncStorage.getItem(historyKey(p))) ?? 'null') as Message[] | null;
+  const flush = () => new Promise((r) => setTimeout(r, 0));
 
-    await new Promise((r) => setTimeout(r, 0));
-    const saved = JSON.parse((await AsyncStorage.getItem(STORE_KEY)) ?? '{}');
-    expect(saved.state).toEqual({ activePersona: 3, uiMode: 'conversation' });
-    expect(JSON.stringify(saved)).not.toContain('ข้อความลับ');
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    useAtomStore.setState({ historyLoaded: true, historyPersisted: true });
   });
 
+  test('saves after every message, one key per persona', async () => {
+    const s = useAtomStore.getState();
+    s.pushMessage({ role: 'user', content: 'a1' });
+    s.pushMessage({ role: 'assistant', content: 'a2' });
+    s.pushMessage({ role: 'user', content: 'u1', persona: 4 });
+    await flush();
+
+    expect((await stored(1))?.map((m) => m.content)).toEqual(['a1', 'a2']);
+    expect((await stored(4))?.map((m) => m.content)).toEqual(['u1']);
+    expect(await stored(2)).toBeNull(); // untouched personas are not written
+    expect((await stored(1))?.[0]).toMatchObject({ persona: 1, role: 'user', id: expect.any(String) });
+  });
+
+  test('rapid writes land in order (last write has every message)', async () => {
+    for (let i = 0; i < 30; i++) useAtomStore.getState().pushMessage({ role: 'user', content: `m${i}` });
+    await flush();
+    expect((await stored(1))?.map((m) => m.content)).toEqual(Array.from({ length: 30 }, (_, i) => `m${i}`));
+  });
+
+  test('a full conversation turn (user + reply) is persisted for that persona', async () => {
+    mockChatGemini();
+    useAtomStore.getState().setActivePersona(2);
+    await sendMessage('จำฉันได้ไหม', { speak: false });
+    await flush();
+    expect((await stored(2))?.map((m) => [m.role, m.content])).toEqual([
+      ['user', 'จำฉันได้ไหม'],
+      ['assistant', 'reply 1'],
+    ]);
+  });
+
+  test('loads saved histories on app start', async () => {
+    const msg = (persona: Persona, content: string, role = 'user') => ({
+      id: `${persona}-${content}`, persona, role, content, createdAt: 1,
+    });
+    await AsyncStorage.setItem(historyKey(1), JSON.stringify([msg(1, 'old atom'), msg(1, 'reply', 'assistant')]));
+    await AsyncStorage.setItem(historyKey(3), JSON.stringify([msg(3, 'old friday')]));
+    useAtomStore.setState({ historyLoaded: false, messagesByPersona: { 1: [], 2: [], 3: [], 4: [] } });
+
+    await useAtomStore.getState().loadHistory();
+
+    expect(roles(1)).toEqual([['user', 'old atom'], ['assistant', 'reply']]);
+    expect(roles(3)).toEqual([['user', 'old friday']]);
+    expect(history(2)).toEqual([]);
+    expect(useAtomStore.getState()).toMatchObject({ historyLoaded: true, historyPersisted: true });
+  });
+
+  test('messages pushed before loading finished are kept, merged after saved ones and saved', async () => {
+    await AsyncStorage.setItem(
+      historyKey(1),
+      JSON.stringify([{ id: 'old', persona: 1, role: 'user', content: 'saved', createdAt: 1 }])
+    );
+    useAtomStore.setState({ historyLoaded: false, messagesByPersona: { 1: [], 2: [], 3: [], 4: [] } });
+    useAtomStore.getState().pushMessage({ role: 'user', content: 'early' });
+    await flush();
+    // not written yet: would have overwritten the saved history
+    expect((await stored(1))?.map((m) => m.content)).toEqual(['saved']);
+
+    await useAtomStore.getState().loadHistory();
+    await flush();
+    expect(roles(1).map(([, c]) => c)).toEqual(['saved', 'early']);
+    expect((await stored(1))?.map((m) => m.content)).toEqual(['saved', 'early']);
+
+    // loading twice does not duplicate anything
+    await useAtomStore.getState().loadHistory();
+    expect(roles(1).map(([, c]) => c)).toEqual(['saved', 'early']);
+  });
+
+  test('corrupt / invalid / foreign entries are dropped on load', async () => {
+    await AsyncStorage.setItem(historyKey(1), '{not json');
+    await AsyncStorage.setItem(
+      historyKey(2),
+      JSON.stringify([
+        { id: 'ok', persona: 2, role: 'assistant', content: 'valid', createdAt: 1 },
+        { id: 'x', persona: 3, role: 'user', content: 'wrong persona', createdAt: 1 },
+        { id: 'y', persona: 2, role: 'robot', content: 'bad role', createdAt: 1 },
+        { persona: 2, role: 'user', content: 'no id', createdAt: 1 },
+        null,
+      ])
+    );
+    await AsyncStorage.setItem(historyKey(4), JSON.stringify({ not: 'an array' }));
+    useAtomStore.setState({ historyLoaded: false, messagesByPersona: { 1: [], 2: [], 3: [], 4: [] } });
+
+    await useAtomStore.getState().loadHistory();
+
+    expect(history(1)).toEqual([]);
+    expect(roles(2)).toEqual([['assistant', 'valid']]);
+    expect(history(4)).toEqual([]);
+    expect(useAtomStore.getState().historyPersisted).toBe(true);
+  });
+
+  test('storage read error → app keeps working in memory', async () => {
+    jest.mocked(AsyncStorage.multiGet).mockRejectedValueOnce(new Error('disk I/O'));
+    useAtomStore.setState({ historyLoaded: false });
+
+    await useAtomStore.getState().loadHistory();
+
+    expect(useAtomStore.getState()).toMatchObject({ historyLoaded: true, historyPersisted: false });
+    useAtomStore.getState().pushMessage({ role: 'user', content: 'still works' });
+    expect(roles(1)).toEqual([['user', 'still works']]);
+  });
+
+  test('storage write error → message stays in memory, store flags memory-only', async () => {
+    // Fail only history writes (zustand's own 'atom-store' write must keep working). setItem is
+    // already a jest.fn in the AsyncStorage mock, so restore its implementation explicitly.
+    const setItem = jest.mocked(AsyncStorage.setItem);
+    const original = setItem.getMockImplementation()!;
+    setItem.mockImplementation((key, value) =>
+      key.startsWith('atom.history.') ? Promise.reject(new Error('quota exceeded')) : original(key, value)
+    );
+    try {
+      useAtomStore.getState().pushMessage({ role: 'user', content: 'not saved' });
+      await flush();
+      await flush();
+      expect(roles(1)).toEqual([['user', 'not saved']]);
+      expect(useAtomStore.getState().historyPersisted).toBe(false);
+    } finally {
+      setItem.mockImplementation(original);
+    }
+  });
+
+  test(`only the newest ${MAX_STORED_MESSAGES} messages per persona are stored`, async () => {
+    const many = Array.from({ length: MAX_STORED_MESSAGES + 20 }, (_, i) => ({
+      id: `m${i}`, persona: 1 as const, role: 'user' as const, content: `m${i}`, createdAt: i,
+    }));
+    await expect(ChatHistoryStorage.save(1, many)).resolves.toBe(true);
+    const saved = await stored(1);
+    expect(saved).toHaveLength(MAX_STORED_MESSAGES);
+    expect(saved?.[0].content).toBe('m20');
+  });
+
+  test('persona/UI-mode store key stays separate from history keys', async () => {
+    useAtomStore.getState().setActivePersona(3);
+    useAtomStore.getState().pushMessage({ role: 'user', content: 'ข้อความ' });
+    useAtomStore.getState().setUIMode('conversation');
+    await flush();
+    const saved = JSON.parse((await AsyncStorage.getItem(STORE_KEY)) ?? '{}');
+    expect(saved.state).toEqual({ activePersona: 3, uiMode: 'conversation' });
+    expect((await stored(3))?.map((m) => m.content)).toEqual(['ข้อความ']);
+  });
+});
+
+describe('Persistence: persona + mode rehydration', () => {
   test('load: rehydration restores persona + mode and re-derives prompt and voice', async () => {
     await ProviderSettings.setTTSFor(4, { providerId: 'expo', voiceId: 'ultron-voice' });
     await AsyncStorage.setItem(
@@ -228,7 +373,7 @@ describe('Persistence (save / load)', () => {
     await waitForVoice('ultron-voice');
   });
 
-  test('load keeps the in-memory histories of every persona', async () => {
+  test('rehydrating persona/mode does not touch in-memory histories', async () => {
     useAtomStore.getState().pushMessage({ role: 'user', content: 'still here', persona: 2 });
     await AsyncStorage.setItem(STORE_KEY, JSON.stringify({ state: { activePersona: 1, uiMode: 'idle' }, version: 1 }));
     await useAtomStore.persist.rehydrate();

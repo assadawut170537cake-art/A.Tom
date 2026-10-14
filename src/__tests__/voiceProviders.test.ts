@@ -4,6 +4,7 @@ import * as Speech from 'expo-speech';
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
 import { voiceRegistry } from '../features/voice/core/VoiceRegistry';
+import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import type { STTProviderId, TTSProviderId } from '../features/voice/core/types';
 import { STT_PROVIDERS, TTS_PROVIDERS, VOICE_PROVIDER_FIELDS } from '../features/voice/voice.config';
 import { bytes, httpError, json, mockFetch, type RecordedCall, type Route } from '../test-utils/mockFetch';
@@ -319,11 +320,7 @@ describe('TTS specifics', () => {
     expect(pause).toHaveBeenCalled();
   });
 
-  // KNOWN BUG (BaseCloudTTS.speak): when player.play() throws, `this.finish()` resolves the promise
-  // before `reject(...)` runs, so the error is swallowed and VoiceOrchestrator never falls back.
-  // test.failing keeps the suite green and will start failing once the bug is fixed — then
-  // switch it back to test().
-  test.failing('playback failure → unsupported (so the orchestrator can fall back)', async () => {
+  test('playback failure → unsupported (so the orchestrator can fall back)', async () => {
     await configure('tts', 'openai');
     mockFetch([[/openai/, () => bytes()]]);
     jest.mocked(createAudioPlayer).mockImplementation(
@@ -337,7 +334,33 @@ describe('TTS specifics', () => {
           remove: jest.fn(),
         }) as never
     );
-    await expect(tts('openai').speak('x')).rejects.toMatchObject({ kind: 'unsupported' });
+    const err = await tts('openai').speak('x').catch((e) => e);
+    expect(err).toMatchObject({ kind: 'unsupported', shouldFallback: true });
+    expect(err.message).toContain('no audio device');
+  });
+
+  test('playback failure → VoiceOrchestrator falls back to the next voice (Expo Speech)', async () => {
+    await configure('tts', 'openai');
+    await ProviderSettings.setTTSFor(2, { providerId: 'openai', voiceId: 'nova' });
+    const { calls } = mockFetch([[/openai/, () => bytes()]]);
+    const remove = jest.fn();
+    jest.mocked(createAudioPlayer).mockImplementation(
+      () =>
+        ({
+          addListener: () => ({ remove }),
+          play: () => {
+            throw new Error('no audio device');
+          },
+          pause: jest.fn(),
+          remove,
+        }) as never
+    );
+
+    await voiceOrchestrator.speak('สวัสดีครับ', 2);
+
+    expect(calls[0].url.pathname).toBe('/v1/audio/speech'); // OpenAI synthesized…
+    expect(remove).toHaveBeenCalledTimes(2); // …its player and listener were released…
+    expect(Speech.speak).toHaveBeenCalledWith('สวัสดีครับ', expect.objectContaining({ language: 'th-TH' })); // …then Expo spoke
   });
 
   test('Expo Speech: Thai, voice/rate/pitch, voices from the device, errors surface', async () => {

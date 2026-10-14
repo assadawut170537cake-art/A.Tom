@@ -68,7 +68,7 @@ export abstract class BaseCloudTTS implements TTSProvider {
     await new Promise<void>((resolve, reject) => {
       const player = createAudioPlayer(file.uri);
       this.player = player;
-      this.finish = () => {
+      const cleanup = () => {
         sub.remove();
         player.remove();
         if (this.player === player) this.player = null;
@@ -78,6 +78,9 @@ export abstract class BaseCloudTTS implements TTSProvider {
         } catch {
           // cache cleanup is best-effort
         }
+      };
+      this.finish = () => {
+        cleanup();
         resolve();
       };
       const sub = player.addListener('playbackStatusUpdate', (status) => {
@@ -86,7 +89,8 @@ export abstract class BaseCloudTTS implements TTSProvider {
       try {
         player.play();
       } catch (e) {
-        this.finish();
+        // Clean up without resolving, so the error reaches VoiceOrchestrator and it falls back
+        cleanup();
         reject(new ProviderError(this.id, 'unsupported', `เล่นเสียงไม่ได้: ${String(e)}`));
       }
     });
