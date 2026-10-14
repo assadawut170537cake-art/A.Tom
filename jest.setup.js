@@ -45,15 +45,24 @@ jest.mock('expo-audio', () => ({
   })),
 }));
 
-jest.mock('expo-file-system', () => ({
-  Paths: { cache: { uri: 'file:///cache' } },
-  File: class {
+// Mirrors the real expo-file-system File (which implements Blob) closely enough for uploads
+jest.mock('expo-file-system', () => {
+  const AUDIO = new Uint8Array([82, 73, 70, 70]);
+  class File extends Blob {
     constructor(...parts) {
+      super([AUDIO]);
       this.uri = parts.map((p) => p.uri ?? p).join('/');
       this.name = this.uri.split('/').pop();
-      this.exists = true;
+      this.exists = !this.uri.includes('missing');
     }
     write() {}
     delete() {}
-  },
-}));
+    async bytes() {
+      return AUDIO;
+    }
+    async base64() {
+      return 'UklGRg==';
+    }
+  }
+  return { Paths: { cache: { uri: 'file:///cache' } }, File };
+});

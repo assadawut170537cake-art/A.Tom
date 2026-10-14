@@ -45,7 +45,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "private": true,
   "jest": {
@@ -58,6 +59,24 @@
     ],
     "moduleNameMapper": {
       "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
+    },
+    "collectCoverageFrom": [
+      "src/core/**/*.ts",
+      "src/features/ai/**/*.ts",
+      "src/features/voice/**/*.ts",
+      "src/features/router/**/*.ts",
+      "src/features/jarvis/stores/useAtomStore.ts",
+      "src/features/jarvis/services/**/*.ts",
+      "src/features/settings/**/*.tsx",
+      "!src/**/types.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 70,
+        "branches": 70,
+        "functions": 70,
+        "lines": 70
+      }
     }
   }
 }
