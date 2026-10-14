@@ -1,4 +1,6 @@
-# Architecture Decision Records — Phase 3
+# Architecture Decision Records
+
+ADR-001 – 010: การตัดสินใจที่ **lock** ไว้ใน Phase 3 · ADR-011 ขึ้นไป: Phase 4
 
 10 การตัดสินใจที่ **lock** ไว้ใน Phase 3 แต่ละข้อเขียนในรูปแบบ ADR:
 **Decision** · **Status** · **Context** · **Rationale** · **Consequences**
@@ -23,6 +25,7 @@
 | [008](#adr-008--expo-speech-เป็น-tts-สำรองสุดท้ายเสมอ) | Expo Speech เป็น TTS สำรองสุดท้ายเสมอ | ✅ Accepted | `VoiceOrchestrator.ts` |
 | [009](#adr-009--navigation-ใช้-react-navigationnative-stack) | Navigation ใช้ `@react-navigation/native-stack` | ✅ Accepted | `navigation/*` |
 | [010](#adr-010--ใช้-expo-audio-แทน-expo-av) | ใช้ expo-audio แทน expo-av | ✅ Accepted | `TTSInterface.ts` |
+| [011](#adr-011--phase-4-shared-memory--module-system) | Phase 4: Shared Memory + Module System | 🧱 Accepted (scaffold) | `core/memory/*`, `core/modules/*` |
 
 ---
 
@@ -143,3 +146,15 @@
 | **Context** | spec Phase 3 ให้ติดตั้ง `expo-av` แต่ expo-av ถูกถอดออกจาก Expo SDK 57 แล้ว |
 | **Rationale** | • expo-audio เป็นตัวแทนอย่างเป็นทางการ (ต้องมี `expo-asset` เป็น peer)<br>• API ใหม่ของ expo-file-system (`File` implements `Blob`) ใช้อัปโหลดไฟล์เสียงให้ STT ผ่าน `FormData` ได้ตรง ๆ |
 | **Consequences** | ➕ ตรงกับ SDK ปัจจุบัน และได้ config plugin สำหรับข้อความขอสิทธิ์ไมค์ (`app.json`)<br>➖ ตัวอย่างโค้ดเก่าที่ใช้ `Audio.Sound` ของ expo-av ใช้ไม่ได้<br>➖ เปลี่ยนข้อความขอสิทธิ์ต้อง build native ใหม่ |
+
+---
+
+## ADR-011 — Phase 4: Shared Memory + Module System
+
+| | |
+|---|---|
+| **Decision** | วางราก Phase 4 ด้วยโครงสองชิ้นใน `src/core/`:<br>**1. Shared Memory** — interface `MemoryStore` (save / load / list / remove / clear / sync) เก็บ `MemoryFact` แบบ key → value แยก scope `global` กับ `persona` · `LocalMemoryAdapter` (AsyncStorage, key `atom.memory.v1.<global\|persona.N>.<key>`) **ใช้งานได้แล้ว** · `RemoteMemoryAdapter` และ `SyncQueue.flush()` เป็น **stub** (`Not implemented (Phase 4.5+)`)<br>**2. Module System** — interface `AtomModule` (id, name, enabled, dependencies, `init(ctx)`, `dispose()`) + `ModuleRegistry` ที่ init ตามลำดับ dependency และ dispose ย้อนลำดับ · `loader.ts` เป็น stub<br>**Hooks:** `ChatHandler` รับ `memoryStore?` (แนบ facts ต่อท้าย system prompt) · `PCCommandHandler` ส่งต่อให้ module `pc-bridge` เมื่อมี ไม่งั้นตอบ stub เดิม |
+| **Status** | 🧱 Accepted — **scaffold** (Q6) · ยังไม่ต่อ UI และยังไม่เปิดใช้ในแอป (Phase 4.5+) |
+| **Context** | Phase 4 ต้องการ (ก) ความจำระยะยาวที่ทุก persona และทุก module ใช้ร่วมกันได้ เช่น ชื่อเล่นหรือความชอบของบอส และ (ข) ทางเสียบความสามารถใหม่ (เริ่มจากสั่งงานคอม) โดยไม่ต้องแก้ router หรือ handler ทุกครั้ง ประวัติแชท ([ADR-003](#adr-003--ประวัติแชทแยกต่อ-persona-และเก็บถาวร)) ไม่เหมาะเป็นความจำ เพราะยาว ถูกตัดที่ 500 ข้อความ และแยกต่อ persona เสมอ |
+| **Rationale** | • **Interface ก่อน implementation:** ใช้ pattern เดียวกับ provider ใน Phase 3 (interface + adapter) เพื่อให้สลับ local ↔ remote ได้โดยไม่แตะผู้ใช้งาน<br>• **Offline-first:** เขียน local ก่อนเสมอ แล้วค่อยส่งขึ้น remote ผ่าน SyncQueue → แอปใช้ได้แม้ออฟไลน์ และ remote ล่มไม่ทำให้ความจำหาย · conflict policy ที่ร่างไว้คือ last-write-wins ตาม `updatedAt` (ต้องยืนยันใน ADR ใหม่ตอน implement remote)<br>• **Key ต่อ fact:** แก้ fact เดียวเขียน key เดียว และ list ตาม scope ด้วย prefix · key จำกัด `A-Z a-z 0-9 _ -` (ไม่มีจุด) กัน prefix ชนกัน<br>• **อยู่ใน `core/`:** ทั้ง memory และ module ไม่รู้จัก UI หรือ provider (ตาม [ARCHITECTURE §2](ARCHITECTURE.md#2-core-vs-module-pattern)) · module ได้แค่ `ModuleContext` (memory + logger) ไม่ใช่ internals ของ feature<br>• **Dependency order + แยกความล้มเหลว:** module ที่ init ล้ม, dependency หาย/ปิด หรือวนกัน ถูกทำเครื่องหมาย `failed` พร้อมเหตุผล ไม่ลาก module อื่นหรือแอปล้มตาม<br>• **Stub ที่ reject จริง:** remote / flush / loader โยน error ชัดเจน แทนการคืนค่าเปล่า เพื่อไม่ให้ใครเข้าใจผิดว่าข้อมูลถูก sync แล้ว<br>• **Backward compatible:** ไม่ส่ง `memoryStore` = ChatHandler ทำงานเหมือนเดิมทุกไบต์ · ไม่มี `pc-bridge` = ตอบ "Phase 4 ครับ" เหมือนเดิม |
+| **Consequences** | ➕ เพิ่ม fact หรือ module ใหม่ได้โดยไม่แก้ router / handler · test ด้วย fake ได้ทุกชั้น (21 tests memory + 21 tests module/hooks)<br>➖ facts ที่แนบเพิ่มขนาด system prompt (จำกัด 20 fact ล่าสุด, ค่าละไม่เกิน 200 ตัวอักษร)<br>➖ ค่าใน fact มาจากผู้ใช้/module แล้วถูกใส่ใน prompt ตรง ๆ — ต้องพิจารณาเรื่อง prompt injection ก่อนเปิดให้ module เขียน memory ได้<br>➖ `loader.ts` ใน `core/` จะต้อง import module จาก `features/` เมื่อมี module จริง → ควรย้ายตาราง loader ไประดับแอป<br>🔜 **ยังไม่ทำ (Phase 4.5+):** UI จัดการความจำ/เปิดปิด module · ส่ง `localMemory` เข้า ChatHandler ของแอป · `initAll()` ตอนเปิดแอป · RemoteMemoryAdapter · SyncQueue แบบ persist + flush · module `pc-bridge` ตัวจริง |

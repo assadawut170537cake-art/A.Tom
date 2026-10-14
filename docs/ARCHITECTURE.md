@@ -218,7 +218,7 @@ text ─▶ RuleClassifier (regex, ฟรี, ไม่ใช้เน็ต)
 |--------|---------|--------|
 | `chat` | `ChatHandler` | system prompt ของ persona + ประวัติ 20 ข้อความล่าสุด → AI Orchestrator |
 | `switch_assistant` | `SwitchAssistantHandler` | เปลี่ยน `activePersona` แล้วตอบด้วยคำทักทายของ persona ใหม่ |
-| `pc_command` | `PCCommandHandler` | stub — "Phase 4 ครับ" |
+| `pc_command` | `PCCommandHandler` | ส่งต่อ module `pc-bridge` ถ้าลงทะเบียนและเปิดไว้ ไม่งั้นตอบ stub "Phase 4 ครับ" ([ADR-011](DECISIONS.md#adr-011--phase-4-shared-memory--module-system)) |
 
 เหตุผลของลำดับและเกณฑ์ 0.7 → [ADR-005](DECISIONS.md#adr-005--intent-router-rule--jev--llm--chat) · [ADR-006](DECISIONS.md#adr-006--jev-ใช้จำแนก-intent-เท่านั้น)
 

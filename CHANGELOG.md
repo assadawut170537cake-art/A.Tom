@@ -13,6 +13,11 @@
 ## [Unreleased]
 
 ### Added
+- **Phase 4 scaffold — Shared Memory** (`src/core/memory/`): `MemoryStore` interface, `LocalMemoryAdapter` (AsyncStorage `atom.memory.v1.<scope>.<key>`, fallback ในหน่วยความจำ), `RemoteMemoryAdapter` (stub), `SyncQueue` (skeleton offline-first)
+- **Phase 4 scaffold — Module System** (`src/core/modules/`): `AtomModule`, `ModuleRegistry` (init ตาม dependency, dispose ย้อนลำดับ), `loader.ts` (stub)
+- Hook: `ChatHandler` รับ `memoryStore` แล้วแนบ facts ต่อท้าย system prompt (ไม่ส่ง = เหมือนเดิม)
+- Hook: `PCCommandHandler` เรียก module `pc-bridge` เมื่อมี (ไม่มี = ตอบ "Phase 4 ครับ" เหมือนเดิม)
+- ADR-011 Phase 4: Shared Memory + Module System
 - เอกสาร: `README.md` (เขียนใหม่), `CHANGELOG.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`
 - JSDoc หัวไฟล์ของ `request.ts`, `ChatHistoryStorage.ts`, `IntentRouter.ts`, `Orchestrator.ts`, `VoiceOrchestrator.ts`
 

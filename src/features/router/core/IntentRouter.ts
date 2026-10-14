@@ -16,7 +16,7 @@
  * |--------------------|--------------------------|
  * | `chat`             | `ChatHandler` → AI Orchestrator |
  * | `switch_assistant` | `SwitchAssistantHandler` |
- * | `pc_command`       | `PCCommandHandler` (stub จนถึง Phase 4) |
+ * | `pc_command`       | `PCCommandHandler` → module `pc-bridge` (ถ้ามี) ไม่งั้นตอบ stub |
  *
  * classifier และ handler ทุกตัวฉีดผ่าน constructor ได้ (ใช้ใน test)
  *

@@ -1,25 +1,36 @@
+import type { MemoryFact, MemoryStore } from '../../../core/memory/types';
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
-import { DEFAULT_PERSONA } from '../../jarvis/constants';
+import { DEFAULT_PERSONA, USER_NAME } from '../../jarvis/constants';
 import type { Persona } from '../../jarvis/types';
 import type { HandlerResult, IntentHandler, RouterInput } from '../core/types';
 
 /** Keep prompts small: the last N turns of the persona's own history. */
 const MAX_HISTORY = 20;
+/** Most recently updated memory facts appended to the system prompt. */
+export const MAX_MEMORY_FACTS = 20;
+const MAX_FACT_LENGTH = 200;
 
 type SystemPromptFor = (persona: Persona) => string | undefined;
 
-/** Forwards the conversation to the AI Orchestrator with the active persona's system prompt. */
+/**
+ * Forwards the conversation to the AI Orchestrator with the active persona's system prompt.
+ * With a `memoryStore`, shared facts (global + this persona's) are appended to that prompt;
+ * without one — or if reading memory fails — the request is exactly as before.
+ */
 export class ChatHandler implements IntentHandler<'chat'> {
   constructor(
     private readonly orchestrator: Orchestrator = aiOrchestrator,
-    private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt
+    private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt,
+    private readonly memoryStore?: MemoryStore
   ) {}
 
   async handle(input: RouterInput): Promise<HandlerResult> {
     const persona = input.context?.activePersona ?? DEFAULT_PERSONA;
-    const system = this.systemPromptFor(persona);
+    const system = [this.systemPromptFor(persona), await this.memoryNotes(persona)]
+      .filter(Boolean)
+      .join('\n\n');
     const messages: ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...(input.context?.history ?? []).filter((m) => m.role !== 'system').slice(-MAX_HISTORY),
@@ -27,5 +38,26 @@ export class ChatHandler implements IntentHandler<'chat'> {
     ];
     const res = await this.orchestrator.chat({ messages });
     return { reply: res.content.trim(), persona };
+  }
+
+  /** "What I remember about Boss" block, or '' when there is no memory (or it can't be read). */
+  private async memoryNotes(persona: Persona): Promise<string> {
+    if (!this.memoryStore) return '';
+    let facts: MemoryFact[];
+    try {
+      const [shared, own] = await Promise.all([
+        this.memoryStore.list({ scope: 'global' }),
+        this.memoryStore.list({ scope: 'persona', persona }),
+      ]);
+      // A persona's own fact overrides a global one with the same key
+      facts = [...new Map([...shared, ...own].map((f) => [f.key, f])).values()];
+    } catch (e) {
+      console.error('[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ', e);
+      return '';
+    }
+    if (!facts.length) return '';
+    const recent = facts.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_MEMORY_FACTS);
+    const lines = recent.map((f) => `- ${f.key}: ${f.value.slice(0, MAX_FACT_LENGTH)}`);
+    return [`สิ่งที่จำได้เกี่ยวกับ${USER_NAME}:`, ...lines].join('\n');
   }
 }

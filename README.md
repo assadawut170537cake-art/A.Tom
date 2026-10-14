@@ -83,6 +83,8 @@ src/
 │   ├── http/                  #   request() + ProviderError + redaction
 │   ├── storage/               #   SecureKeyStore · ProviderSettings · ChatHistoryStorage · jsonStorage
 │   ├── network/               #   isOffline()
+│   ├── memory/                #   Shared Memory: MemoryStore · LocalMemoryAdapter · remote/sync stubs (Phase 4)
+│   ├── modules/               #   Module System: AtomModule · ModuleRegistry · loader stub (Phase 4)
 │   ├── crypto/                #   SigV4 (สำหรับ Amazon Polly)
 │   └── types/                 #   runtime type guards
 │
@@ -158,7 +160,8 @@ npm run test:coverage    # jest --coverage
 | 2 | **Core UI** — หน้าจอหลัก, Orb (WebGL), dropdown สลับ 4 persona, แชทแยกต่อ persona | ✅ เสร็จ |
 | 3 | **Brain + Voice** — AI providers + fallback, 16 voice providers, Intent Router, Settings UI, persona prompt/voice | ✅ เสร็จ |
 | 3+ | **Polish (Q1–Q5)** — tests, refactor, strict types, error handling, documentation | ✅ เสร็จ |
-| 4 | **PC Command** — เชื่อมต่อคอมพิวเตอร์ (ตอนนี้ `PCCommandHandler` ตอบ "Phase 4 ครับ") และรับเสียงพูดจริง (บันทึก → STT) | 🔜 ถัดไป |
+| 4 | **Shared Memory** — local พร้อมใช้ (`LocalMemoryAdapter`), remote + sync เป็น stub · **Module System** — scaffold (`ModuleRegistry`, hook `pc-bridge` ใน `PCCommandHandler`, hook memory ใน `ChatHandler`) — ดู [ADR-011](docs/DECISIONS.md#adr-011--phase-4-shared-memory--module-system) | 🧱 scaffold |
+| 4.5 | ต่อ UI จัดการความจำ / module · Remote memory + SyncQueue · module `pc-bridge` ตัวจริง (สั่งงานคอม) · รับเสียงพูดจริง (บันทึก → STT) | 🔜 ถัดไป |
 | 5 | ยังไม่กำหนด scope (ตัวเลือกที่ค้างอยู่: โหมด "ประชุม" ใน dropdown, แท็บ Today / Memory) | 🗓️ วางแผน |
 
 ประวัติการเปลี่ยนแปลงทั้งหมด → [CHANGELOG.md](CHANGELOG.md)
@@ -171,5 +174,5 @@ npm run test:coverage    # jest --coverage
 |--------|---------|
 | [CHANGELOG.md](CHANGELOG.md) | สิ่งที่เปลี่ยนในแต่ละ Phase (Keep a Changelog) |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Core vs Module, Registry + DI, Orchestrator, data flow |
-| [docs/DECISIONS.md](docs/DECISIONS.md) | 10 lock decisions ของ Phase 3 (ADR) |
+| [docs/DECISIONS.md](docs/DECISIONS.md) | 10 lock decisions ของ Phase 3 + ADR-011 Phase 4 (ADR) |
 | [AGENTS.md](AGENTS.md) | กติกาสำหรับ AI agent / ผู้ร่วมพัฒนา (Expo commands, CNG) |
