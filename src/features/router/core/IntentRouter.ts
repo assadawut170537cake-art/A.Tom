@@ -13,7 +13,7 @@ import type {
   RouterOutput,
 } from './types';
 
-/** Jev answers at or below this confidence defer to the LLM classifier. */
+/** Jev answers below this confidence defer to the LLM classifier (0.7 itself is accepted). */
 export const JEV_MIN_CONFIDENCE = 0.7;
 
 /** Used when every classifier is unavailable: treat the message as plain chat. */
@@ -27,7 +27,7 @@ export interface IntentRouterDeps {
 }
 
 /**
- * rule (regex, free) → Jev (if enabled, confidence > 0.7) → LLM → default chat.
+ * rule (regex, free) → Jev (if enabled, confidence ≥ 0.7) → LLM → default chat.
  * Classifier failures never block the user: they fall through to the next stage.
  */
 export class IntentRouter {
@@ -56,7 +56,7 @@ export class IntentRouter {
     if (byRule) return byRule;
 
     const byJev = await this.jev.classify(input).catch(() => null);
-    if (byJev && byJev.confidence > JEV_MIN_CONFIDENCE) return byJev;
+    if (byJev && byJev.confidence >= JEV_MIN_CONFIDENCE) return byJev;
 
     const byLLM = await this.llm.classify(input).catch(() => null);
     return byLLM ?? DEFAULT_ROUTE;

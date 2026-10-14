@@ -240,14 +240,13 @@ describe('IntentRouter pipeline', () => {
     expect(jev.calls + llm.calls).toBe(0);
   });
 
-  test(`Jev wins only when confidence > ${JEV_MIN_CONFIDENCE}`, async () => {
+  test(`Jev wins when confidence ≥ ${JEV_MIN_CONFIDENCE}, otherwise the LLM decides`, async () => {
     const llm = stubClassifier(chatOut('llm', 0.6));
     let router = new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.71)), llm });
     expect((await router.route({ text: 'อืม' })).provider).toBe('jev');
     expect(llm.calls).toBe(0);
 
-    // exactly at the threshold is not enough → LLM decides
-    router = new IntentRouter({ jev: stubClassifier(chatOut('jev', JEV_MIN_CONFIDENCE)), llm });
+    router = new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.6)), llm });
     expect((await router.route({ text: 'อืม' })).provider).toBe('llm');
   });
 
