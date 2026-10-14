@@ -8,6 +8,9 @@ import { useAtomStore } from '../stores/useAtomStore';
 let router: IntentRouter | null = null;
 const getRouter = () => (router ??= new IntentRouter());
 
+/** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
+let activeTurn = 0;
+
 interface SendResult {
   route: RouterOutput | null;
   reply: string;
@@ -28,6 +31,8 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     .filter((m) => m.role !== 'system')
     .map((m) => ({ role: m.role, content: m.content }));
 
+  const turn = ++activeTurn;
+  const isLatest = () => turn === activeTurn;
   store.pushMessage({ role: 'user', content, persona });
   store.setUIMode('conversation');
   store.setMood('thinking');
@@ -45,7 +50,7 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
 
     if (opts.speak !== false && result.reply) {
-      useAtomStore.getState().setMood('speaking');
+      if (isLatest()) useAtomStore.getState().setMood('speaking');
       await voiceOrchestrator.speak(result.reply, result.persona).catch(() => {
         // Speech is best-effort; the text reply is already on screen
       });
@@ -56,6 +61,7 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${error}`, persona });
     return { route: null, reply: '', error };
   } finally {
-    useAtomStore.getState().setMood('idle');
+    // An older turn finishing must not reset the mood of a newer one still in flight
+    if (isLatest()) useAtomStore.getState().setMood('idle');
   }
 }

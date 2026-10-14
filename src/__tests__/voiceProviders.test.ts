@@ -321,6 +321,29 @@ describe('TTS specifics', () => {
     expect(pause).toHaveBeenCalled();
   });
 
+  test('stop() during synthesize → stale audio is never played', async () => {
+    await configure('tts', 'openai');
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    mockFetch([[/openai/, async () => (await delay(30), bytes())]]);
+    const speaking = tts('openai').speak('ช้าหน่อย');
+    await delay(5);
+    tts('openai').stop();
+    await speaking;
+    expect(createAudioPlayer).not.toHaveBeenCalled();
+  });
+
+  test('a newer speak() supersedes one still synthesizing', async () => {
+    await configure('tts', 'openai');
+    autoFinishingPlayer();
+    let n = 0;
+    mockFetch([[/openai/, async () => (await new Promise((r) => setTimeout(r, ++n === 1 ? 30 : 0)), bytes())]]);
+    const first = tts('openai').speak('อันแรก');
+    await new Promise((r) => setTimeout(r, 5));
+    await tts('openai').speak('อันสอง');
+    await first;
+    expect(createAudioPlayer).toHaveBeenCalledTimes(1);
+  });
+
   test('playback failure → unsupported (so the orchestrator can fall back)', async () => {
     await configure('tts', 'openai');
     mockFetch([[/openai/, () => bytes()]]);

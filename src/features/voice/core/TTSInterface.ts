@@ -45,6 +45,8 @@ export abstract class BaseCloudTTS implements TTSProvider {
 
   private player: AudioPlayer | null = null;
   private finish: (() => void) | null = null;
+  /** Bumped by every speak()/stop(); a synthesize() that resolves after a newer call is dropped. */
+  private runId = 0;
 
   protected abstract synthesize(text: string, opts: SpeakOptions): Promise<SynthesizedAudio>;
   protected abstract fetchVoices(): Promise<Voice[]>;
@@ -56,7 +58,10 @@ export abstract class BaseCloudTTS implements TTSProvider {
   async speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     if (!text.trim()) return;
     this.stop();
+    const currentRun = ++this.runId;
     const audio = await this.synthesize(text, opts);
+    // stop() or a newer speak() ran while we were synthesizing: don't play stale audio
+    if (currentRun !== this.runId) return;
 
     const file = new File(Paths.cache, `tts-${this.id}-${Date.now()}.${audio.ext}`);
     if (audio.data instanceof Uint8Array) file.write(audio.data);
@@ -94,6 +99,7 @@ export abstract class BaseCloudTTS implements TTSProvider {
   }
 
   stop(): void {
+    this.runId++;
     this.player?.pause();
     this.finish?.();
   }

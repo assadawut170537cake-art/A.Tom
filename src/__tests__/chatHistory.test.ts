@@ -196,6 +196,33 @@ describe('Conversation: history goes to the right persona', () => {
     expect(useAtomStore.getState()).toMatchObject({ mood: 'idle', uiMode: 'conversation' });
   });
 
+  test('overlapping turns: the first finishing does not reset the mood of the second', async () => {
+    const replies: ((r: Response) => void)[] = [];
+    mockFetch([
+      [
+        GEMINI,
+        (c) =>
+          isClassifierCall(c)
+            ? geminiText('{"intent":"chat","confidence":0.9}')
+            : new Promise<Response>((resolve) => replies.push(resolve)),
+      ],
+    ]);
+    const flushAll = () => new Promise((r) => setTimeout(r, 10));
+    const first = sendMessage('ข้อแรก', { speak: false });
+    await flushAll();
+    const second = sendMessage('ข้อสอง', { speak: false });
+    await flushAll();
+    expect(replies).toHaveLength(2);
+
+    nth(replies, 0)(geminiText('ตอบข้อแรก'));
+    await first;
+    expect(useAtomStore.getState().mood).toBe('thinking');
+
+    nth(replies, 1)(geminiText('ตอบข้อสอง'));
+    await second;
+    expect(useAtomStore.getState().mood).toBe('idle');
+  });
+
   test('speech failure does not lose the text reply', async () => {
     mockChatGemini();
     jest.mocked(Speech.speak).mockImplementationOnce((_t, opts) => {
