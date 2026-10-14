@@ -13,7 +13,7 @@ export type ProviderErrorKind =
 export class ProviderError extends Error {
   readonly providerId: string;
   readonly kind: ProviderErrorKind;
-  readonly status?: number;
+  readonly status: number | undefined;
 
   constructor(providerId: string, kind: ProviderErrorKind, message: string, status?: number) {
     super(`[${providerId}] ${message}`);

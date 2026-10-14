@@ -7,8 +7,7 @@ import { SwitchAssistantHandler } from '../handlers/SwitchAssistantHandler';
 import type {
   Classifier,
   HandlerResult,
-  Intent,
-  IntentHandler,
+  IntentHandlers,
   RouterInput,
   RouterOutput,
 } from './types';
@@ -23,7 +22,7 @@ interface IntentRouterDeps {
   rule?: RuleClassifier;
   jev?: Classifier;
   llm?: Classifier;
-  handlers?: Partial<Record<Intent, IntentHandler>>;
+  handlers?: Partial<IntentHandlers>;
 }
 
 /**
@@ -34,7 +33,7 @@ export class IntentRouter {
   private readonly rule: RuleClassifier;
   private readonly jev: Classifier;
   private readonly llm: Classifier;
-  private readonly handlers: Record<Intent, IntentHandler>;
+  private readonly handlers: IntentHandlers;
 
   constructor(deps: IntentRouterDeps = {}) {
     this.rule = deps.rule ?? new RuleClassifier();
@@ -65,7 +64,18 @@ export class IntentRouter {
   /** route() then run the matching handler. */
   async handle(input: RouterInput): Promise<{ route: RouterOutput; result: HandlerResult }> {
     const route = await this.route(input);
-    const result = await this.handlers[route.intent].handle(input, route);
-    return { route, result };
+    return { route, result: await this.dispatch(input, route) };
+  }
+
+  /** Exhaustive switch: each handler receives exactly its own route variant. */
+  private dispatch(input: RouterInput, route: RouterOutput): Promise<HandlerResult> {
+    switch (route.intent) {
+      case 'chat':
+        return this.handlers.chat.handle(input, route);
+      case 'pc_command':
+        return this.handlers.pc_command.handle(input, route);
+      case 'switch_assistant':
+        return this.handlers.switch_assistant.handle(input, route);
+    }
   }
 }

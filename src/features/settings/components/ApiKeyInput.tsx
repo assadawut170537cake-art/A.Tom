@@ -9,7 +9,7 @@ interface ApiKeyInputProps {
   /** SecureKeyStore key, e.g. secretKey('ai', 'gemini'). */
   storageKey: string;
   label?: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
   onChange?: (hasKey: boolean) => void;
 }
 

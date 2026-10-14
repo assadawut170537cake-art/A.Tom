@@ -1,36 +1,43 @@
 import { useEffect, useState } from 'react';
 import { ScrollView } from 'react-native';
 
-import { ProviderSettings, type VoiceKind } from '../../../core/storage/ProviderSettings';
+import {
+  ProviderSettings,
+  type VoiceIdOf,
+  type VoiceKind,
+} from '../../../core/storage/ProviderSettings';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
-import type { STTProviderId, TTSProviderId } from '../../voice/core/types';
-import { STT_PROVIDERS, TTS_PROVIDERS } from '../../voice/voice.config';
+import { STT_PROVIDERS, TTS_PROVIDERS, type VoiceProviderMeta } from '../../voice/voice.config';
 import { PriorityList } from '../components/PriorityList';
 import { STTProviderCard } from '../components/STTProviderCard';
 import { TTSProviderCard } from '../components/TTSProviderCard';
 import { Section } from '../components/ui';
 import { mergeOrder, whileMounted } from '../utils';
 
-const META = { tts: TTS_PROVIDERS, stt: STT_PROVIDERS } as const;
+const META: { [K in VoiceKind]: VoiceProviderMeta<VoiceIdOf[K]>[] } = {
+  tts: TTS_PROVIDERS,
+  stt: STT_PROVIDERS,
+};
 
-function useVoicePriority(kind: VoiceKind) {
-  const [order, setOrder] = useState<string[]>(META[kind].map((p) => p.id));
+function useVoicePriority<K extends VoiceKind>(kind: K) {
+  const meta: VoiceProviderMeta<VoiceIdOf[K]>[] = META[kind];
+  const [order, setOrder] = useState<VoiceIdOf[K][]>(() => meta.map((p) => p.id));
 
   useEffect(
     () =>
       whileMounted(
-        (): Promise<string[]> => ProviderSettings.getVoicePriority(kind),
+        () => ProviderSettings.getVoicePriority(kind),
         (saved) => setOrder((current) => mergeOrder(saved, current))
       ),
     [kind]
   );
 
-  const change = (ids: string[]) => {
+  const change = (ids: VoiceIdOf[K][]) => {
     setOrder(ids);
-    ProviderSettings.setVoicePriority(kind, ids as (TTSProviderId | STTProviderId)[]);
+    ProviderSettings.setVoicePriority(kind, ids);
   };
 
-  const names = new Map<string, string>(META[kind].map((p) => [p.id, p.name]));
+  const names = new Map<string, string>(meta.map((p) => [p.id, p.name]));
   return { items: order.map((id) => ({ id, label: names.get(id) ?? id })), change };
 }
 

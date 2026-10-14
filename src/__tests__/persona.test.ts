@@ -15,7 +15,7 @@ const geminiReply = (text: string) =>
 
 /** Gemini mock: classifier prompt → JSON label, anything else → `reply`. Records request bodies. */
 function mockGemini(reply: string, intent = 'chat') {
-  const bodies: { systemInstruction?: { parts: { text: string }[] }; contents: unknown[] }[] = [];
+  const bodies: { systemInstruction?: { parts: [{ text: string }] }; contents: unknown[] }[] = [];
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
     const body = JSON.parse(String(init?.body));
     bodies.push(body);

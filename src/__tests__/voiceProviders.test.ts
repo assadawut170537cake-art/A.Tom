@@ -9,6 +9,7 @@ import type { STTProviderId, TTSProviderId } from '../features/voice/core/types'
 import { STT_PROVIDERS, TTS_PROVIDERS, VOICE_PROVIDER_FIELDS } from '../features/voice/voice.config';
 import { bytes, httpError, json, mockFetch, type RecordedCall, type Route } from '../test-utils/mockFetch';
 import { registerAll, resetSettings } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 beforeAll(registerAll);
 
@@ -219,7 +220,7 @@ describe.each(TTS_CASES)('TTS $id', ({ id, route, probe, speak, voices }) => {
     await configure('tts', id);
     const { calls } = mockFetch([route]);
     await expect(tts(id).testConnection()).resolves.toEqual({ ok: true });
-    probe(calls[0]);
+    probe(nth(calls, 0));
   });
 
   test('testConnection maps a 401 to an auth message', async () => {
@@ -268,8 +269,8 @@ describe('TTS specifics', () => {
     const { calls } = mockFetch([[/texttospeech/, () => json({ audioContent: 'SUQz' })]]);
     await tts('google').speak('a', { pitch: 1.25 });
     await tts('google').speak('b', { pitch: 3 });
-    expect((calls[0].body as { audioConfig: { pitch: number } }).audioConfig.pitch).toBe(5);
-    expect((calls[1].body as { audioConfig: { pitch: number } }).audioConfig.pitch).toBe(20);
+    expect((nth(calls, 0).body as { audioConfig: { pitch: number } }).audioConfig.pitch).toBe(5);
+    expect((nth(calls, 1).body as { audioConfig: { pitch: number } }).audioConfig.pitch).toBe(20);
 
     jest.restoreAllMocks();
     mockFetch([[/texttospeech/, () => json({})]]);
@@ -281,7 +282,7 @@ describe('TTS specifics', () => {
     autoFinishingPlayer();
     const { calls } = mockFetch([[/microsoft\.com/, () => bytes()]]);
     await tts('azure').speak(`<b>"A" & 'B'</b>`, { voiceId: 'x"y' });
-    expect(calls[0].body).toBe(
+    expect(nth(calls, 0).body).toBe(
       '<speak version="1.0" xml:lang="th-TH"><voice name="x&#34;y">&#60;b&#62;&#34;A&#34; &#38; &#39;B&#39;&#60;/b&#62;</voice></speak>'
     );
   });
@@ -291,8 +292,8 @@ describe('TTS specifics', () => {
     await ProviderSettings.setOption('tts.polly', 'region', 'ap-southeast-1');
     const { calls } = mockFetch([[/amazonaws\.com/, () => json({ Voices: [] })]]);
     await tts('polly').getVoices();
-    expect(calls[0].url.host).toBe('polly.ap-southeast-1.amazonaws.com');
-    expect(calls[0].headers.Authorization).toContain('/ap-southeast-1/polly/aws4_request');
+    expect(nth(calls, 0).url.host).toBe('polly.ap-southeast-1.amazonaws.com');
+    expect(nth(calls, 0).headers.Authorization).toContain('/ap-southeast-1/polly/aws4_request');
   });
 
   test('Polly without prosody sends plain text; default voice Joanna', async () => {
@@ -300,7 +301,7 @@ describe('TTS specifics', () => {
     autoFinishingPlayer();
     const { calls } = mockFetch([[/polly/, () => bytes()]]);
     await tts('polly').speak('hello');
-    expect(calls[0].body).toEqual({ OutputFormat: 'mp3', VoiceId: 'Joanna', Engine: 'neural', TextType: 'text', Text: 'hello' });
+    expect(nth(calls, 0).body).toEqual({ OutputFormat: 'mp3', VoiceId: 'Joanna', Engine: 'neural', TextType: 'text', Text: 'hello' });
   });
 
   test('blank text is a no-op; stop() halts playback and resolves speak()', async () => {
@@ -358,7 +359,7 @@ describe('TTS specifics', () => {
 
     await voiceOrchestrator.speak('สวัสดีครับ', 2);
 
-    expect(calls[0].url.pathname).toBe('/v1/audio/speech'); // OpenAI synthesized…
+    expect(nth(calls, 0).url.pathname).toBe('/v1/audio/speech'); // OpenAI synthesized…
     expect(remove).toHaveBeenCalledTimes(2); // …its player and listener were released…
     expect(Speech.speak).toHaveBeenCalledWith('สวัสดีครับ', expect.objectContaining({ language: 'th-TH' })); // …then Expo spoke
   });
@@ -401,7 +402,8 @@ const STT_CASES: STTCase[] = [
     uri: 'file:///cache/rec.m4a',
     route: [/api\.openai\.com/, (c) => (c.method === 'GET' ? json({ data: [] }) : json({ text: ' สวัสดีครับ ' }))],
     probe: (c) => expect(c.url.href).toBe('https://api.openai.com/v1/models'),
-    transcribe: ([c]) => {
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
       expect(c.url.pathname).toBe('/v1/audio/transcriptions');
       const form = c.body as FormData;
       expect(form.get('model')).toBe('whisper-1');
@@ -414,7 +416,8 @@ const STT_CASES: STTCase[] = [
     uri: 'file:///cache/rec.m4a',
     route: [/custom\.local/, (c) => (c.method === 'GET' ? json({ data: [] }) : json({ text: 'สวัสดีครับ' }))],
     probe: (c) => expect(c.url.href).toBe('https://custom.local/v1/models'),
-    transcribe: ([c]) => {
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
       expect(c.url.href).toBe('https://custom.local/v1/audio/transcriptions');
       expect((c.body as FormData).get('model')).toBe('custom-model');
     },
@@ -433,7 +436,8 @@ const STT_CASES: STTCase[] = [
       expect(c.url.href).toBe('https://api.deepgram.com/v1/projects');
       expect(c.headers.Authorization).toBe('Token deepgram-key');
     },
-    transcribe: ([c]) => {
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
       expect(c.url.pathname).toBe('/v1/listen');
       expect(Object.fromEntries(c.url.searchParams)).toEqual({ model: 'nova-2', language: 'th', smart_format: 'true' });
       expect(c.headers['Content-Type']).toBe('audio/mp4');
@@ -451,7 +455,8 @@ const STT_CASES: STTCase[] = [
           : json({ results: [{ alternatives: [{ transcript: 'สวัสดี' }] }, { alternatives: [{ transcript: 'ครับ' }] }] }),
     ],
     probe: (c) => expect(c.headers['x-goog-api-key']).toBe('google-key'),
-    transcribe: ([c]) => {
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
       expect(c.body).toEqual({
         config: { languageCode: 'th-TH', encoding: 'LINEAR16', enableAutomaticPunctuation: true },
         audio: { content: 'UklGRg==' },
@@ -469,7 +474,8 @@ const STT_CASES: STTCase[] = [
           : json({ RecognitionStatus: 'Success', DisplayText: 'สวัสดีครับ' }),
     ],
     probe: (c) => expect(c.url.host).toBe('southeastasia.api.cognitive.microsoft.com'),
-    transcribe: ([c]) => {
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
       expect(c.url.host).toBe('southeastasia.stt.speech.microsoft.com');
       expect(c.url.searchParams.get('language')).toBe('th-TH');
       expect(c.headers['Content-Type']).toBe('audio/wav; codecs=audio/pcm; samplerate=16000');
@@ -496,8 +502,8 @@ const STT_CASES: STTCase[] = [
         'POST /v2/transcript',
         'GET /v2/transcript/t1',
       ]);
-      expect(calls[1].body).toEqual({ audio_url: 'https://cdn.assemblyai.com/u1', language_code: 'th' });
-      expect(calls[0].headers.authorization).toBe('assemblyai-key');
+      expect(nth(calls, 1).body).toEqual({ audio_url: 'https://cdn.assemblyai.com/u1', language_code: 'th' });
+      expect(nth(calls, 0).headers.authorization).toBe('assemblyai-key');
     },
   },
   {
@@ -521,8 +527,8 @@ const STT_CASES: STTCase[] = [
         '/speechtotext/v1/jobs/j1',
         '/speechtotext/v1/jobs/j1/transcript',
       ]);
-      expect(JSON.parse((calls[0].body as FormData).get('options') as string)).toEqual({ language: 'th' });
-      expect(calls[2].headers.Accept).toBe('text/plain');
+      expect(JSON.parse((nth(calls, 0).body as FormData).get('options') as string)).toEqual({ language: 'th' });
+      expect(nth(calls, 2).headers.Accept).toBe('text/plain');
     },
   },
 ];
@@ -543,7 +549,7 @@ describe.each(STT_CASES)('STT $id', ({ id, route, uri, probe, transcribe }) => {
     await configure('stt', id);
     const { calls } = mockFetch([route]);
     await expect(stt(id).testConnection()).resolves.toEqual({ ok: true });
-    probe(calls[0]);
+    probe(nth(calls, 0));
   });
 
   test('testConnection reports 401 as auth', async () => {

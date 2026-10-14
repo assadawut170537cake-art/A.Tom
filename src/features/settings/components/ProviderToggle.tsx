@@ -4,7 +4,7 @@ interface ProviderToggleProps {
   label: string;
   value: boolean;
   onChange: (value: boolean) => void;
-  subtitle?: string;
+  subtitle?: string | undefined;
 }
 
 export function ProviderToggle({ label, value, onChange, subtitle }: ProviderToggleProps) {

@@ -11,7 +11,12 @@ import {
 } from '../features/router/classifiers/LLMClassifier';
 import { RuleClassifier, findPersona } from '../features/router/classifiers/RuleClassifier';
 import { IntentRouter, JEV_MIN_CONFIDENCE } from '../features/router/core/IntentRouter';
-import type { Classifier, RouterOutput } from '../features/router/core/types';
+import type {
+  Classifier,
+  PersonaEntity,
+  RouteOf,
+  RouterOutput,
+} from '../features/router/core/types';
 import { ChatHandler } from '../features/router/handlers/ChatHandler';
 import { PCCommandHandler } from '../features/router/handlers/PCCommandHandler';
 import { SwitchAssistantHandler } from '../features/router/handlers/SwitchAssistantHandler';
@@ -27,6 +32,7 @@ import {
   openRouterText,
 } from '../test-utils/mockFetch';
 import { registerAll, resetSettings, resetStore, setAIKeys } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 beforeAll(registerAll);
 
@@ -132,8 +138,8 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
       entities: { persona: '3' },
       provider: 'llm',
     });
-    const body = calls[0].body as {
-      systemInstruction: { parts: { text: string }[] };
+    const body = nth(calls, 0).body as {
+      systemInstruction: { parts: [{ text: string }] };
       generationConfig: { temperature: number; maxOutputTokens: number };
     };
     expect(body.systemInstruction.parts[0].text).toBe(CLASSIFIER_SYSTEM_PROMPT);
@@ -149,7 +155,7 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
     expect(out).toMatchObject({ intent: 'pc_command', confidence: 0.77, provider: 'llm' });
     expect(out?.entities).toBeUndefined();
     expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai']);
-    expect(calls[1].headers.Authorization).toBe('Bearer openrouter-test-key');
+    expect(nth(calls, 1).headers.Authorization).toBe('Bearer openrouter-test-key');
   });
 
   test('returns null when the LLM answers with something unparseable', async () => {
@@ -178,9 +184,9 @@ describe('JevClassifier (TypeSafe System One)', () => {
     });
 
     expect(out).toEqual({ intent: 'pc_command', confidence: 0.91, provider: 'jev' });
-    expect(calls[0].url.pathname).toBe('/v1/systemone');
-    expect(calls[0].headers.Authorization).toBe('Bearer jev-test-key');
-    const body = calls[0].body as {
+    expect(nth(calls, 0).url.pathname).toBe('/v1/systemone');
+    expect(nth(calls, 0).headers.Authorization).toBe('Bearer jev-test-key');
+    const body = nth(calls, 0).body as {
       model: string;
       state: { message: string; recent_messages: string[] };
       questions: { intent: { type: string; criteria: Record<string, string> } };
@@ -358,13 +364,13 @@ describe('Handlers', () => {
     });
 
     expect(res).toEqual({ reply: 'ตอบแล้วครับ', persona: 3 });
-    const body = calls[0].body as {
-      systemInstruction: { parts: { text: string }[] };
-      contents: { role: string; parts: { text: string }[] }[];
+    const body = nth(calls, 0).body as {
+      systemInstruction: { parts: [{ text: string }] };
+      contents: { role: string; parts: [{ text: string }] }[];
     };
     expect(body.systemInstruction.parts[0].text).toContain(PERSONA_PROMPTS[3]);
     expect(body.contents).toHaveLength(21);
-    expect(body.contents[0].parts[0].text).toBe('m5');
+    expect(nth(body.contents, 0).parts[0].text).toBe('m5');
     expect(body.contents.at(-1)).toEqual({ role: 'user', parts: [{ text: 'สวัสดี' }] });
     expect(JSON.stringify(body.contents)).not.toContain('should be dropped');
   });
@@ -373,7 +379,7 @@ describe('Handlers', () => {
     const { calls } = mockFetch([[GEMINI, () => geminiText('ok')]]);
     const res = await new ChatHandler(undefined, () => undefined).handle({ text: 'hi' });
     expect(res.persona).toBe(1);
-    expect((calls[0].body as { systemInstruction?: unknown }).systemInstruction).toBeUndefined();
+    expect((nth(calls, 0).body as { systemInstruction?: unknown }).systemInstruction).toBeUndefined();
   });
 
   test('PCCommandHandler is a Phase 4 stub that keeps the persona', async () => {
@@ -384,7 +390,7 @@ describe('Handlers', () => {
   });
 
   describe('SwitchAssistantHandler', () => {
-    const route = (persona?: string): RouterOutput => ({
+    const route = (persona?: PersonaEntity): RouteOf<'switch_assistant'> => ({
       intent: 'switch_assistant',
       confidence: 1,
       provider: 'rule',
@@ -404,7 +410,8 @@ describe('Handlers', () => {
       const set = jest.fn();
       const res = await new SwitchAssistantHandler(set).handle(
         { text: 'ขอจาร์วิส', context: { activePersona: 1 } },
-        route('9')
+        // Deliberately out of range: checks the handler's runtime validation of entities
+        route('9' as PersonaEntity)
       );
       expect(set).toHaveBeenCalledWith(2);
       expect(res.persona).toBe(2);

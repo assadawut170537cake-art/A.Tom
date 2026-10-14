@@ -16,6 +16,13 @@ const K = new Uint32Array([
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
+/**
+ * Element read for the fixed-size tables below. Every index used is in range by construction
+ * (64-entry K/W, 8-word state, 64-byte blocks), so `?? 0` never triggers — it only satisfies
+ * noUncheckedIndexedAccess without non-null assertions.
+ */
+const at = (arr: Uint32Array | Uint8Array, i: number): number => arr[i] ?? 0;
+
 function sha256(data: Uint8Array): Uint8Array {
   const len = data.length;
   const padded = new Uint8Array(((len + 9 + 63) >> 6) << 6);
@@ -34,14 +41,24 @@ function sha256(data: Uint8Array): Uint8Array {
   for (let off = 0; off < padded.length; off += 64) {
     for (let i = 0; i < 16; i++) w[i] = view.getUint32(off + i * 4);
     for (let i = 16; i < 64; i++) {
-      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
-      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+      const w15 = at(w, i - 15);
+      const w2 = at(w, i - 2);
+      const s0 = rotr(w15, 7) ^ rotr(w15, 18) ^ (w15 >>> 3);
+      const s1 = rotr(w2, 17) ^ rotr(w2, 19) ^ (w2 >>> 10);
+      w[i] = (at(w, i - 16) + s0 + at(w, i - 7) + s1) >>> 0;
     }
-    let [a, b, c, d, e, f, g, hh] = h;
+    let a = at(h, 0);
+    let b = at(h, 1);
+    let c = at(h, 2);
+    let d = at(h, 3);
+    let e = at(h, 4);
+    let f = at(h, 5);
+    let g = at(h, 6);
+    let hh = at(h, 7);
     for (let i = 0; i < 64; i++) {
       const t1 =
-        (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) >>> 0;
+        (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + at(K, i) + at(w, i)) >>>
+        0;
       const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
       hh = g;
       g = f;
@@ -52,18 +69,12 @@ function sha256(data: Uint8Array): Uint8Array {
       b = a;
       a = (t1 + t2) >>> 0;
     }
-    h[0] += a;
-    h[1] += b;
-    h[2] += c;
-    h[3] += d;
-    h[4] += e;
-    h[5] += f;
-    h[6] += g;
-    h[7] += hh;
+    // Uint32Array stores wrap mod 2^32, exactly like the original `h[i] += x`
+    [a, b, c, d, e, f, g, hh].forEach((x, i) => (h[i] = at(h, i) + x));
   }
   const out = new Uint8Array(32);
   const outView = new DataView(out.buffer);
-  for (let i = 0; i < 8; i++) outView.setUint32(i * 4, h[i]);
+  for (let i = 0; i < 8; i++) outView.setUint32(i * 4, at(h, i));
   return out;
 }
 
@@ -73,8 +84,8 @@ function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
   const inner = new Uint8Array(64 + data.length);
   const outer = new Uint8Array(64 + 32);
   for (let i = 0; i < 64; i++) {
-    inner[i] = block[i] ^ 0x36;
-    outer[i] = block[i] ^ 0x5c;
+    inner[i] = at(block, i) ^ 0x36;
+    outer[i] = at(block, i) ^ 0x5c;
   }
   inner.set(data, 64);
   outer.set(sha256(inner), 64);
@@ -96,7 +107,7 @@ interface SigV4Request {
   region: string;
   service: string;
   headers?: Record<string, string>;
-  body?: string;
+  body?: string | undefined;
   /** Injected for tests; defaults to now. */
   date?: Date;
 }
@@ -126,7 +137,7 @@ export function signV4(req: SigV4Request, creds: SigV4Credentials): Record<strin
   const canonicalHeaders = lower.map(([k, v]) => `${k}:${v}\n`).join('');
 
   const query = [...url.searchParams.entries()]
-    .map(([k, v]) => [awsEncode(k), awsEncode(v)])
+    .map(([k, v]): [string, string] => [awsEncode(k), awsEncode(v)])
     .sort(([a, x], [b, y]) => (a === b ? (x < y ? -1 : 1) : a < b ? -1 : 1))
     .map(([k, v]) => `${k}=${v}`)
     .join('&');

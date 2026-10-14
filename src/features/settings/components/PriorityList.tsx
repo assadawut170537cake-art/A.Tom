@@ -2,16 +2,16 @@ import { ChevronDown, ChevronUp, GripVertical } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
 
-interface PriorityItem {
-  id: string;
+interface PriorityItem<T extends string> {
+  id: T;
   label: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
 }
 
-interface PriorityListProps {
+interface PriorityListProps<T extends string> {
   /** Items in their current priority order (first = tried first). */
-  items: PriorityItem[];
-  onChange: (orderedIds: string[]) => void;
+  items: PriorityItem<T>[];
+  onChange: (orderedIds: T[]) => void;
   /** Lets the parent ScrollView stop scrolling while a row is being dragged. */
   onDragStateChange?: (dragging: boolean) => void;
 }
@@ -25,6 +25,7 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 function move<T>(list: T[], from: number, to: number): T[] {
   const next = [...list];
   const [item] = next.splice(from, 1);
+  if (item === undefined) return next; // `from` out of range: nothing to move
   next.splice(to, 0, item);
   return next;
 }
@@ -36,7 +37,12 @@ interface DragCallbacks {
 }
 
 /** Drag handle with a PanResponder created once; it always calls the latest callbacks. */
-function DragHandle({ label, callbacks }: { label: string; callbacks: DragCallbacks }) {
+interface DragHandleProps {
+  label: string;
+  callbacks: DragCallbacks;
+}
+
+function DragHandle({ label, callbacks }: DragHandleProps) {
   const latest = useRef(callbacks);
   useEffect(() => {
     latest.current = callbacks;
@@ -73,7 +79,11 @@ function DragHandle({ label, callbacks }: { label: string; callbacks: DragCallba
  * Drag-and-drop priority list (drag the grip handle), built on RN's PanResponder so it needs no
  * extra native gesture library. ↑/↓ buttons give the same control to screen-reader users.
  */
-export function PriorityList({ items, onChange, onDragStateChange }: PriorityListProps) {
+export function PriorityList<T extends string>({
+  items,
+  onChange,
+  onDragStateChange,
+}: PriorityListProps<T>) {
   const [drag, setDrag] = useState<{ from: number; to: number } | null>(null);
   const [dragY] = useState(() => new Animated.Value(0));
 

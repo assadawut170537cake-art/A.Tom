@@ -1,8 +1,9 @@
 import { ProviderSettings, type ProviderSettingsStore } from '../../../core/storage/ProviderSettings';
-import type { JevAdapter } from '../../ai/adapters/JevAdapter';
+import { isOneOf } from '../../../core/types/guards';
+import { JevAdapter } from '../../ai/adapters/JevAdapter';
 import { aiRegistry, type ProviderRegistry } from '../../ai/core/ProviderRegistry';
-import { findPersona } from './RuleClassifier';
 import { INTENTS, type Classifier, type Intent, type RouterInput, type RouterOutput } from '../core/types';
+import { routeFor } from './routeFor';
 
 const CRITERIA: Record<Intent, string> = {
   chat: 'General conversation, questions, or anything that is not a device command or assistant switch.',
@@ -26,7 +27,8 @@ export class JevClassifier implements Classifier {
 
   async classify(input: RouterInput): Promise<RouterOutput | null> {
     if (!(await this.isEnabled())) return null;
-    const jev = this.registry.get('jev') as JevAdapter;
+    const jev = this.registry.get('jev');
+    if (!(jev instanceof JevAdapter)) return null;
     const model = (await this.settings.getModelFor('jev')) ?? jev.config.defaultModel;
 
     const state = {
@@ -48,14 +50,9 @@ export class JevClassifier implements Classifier {
     );
 
     const answer = answers.intent;
-    if (answer?.type !== 'choice' || !INTENTS.includes(answer.choice as Intent)) return null;
-    const intent = answer.choice as Intent;
-    const persona = intent === 'switch_assistant' ? findPersona(input.text) : undefined;
-    return {
-      intent,
-      confidence: answer.confidence ?? answer.probabilities?.[intent] ?? 0,
-      ...(persona && { entities: { persona: String(persona) } }),
-      provider: 'jev',
-    };
+    if (answer?.type !== 'choice' || !isOneOf(INTENTS, answer.choice)) return null;
+    const intent = answer.choice;
+    const confidence = answer.confidence ?? answer.probabilities?.[intent] ?? 0;
+    return routeFor(intent, confidence, 'jev', input.text);
   }
 }

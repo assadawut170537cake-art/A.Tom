@@ -41,17 +41,19 @@ export class RuleClassifier implements Classifier {
         return {
           intent: 'switch_assistant',
           confidence: 0.95,
-          entities: { persona: String(persona) },
+          entities: { persona: `${persona}` },
           provider: 'rule',
         };
       }
     }
     const pc = text.match(PC_COMMAND);
     if (pc) {
+      // Both groups are mandatory in PC_COMMAND, so a match always fills them
+      const [, action = '', target = ''] = pc;
       return {
         intent: 'pc_command',
         confidence: 0.9,
-        entities: { action: pc[1], target: pc[2] },
+        entities: { action, target },
         provider: 'rule',
       };
     }

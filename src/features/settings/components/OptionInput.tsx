@@ -10,7 +10,7 @@ interface OptionInputProps {
   scope: string;
   name: string;
   label: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
 }
 
 /** Plain (non-secret) provider option, e.g. Azure region or a custom base URL. Saved on blur. */

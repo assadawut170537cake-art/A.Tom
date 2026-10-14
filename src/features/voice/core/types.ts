@@ -36,14 +36,14 @@ export interface STTProvider {
 }
 
 export interface SpeakOptions {
-  voiceId?: string;
-  speed?: number;
-  pitch?: number;
+  voiceId?: string | undefined;
+  speed?: number | undefined;
+  pitch?: number | undefined;
 }
 
 export interface Voice {
   id: string;
   name: string;
-  language?: string;
-  gender?: 'male' | 'female' | 'neutral';
+  language?: string | undefined;
+  gender?: 'male' | 'female' | 'neutral' | undefined;
 }

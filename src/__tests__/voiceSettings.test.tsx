@@ -11,6 +11,7 @@ import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { STT_PROVIDERS, TTS_PROVIDERS } from '../features/voice/voice.config';
 import { json, mockFetch } from '../test-utils/mockFetch';
 import { registerAll, resetSettings } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -40,9 +41,9 @@ async function renderScreen() {
 /** Type into a secret field and press the Save button that belongs to it. */
 async function saveSecret(label: string, value: string, index = 0) {
   const fields = screen.getAllByLabelText(/^(API key|Access key ID|User ID)$/);
-  const target = screen.getAllByLabelText(label)[index];
+  const target = nth(screen.getAllByLabelText(label), index);
   await fireEvent.changeText(target, value);
-  await fireEvent.press(screen.getAllByText('บันทึก')[fields.indexOf(target)]);
+  await fireEvent.press(nth(screen.getAllByText('บันทึก'), fields.indexOf(target)));
 }
 
 /**
@@ -144,10 +145,10 @@ describe('Voice settings screen — interactions', () => {
       expect(await SecureKeyStore.get(secretKey('tts', 'polly', 'accessKeyId'))).toBe('AKIA-TEST')
     );
 
-    const pollyRegion = screen.getAllByLabelText('Region')[1];
+    const pollyRegion = nth(screen.getAllByLabelText('Region'), 1);
     await fireEvent.changeText(pollyRegion, ' ap-southeast-1 ');
     await fireEvent(pollyRegion, 'endEditing');
-    const customUrl = screen.getAllByLabelText('Base URL')[0];
+    const customUrl = nth(screen.getAllByLabelText('Base URL'), 0);
     await fireEvent.changeText(customUrl, 'http://192.168.1.10:8000/v1');
     await fireEvent(customUrl, 'endEditing');
     await waitFor(async () => {
@@ -158,7 +159,7 @@ describe('Voice settings screen — interactions', () => {
 
   test('default voice picker loads the device voices and saves the choice', async () => {
     await renderScreen();
-    await fireEvent.press(screen.getAllByLabelText(/^เสียงเริ่มต้น:/)[0]); // Expo Speech
+    await fireEvent.press(nth(screen.getAllByLabelText(/^เสียงเริ่มต้น:/), 0)); // Expo Speech
     await fireEvent.press(screen.getByText('โหลดรายการ'));
     await fireEvent.press(await screen.findByText('Kanya'));
     await waitFor(async () =>
@@ -176,10 +177,10 @@ describe('Voice settings screen — interactions', () => {
 
   test('preview: Expo speaks the sample; a keyless cloud provider shows the error', async () => {
     await renderScreen();
-    await fireEvent.press(screen.getAllByText('ลองฟัง')[0]);
+    await fireEvent.press(nth(screen.getAllByText('ลองฟัง'), 0));
     expect(Speech.speak).toHaveBeenCalledWith(PREVIEW_TEXT, expect.objectContaining({ language: 'th-TH' }));
 
-    await fireEvent.press(screen.getAllByText('ลองฟัง')[1]); // OpenAI TTS, no key
+    await fireEvent.press(nth(screen.getAllByText('ลองฟัง'), 1)); // OpenAI TTS, no key
     expect(await screen.findByText(/\[openai\] ยังไม่ได้ตั้งค่า API key/)).toBeTruthy();
   });
 
@@ -188,11 +189,11 @@ describe('Voice settings screen — interactions', () => {
     const { calls } = mockFetch([[/api\.openai\.com/, () => json({ data: [] })]]);
     await renderScreen();
 
-    await fireEvent.press(screen.getAllByText('ทดสอบการเชื่อมต่อ')[1]); // OpenAI TTS
+    await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 1)); // OpenAI TTS
     expect(await screen.findByText('✓ เชื่อมต่อได้')).toBeTruthy();
-    expect(calls[0].headers.Authorization).toBe('Bearer sk');
+    expect(nth(calls, 0).headers.Authorization).toBe('Bearer sk');
 
-    await fireEvent.press(screen.getAllByText('ทดสอบการเชื่อมต่อ')[9]); // Whisper
+    await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 9)); // Whisper
     expect(await screen.findByText('[whisper] ยังไม่ได้ตั้งค่า API key')).toBeTruthy();
   });
 

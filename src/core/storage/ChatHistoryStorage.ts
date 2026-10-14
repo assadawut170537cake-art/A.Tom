@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Moving Persona/Message/provider-id types into core/ would make the dependency one-way; deferred
 // because it touches most feature files — revisit before Phase 4 adds more storage.
 import type { Message, Persona } from '../../features/jarvis/types';
+import { isArray, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
 
 /**
  * Chat history persistence: one AsyncStorage key per persona so histories stay separate and a
@@ -12,8 +13,8 @@ import type { Message, Persona } from '../../features/jarvis/types';
  */
 
 const KEY_PREFIX = 'atom.history.v1.';
-const PERSONAS: Persona[] = [1, 2, 3, 4];
-const ROLES = new Set(['user', 'assistant', 'system']);
+const PERSONAS = [1, 2, 3, 4] as const satisfies readonly Persona[];
+const ROLES = ['user', 'assistant', 'system'] as const satisfies readonly Message['role'][];
 
 /** Newest messages kept per persona (keeps AsyncStorage well under Android's size limit). */
 export const MAX_STORED_MESSAGES = 500;
@@ -21,14 +22,13 @@ export const MAX_STORED_MESSAGES = 500;
 export const historyKey = (persona: Persona) => `${KEY_PREFIX}${persona}`;
 
 function isMessage(value: unknown, persona: Persona): value is Message {
-  const m = value as Partial<Message> | null;
   return (
-    !!m &&
-    typeof m.id === 'string' &&
-    typeof m.content === 'string' &&
-    typeof m.createdAt === 'number' &&
-    ROLES.has(m.role as string) &&
-    m.persona === persona
+    isRecord(value) &&
+    isString(value.id) &&
+    isString(value.content) &&
+    typeof value.createdAt === 'number' &&
+    isOneOf(ROLES, value.role) &&
+    value.persona === persona
   );
 }
 
@@ -64,14 +64,11 @@ export const ChatHistoryStorage = {
       return { ok: false, histories };
     }
     for (const [key, raw] of entries) {
-      const persona = Number(key.slice(KEY_PREFIX.length)) as Persona;
-      if (!raw || !PERSONAS.includes(persona)) continue;
-      try {
-        const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) histories[persona] = parsed.filter((m) => isMessage(m, persona));
-      } catch {
-        // corrupt entry → start that persona fresh
-      }
+      const persona = Number(key.slice(KEY_PREFIX.length));
+      if (!isOneOf(PERSONAS, persona)) continue;
+      // Missing/corrupt entry → that persona starts fresh; invalid messages are dropped
+      const parsed = parseJSON(raw, isArray);
+      if (parsed) histories[persona] = parsed.filter((m) => isMessage(m, persona));
     }
     return { ok: true, histories };
   },

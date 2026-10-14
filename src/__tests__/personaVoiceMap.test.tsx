@@ -12,6 +12,7 @@ import { PREVIEW_TEXT } from '../features/settings/components/voiceOptions';
 import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { bytes, json, mockFetch } from '../test-utils/mockFetch';
 import { registerAll, resetSettings, resetStore } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -43,7 +44,7 @@ async function renderMapper() {
 
 /** Open a ModelSelector by its accessibility label and pick an option by its text. */
 async function choose(selectorLabel: RegExp, optionText: string, index = 0) {
-  await fireEvent.press(screen.getAllByLabelText(selectorLabel)[index]);
+  await fireEvent.press(nth(screen.getAllByLabelText(selectorLabel), index));
   await fireEvent.press(await screen.findByText(optionText));
 }
 
@@ -132,11 +133,11 @@ describe('PersonaVoiceMapper UI', () => {
     await renderMapper();
 
     // JARVIS row is the 2nd "เสียง" selector
-    await fireEvent.press(screen.getAllByLabelText(/^เสียง:/)[1]);
+    await fireEvent.press(nth(screen.getAllByLabelText(/^เสียง:/), 1));
     await fireEvent.press(screen.getByText('โหลดรายการ'));
     expect(await screen.findByText('Bella')).toBeTruthy();
     expect(screen.getByText('th · female')).toBeTruthy();
-    expect(calls[0].headers['xi-api-key']).toBe('el-key');
+    expect(nth(calls, 0).headers['xi-api-key']).toBe('el-key');
 
     await fireEvent.press(screen.getByText('Bella'));
     await waitFor(async () =>
@@ -147,7 +148,7 @@ describe('PersonaVoiceMapper UI', () => {
   test('voice list errors are shown inside the picker', async () => {
     await ProviderSettings.setTTSFor(1, { providerId: 'elevenlabs' });
     await renderMapper();
-    await fireEvent.press(screen.getAllByLabelText(/^เสียง:/)[0]);
+    await fireEvent.press(nth(screen.getAllByLabelText(/^เสียง:/), 0));
     await fireEvent.press(screen.getByText('โหลดรายการ'));
     expect(await screen.findByText(/\[elevenlabs\] ยังไม่ได้ตั้งค่า API key/)).toBeTruthy();
   });
@@ -159,7 +160,7 @@ describe('PersonaVoiceMapper UI', () => {
     const { calls } = mockFetch([[ELEVEN, () => bytes()]]);
     await renderMapper();
 
-    await fireEvent.press(screen.getAllByText('ลองฟัง')[0]);
+    await fireEvent.press(nth(screen.getAllByText('ลองฟัง'), 0));
     expect(Speech.speak).toHaveBeenCalledWith(PREVIEW_TEXT, expect.objectContaining({ voice: 'atom-voice' }));
 
     jest.mocked(createAudioPlayer).mockImplementationOnce(() => {
@@ -174,15 +175,15 @@ describe('PersonaVoiceMapper UI', () => {
         remove: jest.fn(),
       } as never;
     });
-    await fireEvent.press(screen.getAllByText('ลองฟัง')[1]);
+    await fireEvent.press(nth(screen.getAllByText('ลองฟัง'), 1));
     await waitFor(() => expect(createAudioPlayer).toHaveBeenCalled());
-    expect(calls[0].url.pathname).toBe('/v1/text-to-speech/v-adam');
+    expect(nth(calls, 0).url.pathname).toBe('/v1/text-to-speech/v-adam');
   });
 
   test('preview failure is shown under the row', async () => {
     await ProviderSettings.setTTSFor(3, { providerId: 'elevenlabs' });
     await renderMapper();
-    await fireEvent.press(screen.getAllByText('ลองฟัง')[2]);
+    await fireEvent.press(nth(screen.getAllByText('ลองฟัง'), 2));
     expect(await screen.findByText(/\[elevenlabs\] ยังไม่ได้ตั้งค่า API key/)).toBeTruthy();
   });
 
@@ -212,7 +213,7 @@ describe('PersonaVoiceMapper UI', () => {
 
   test('provider picker lists all 8 TTS providers with key hints', async () => {
     await renderMapper();
-    await fireEvent.press(screen.getAllByLabelText(/^ผู้ให้บริการเสียง \(TTS\)/)[0]);
+    await fireEvent.press(nth(screen.getAllByLabelText(/^ผู้ให้บริการเสียง \(TTS\)/), 0));
     for (const name of ['OpenAI TTS', 'Amazon Polly', 'Play.ht', 'Custom (OpenAI-compatible)']) {
       expect(screen.getByText(name)).toBeTruthy();
     }

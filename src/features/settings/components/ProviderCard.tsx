@@ -12,8 +12,13 @@ import { Card } from './ui';
 
 const toOptions = (models: string[]): SelectOption[] => models.map((m) => ({ value: m, label: m }));
 
+interface ProviderCardProps {
+  provider: AIProvider;
+  subtitle?: string | undefined;
+}
+
 /** One AI provider: enable toggle, API key, model and connection test. */
-export function ProviderCard({ provider, subtitle }: { provider: AIProvider; subtitle?: string }) {
+export function ProviderCard({ provider, subtitle }: ProviderCardProps) {
   const { config } = provider;
   const [enabled, setEnabled] = useState(config.enabled);
   const [model, setModel] = useState(config.defaultModel);

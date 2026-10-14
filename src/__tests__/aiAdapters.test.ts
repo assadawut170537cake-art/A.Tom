@@ -17,6 +17,7 @@ import {
   openRouterText,
 } from '../test-utils/mockFetch';
 import { registerAll, setAIKeys } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 const config = (id: AIProviderConfig['id']) => PROVIDERS.find((p) => p.id === id)!;
 const gemini = () => aiRegistry.get('gemini') as GeminiAdapter;
@@ -81,7 +82,7 @@ describe('GeminiAdapter (mocked generativelanguage API)', () => {
   test('chat: system instructions merged, roles mapped, generation config, key in header', async () => {
     const { calls } = mockFetch([[GEMINI, () => geminiText('ok')]]);
     await gemini().chat({ ...REQ, model: 'gemini-2.5-flash', timeoutMs: 5000 });
-    const c = calls[0];
+    const c = nth(calls, 0);
     expect(c.url.href).toBe(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
     );
@@ -160,7 +161,7 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
       providerId: 'openrouter',
       tokensUsed: { input: 5, output: 3 },
     });
-    const c = calls[0];
+    const c = nth(calls, 0);
     expect(c.url.href).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(c.headers).toMatchObject({
       Authorization: 'Bearer openrouter-test-key',
@@ -190,7 +191,7 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
     ]);
     await expect(openrouter().getModels()).resolves.toEqual(['a/model', 'z/model']);
     await expect(openrouter().testConnection()).resolves.toEqual({ ok: true });
-    expect(calls[1].url.pathname).toBe('/api/v1/key');
+    expect(nth(calls, 1).url.pathname).toBe('/api/v1/key');
 
     jest.restoreAllMocks();
     mockFetch([[OPENROUTER, () => json({})]]);
@@ -217,8 +218,8 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
     const { calls } = mockFetch([[/llm\.local/, () => json({ data: [] })]]);
     await expect(custom.getModels()).resolves.toEqual(['a', 'b']);
     await expect(custom.testConnection()).resolves.toEqual({ ok: true });
-    expect(calls[0].url.href).toBe('https://llm.local/v1/models'); // trailing slash trimmed
-    expect(calls[0].headers['HTTP-Referer']).toBeUndefined();
+    expect(nth(calls, 0).url.href).toBe('https://llm.local/v1/models'); // trailing slash trimmed
+    expect(nth(calls, 0).headers['HTTP-Referer']).toBeUndefined();
   });
 });
 
@@ -247,9 +248,9 @@ describe('JevAdapter (mocked TypeSafe System One)', () => {
     expect(res.answers.spam).toEqual({ type: 'noul', noul: 0.97 });
     expect(res.answers.tone).toMatchObject({ choice: 'angry', confidence: 0.8 });
     expect(res.answers.urgency).toMatchObject({ score: 1.7 });
-    expect(calls[0].url.href).toBe('https://api.typesafe.ai/v1/systemone');
-    expect(calls[0].headers.Authorization).toBe('Bearer jev-test-key');
-    expect(calls[0].body).toMatchObject({ model: 'jev-latest', state: 'I was charged twice!' });
+    expect(nth(calls, 0).url.href).toBe('https://api.typesafe.ai/v1/systemone');
+    expect(nth(calls, 0).headers.Authorization).toBe('Bearer jev-test-key');
+    expect(nth(calls, 0).body).toMatchObject({ model: 'jev-latest', state: 'I was charged twice!' });
   });
 
   test('ask(): empty answers → invalid_response; 422 validation detail is surfaced', async () => {

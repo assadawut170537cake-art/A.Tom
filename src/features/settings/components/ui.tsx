@@ -3,7 +3,17 @@ import { Pressable, Text, View, type PressableProps } from 'react-native';
 
 /** Shared building blocks for the settings screens (dark NativeWind theme, matches the main screen). */
 
-export function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
+interface SectionProps {
+  title: string;
+  hint?: string | undefined;
+  children: ReactNode;
+}
+
+interface ChildrenProps {
+  children: ReactNode;
+}
+
+export function Section({ title, hint, children }: SectionProps) {
   return (
     <View className="mb-7">
       <Text className="mb-1 px-1 text-xs font-semibold uppercase tracking-widest text-white/50">
@@ -15,11 +25,11 @@ export function Section({ title, hint, children }: { title: string; hint?: strin
   );
 }
 
-export function Card({ children }: { children: ReactNode }) {
+export function Card({ children }: ChildrenProps) {
   return <View className="gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">{children}</View>;
 }
 
-export function FieldLabel({ children }: { children: ReactNode }) {
+export function FieldLabel({ children }: ChildrenProps) {
   return <Text className="mb-1.5 text-xs font-medium text-white/60">{children}</Text>;
 }
 
@@ -31,12 +41,17 @@ const TONES: Record<Tone, string> = {
   danger: 'border-red-400/30 bg-red-500/15 active:bg-red-500/30',
 };
 
+interface SmallButtonProps extends Omit<PressableProps, 'children'> {
+  label: string;
+  tone?: Tone | undefined;
+}
+
 export function SmallButton({
   label,
   tone = 'default',
   disabled,
   ...rest
-}: { label: string; tone?: Tone } & Omit<PressableProps, 'children'>) {
+}: SmallButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"

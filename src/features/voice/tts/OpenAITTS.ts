@@ -54,7 +54,7 @@ export class OpenAITTS extends BaseCloudTTS {
     return OPENAI_VOICES.map((v) => ({ id: v, name: v }));
   }
 
-  protected async probe(): Promise<unknown> {
+  protected override async probe(): Promise<unknown> {
     return requestJson(this.id, `${await this.baseURL()}/models`, { headers: await this.headers() });
   }
 }

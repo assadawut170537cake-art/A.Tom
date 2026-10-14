@@ -25,6 +25,7 @@ import {
   type RecordedCall,
 } from '../test-utils/mockFetch';
 import { registerAll, resetSettings, resetStore, setAIKeys } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 const STORE_KEY = 'atom-store';
 
@@ -47,7 +48,7 @@ function mockChatGemini() {
 }
 
 const contentsOf = (call: RecordedCall) =>
-  (call.body as { contents: { role: string; parts: { text: string }[] }[] }).contents.map((c) => [
+  (call.body as { contents: { role: string; parts: [{ text: string }] }[] }).contents.map((c) => [
     c.role,
     c.parts[0].text,
   ]);
@@ -87,7 +88,7 @@ describe('Store: separate history per persona', () => {
     const ids = Array.from({ length: 50 }, (_, i) => pushMessage({ role: 'user', content: `m${i}` }).id);
     expect(new Set(ids).size).toBe(50);
     expect(history(1).map((m) => m.content)).toEqual(ids.map((_, i) => `m${i}`));
-    expect(history(1)[0].createdAt).toBeGreaterThanOrEqual(before);
+    expect(nth(history(1), 0).createdAt).toBeGreaterThanOrEqual(before);
   });
 
   test('switching persona back and forth never mixes or clears histories', () => {
@@ -126,7 +127,8 @@ describe('Conversation: history goes to the right persona', () => {
       ['assistant', 'reply 2'],
     ]);
 
-    const [first, second, third] = chatCalls();
+    const chat = chatCalls();
+    const [first, second, third] = [nth(chat, 0), nth(chat, 1), nth(chat, 2)];
     expect(contentsOf(first)).toEqual([['user', 'สวัสดีอะตอม']]);
     expect(contentsOf(second)).toEqual([['user', 'สวัสดีจาร์วิส']]); // nothing from ATOM
     expect(contentsOf(third)).toEqual([
@@ -135,7 +137,7 @@ describe('Conversation: history goes to the right persona', () => {
       ['user', 'อะตอมจำได้ไหม'],
     ]);
     const system = (c: RecordedCall) =>
-      (c.body as { systemInstruction: { parts: { text: string }[] } }).systemInstruction.parts[0].text;
+      (c.body as { systemInstruction: { parts: [{ text: string }] } }).systemInstruction.parts[0].text;
     expect(system(second)).toContain(PERSONA_PROMPTS[2]);
     expect(system(third)).toContain(PERSONA_PROMPTS[1]);
   });
@@ -144,8 +146,8 @@ describe('Conversation: history goes to the right persona', () => {
     useAtomStore.getState().pushMessage({ role: 'system', content: '⚠️ old error' });
     const chatCalls = mockChatGemini();
     await sendMessage('ลองใหม่', { speak: false });
-    expect(contentsOf(chatCalls()[0])).toEqual([['user', 'ลองใหม่']]);
-    expect(history(1)[0].role).toBe('system');
+    expect(contentsOf(nth(chatCalls(), 0))).toEqual([['user', 'ลองใหม่']]);
+    expect(nth(history(1), 0).role).toBe('system');
   });
 
   test('switch via OpenRouter-classified intent: request stays with the old persona, greeting starts the new one', async () => {
@@ -342,7 +344,7 @@ describe('Persistence: chat history (save / load)', () => {
     await expect(ChatHistoryStorage.save(1, many)).resolves.toBe(true);
     const saved = await stored(1);
     expect(saved).toHaveLength(MAX_STORED_MESSAGES);
-    expect(saved?.[0].content).toBe('m20');
+    expect(saved?.[0]?.content).toBe('m20');
   });
 
   test('persona/UI-mode store key stays separate from history keys', async () => {

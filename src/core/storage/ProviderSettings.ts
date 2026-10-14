@@ -1,4 +1,13 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  isArrayOf,
+  isBoolean,
+  isNumber,
+  isRecord,
+  isString,
+  keysOf,
+  type Guard,
+} from '../types/guards';
+import { readJSON, writeJSON } from './jsonStorage';
 
 // NOTE(arch, 2026-10-14): core/ imports *types* from features/ (type-only, no runtime cycle).
 // Moving Persona/Message/provider-id types into core/ would make the dependency one-way; deferred
@@ -16,9 +25,9 @@ const STORAGE_KEY = 'atom.providerSettings.v1';
 
 export interface PersonaVoice {
   providerId: TTSProviderId;
-  voiceId?: string;
-  speed?: number;
-  pitch?: number;
+  voiceId?: string | undefined;
+  speed?: number | undefined;
+  pitch?: number | undefined;
 }
 
 export interface AdvancedSettings {
@@ -34,6 +43,12 @@ export const DEFAULT_ADVANCED: AdvancedSettings = { timeoutMs: 30_000, retries: 
 
 export type VoiceKind = 'tts' | 'stt';
 
+/** Provider id type for each voice kind, so `tts` maps only ever hold TTS ids (and vice versa). */
+export interface VoiceIdOf {
+  tts: TTSProviderId;
+  stt: STTProviderId;
+}
+
 interface SettingsData {
   enabled: Partial<Record<AIProviderId, boolean>>;
   priority: AIProviderId[];
@@ -44,8 +59,8 @@ interface SettingsData {
   sharedVoice?: PersonaVoice;
   stt?: STTProviderId;
   advanced: AdvancedSettings;
-  voiceEnabled: { tts: Partial<Record<TTSProviderId, boolean>>; stt: Partial<Record<STTProviderId, boolean>> };
-  voicePriority: { tts: TTSProviderId[]; stt: STTProviderId[] };
+  voiceEnabled: { [K in VoiceKind]: Partial<Record<VoiceIdOf[K], boolean>> };
+  voicePriority: { [K in VoiceKind]: VoiceIdOf[K][] };
   /** Per-provider non-secret options, e.g. options['tts.azure'].region */
   options: Record<string, Record<string, string>>;
 }
@@ -62,14 +77,90 @@ const empty = (): SettingsData => ({
   voicePriority: { tts: [], stt: [] },
 });
 
+// ---- validation of the stored blob (written by this module, but storage can be stale/corrupt) --
+
+/** What can be verified about stored data: same shape, but provider ids are just strings. */
+interface StoredSettings {
+  enabled: Record<string, boolean>;
+  priority: string[];
+  models: Record<string, string>;
+  ttsByPersona: Record<string, StoredVoice>;
+  sameVoiceForAll: boolean;
+  sharedVoice: StoredVoice;
+  stt: string;
+  advanced: Partial<AdvancedSettings>;
+  voiceEnabled: Partial<Record<VoiceKind, Record<string, boolean>>>;
+  voicePriority: Partial<Record<VoiceKind, string[]>>;
+  options: Record<string, Record<string, string>>;
+}
+
+interface StoredVoice {
+  providerId: string;
+  voiceId?: string | undefined;
+  speed?: number | undefined;
+  pitch?: number | undefined;
+}
+
+const recordOf =
+  <T>(guard: Guard<T>) =>
+  (v: unknown): v is Record<string, T> =>
+    isRecord(v) && Object.values(v).every((x) => guard(x));
+
+const optional =
+  <T>(guard: Guard<T>) =>
+  (v: unknown): v is T | undefined =>
+    v === undefined || guard(v);
+
+const isStoredVoice = (v: unknown): v is StoredVoice =>
+  isRecord(v) &&
+  isString(v.providerId) &&
+  optional(isString)(v.voiceId) &&
+  optional(isNumber)(v.speed) &&
+  optional(isNumber)(v.pitch);
+
+const FIELD_GUARDS: { [K in keyof StoredSettings]: Guard<StoredSettings[K]> } = {
+  enabled: recordOf(isBoolean),
+  priority: (v): v is string[] => isArrayOf(v, isString),
+  models: recordOf(isString),
+  ttsByPersona: recordOf(isStoredVoice),
+  sameVoiceForAll: isBoolean,
+  sharedVoice: isStoredVoice,
+  stt: isString,
+  advanced: (v): v is Partial<AdvancedSettings> =>
+    isRecord(v) &&
+    optional(isNumber)(v.timeoutMs) &&
+    optional(isNumber)(v.retries) &&
+    optional(isBoolean)(v.fallback),
+  voiceEnabled: (v): v is StoredSettings['voiceEnabled'] =>
+    isRecord(v) && optional(recordOf(isBoolean))(v.tts) && optional(recordOf(isBoolean))(v.stt),
+  voicePriority: (v): v is StoredSettings['voicePriority'] =>
+    isRecord(v) &&
+    optional((x): x is string[] => isArrayOf(x, isString))(v.tts) &&
+    optional((x): x is string[] => isArrayOf(x, isString))(v.stt),
+  options: recordOf(recordOf(isString)),
+};
+
+/** Keep every stored field that has the right shape; drop the rest (defaults fill the gaps). */
+function validFields(stored: Record<string, unknown>): Partial<SettingsData> {
+  const out: Partial<StoredSettings> = {};
+  const keep = <K extends keyof StoredSettings>(key: K) => {
+    const value = stored[key];
+    if (FIELD_GUARDS[key](value)) out[key] = value;
+  };
+  keysOf(FIELD_GUARDS).forEach(keep);
+  // The single trust boundary: stored provider ids are plain strings that this module wrote from
+  // the id unions. They are only ever looked up by known ids, so an unknown id is inert.
+  return out as Partial<SettingsData>;
+}
+
 let cache: SettingsData | null = null;
 let writeChain: Promise<void> = Promise.resolve();
 
 async function load(): Promise<SettingsData> {
   if (cache) return cache;
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    const saved = raw ? (JSON.parse(raw) as Partial<SettingsData>) : {};
+    const stored = await readJSON(STORAGE_KEY, isRecord);
+    const saved = stored ? validFields(stored) : {};
     const base = empty();
     cache = {
       ...base,
@@ -89,7 +180,7 @@ function update(mutate: (data: SettingsData) => void): Promise<void> {
   writeChain = writeChain.then(async () => {
     const data = await load();
     mutate(data);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    await writeJSON(STORAGE_KEY, data);
   });
   return writeChain;
 }
@@ -164,25 +255,26 @@ export const ProviderSettings = {
   },
 
   /** Voice providers are enabled unless the user switched them off. */
-  async getVoiceEnabled(kind: VoiceKind, id: TTSProviderId | STTProviderId): Promise<boolean> {
-    const map = (await load()).voiceEnabled[kind] as Partial<Record<string, boolean>>;
+  async getVoiceEnabled<K extends VoiceKind>(kind: K, id: VoiceIdOf[K]): Promise<boolean> {
+    const map: Partial<Record<VoiceIdOf[K], boolean>> = (await load()).voiceEnabled[kind];
     return map[id] ?? true;
   },
-  setVoiceEnabled(kind: VoiceKind, id: TTSProviderId | STTProviderId, enabled: boolean): Promise<void> {
+  setVoiceEnabled<K extends VoiceKind>(kind: K, id: VoiceIdOf[K], enabled: boolean): Promise<void> {
     return update((d) => {
-      (d.voiceEnabled[kind] as Partial<Record<string, boolean>>)[id] = enabled;
+      const map: Partial<Record<VoiceIdOf[K], boolean>> = d.voiceEnabled[kind];
+      map[id] = enabled;
     });
   },
-  async getVoicePriority<K extends VoiceKind>(
-    kind: K
-  ): Promise<K extends 'tts' ? TTSProviderId[] : STTProviderId[]> {
-    return [...(await load()).voicePriority[kind]] as K extends 'tts'
-      ? TTSProviderId[]
-      : STTProviderId[];
+  async getVoicePriority<K extends VoiceKind>(kind: K): Promise<VoiceIdOf[K][]> {
+    const list: VoiceIdOf[K][] = (await load()).voicePriority[kind];
+    return [...list];
   },
-  setVoicePriority(kind: VoiceKind, list: (TTSProviderId | STTProviderId)[]): Promise<void> {
+  setVoicePriority<K extends VoiceKind>(kind: K, list: VoiceIdOf[K][]): Promise<void> {
     return update((d) => {
-      (d.voicePriority[kind] as string[]) = [...new Set(list)];
+      // TS can't assign through a mapped type with a generic key, but it can read the array:
+      // replace its contents in place (getVoicePriority hands out copies, so no aliasing)
+      const current: VoiceIdOf[K][] = d.voicePriority[kind];
+      current.splice(0, current.length, ...new Set(list));
     });
   },
 

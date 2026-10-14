@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
+import { isRecord, parseJSON } from '../../../../core/types/guards';
 import { LAYOUT, MOOD_TO_ORB_STATE } from '../../constants';
 import { ORB_HTML } from '../../constants/orbHtml';
 import type { OrbMood, Persona } from '../../types';
@@ -59,12 +60,9 @@ export const OrbWebView = memo(function OrbWebView({ persona, mood }: OrbWebView
 
   const onMessage = useCallback(
     (e: WebViewMessageEvent) => {
-      try {
-        const data = JSON.parse(e.nativeEvent.data) as { type?: string };
-        if (data.type === 'ready') markReady();
-      } catch {
-        // ignore non-JSON messages
-      }
+      // Anything that isn't a JSON object (e.g. stray console bridging) is ignored
+      const data = parseJSON(e.nativeEvent.data, isRecord);
+      if (data?.type === 'ready') markReady();
     },
     [markReady]
   );

@@ -6,14 +6,14 @@ import { WhisperSTT } from './WhisperSTT';
  * Options (ProviderSettings 'stt.custom'): baseURL (required), model.
  */
 export class CustomSTT extends WhisperSTT {
-  readonly id: STTProviderId = 'custom';
-  readonly name: string = 'Custom';
+  override readonly id: STTProviderId = 'custom';
+  override readonly name: string = 'Custom';
 
-  protected async baseURL(): Promise<string> {
+  protected override async baseURL(): Promise<string> {
     return (await this.option('baseURL')).replace(/\/+$/, '');
   }
 
-  protected model(): Promise<string> {
+  protected override model(): Promise<string> {
     return this.option('model', 'whisper-1');
   }
 }

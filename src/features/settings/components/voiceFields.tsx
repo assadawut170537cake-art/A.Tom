@@ -1,9 +1,10 @@
 import { secretKey } from '../../../core/storage/SecureKeyStore';
-import { VOICE_PROVIDER_FIELDS } from '../../voice/voice.config';
+import type { VoiceIdOf, VoiceKind } from '../../../core/storage/ProviderSettings';
+import { voiceProviderFields, type VoiceFieldName } from '../../voice/voice.config';
 import { ApiKeyInput } from './ApiKeyInput';
 import { OptionInput } from './OptionInput';
 
-const LABELS: Record<string, { label: string; placeholder?: string }> = {
+const LABELS: Record<VoiceFieldName, { label: string; placeholder?: string | undefined }> = {
   accessKeyId: { label: 'Access key ID', placeholder: 'AKIA…' },
   userId: { label: 'User ID' },
   region: { label: 'Region', placeholder: 'เช่น southeastasia / us-east-1' },
@@ -11,12 +12,14 @@ const LABELS: Record<string, { label: string; placeholder?: string }> = {
   model: { label: 'Model' },
 };
 
+interface VoiceExtraFieldsProps<K extends VoiceKind> {
+  kind: K;
+  id: VoiceIdOf[K];
+}
+
 /** Extra credentials/options some voice providers need beyond the main API key. */
-export function VoiceExtraFields({ kind, id }: { kind: 'tts' | 'stt'; id: string }) {
-  const fields = (VOICE_PROVIDER_FIELDS[kind] as Record<
-    string,
-    { secrets: readonly string[]; options: readonly string[] }
-  >)[id];
+export function VoiceExtraFields<K extends VoiceKind>({ kind, id }: VoiceExtraFieldsProps<K>) {
+  const fields = voiceProviderFields(kind, id);
   if (!fields) return null;
   return (
     <>
@@ -24,8 +27,8 @@ export function VoiceExtraFields({ kind, id }: { kind: 'tts' | 'stt'; id: string
         <ApiKeyInput
           key={name}
           storageKey={secretKey(kind, id, name)}
-          label={LABELS[name]?.label ?? name}
-          placeholder={LABELS[name]?.placeholder}
+          label={LABELS[name].label}
+          placeholder={LABELS[name].placeholder}
         />
       ))}
       {fields.options.map((name) => (
@@ -33,8 +36,8 @@ export function VoiceExtraFields({ kind, id }: { kind: 'tts' | 'stt'; id: string
           key={name}
           scope={`${kind}.${id}`}
           name={name}
-          label={LABELS[name]?.label ?? name}
-          placeholder={LABELS[name]?.placeholder}
+          label={LABELS[name].label}
+          placeholder={LABELS[name].placeholder}
         />
       ))}
     </>

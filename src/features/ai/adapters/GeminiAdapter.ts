@@ -70,7 +70,7 @@ export class GeminiAdapter extends BaseAIProvider {
   }
 
   /** Live list of models that support generateContent. */
-  async getModels(): Promise<string[]> {
+  override async getModels(): Promise<string[]> {
     const data = await this.listModels();
     return (data.models ?? [])
       .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))

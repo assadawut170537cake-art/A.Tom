@@ -1,9 +1,14 @@
 import type { ChatMessage } from '../../ai/core/types';
 import type { Persona } from '../../jarvis/types';
 
-export type Intent = 'chat' | 'pc_command' | 'switch_assistant';
+export const INTENTS = ['chat', 'pc_command', 'switch_assistant'] as const;
+export type Intent = (typeof INTENTS)[number];
 
-export const INTENTS: readonly Intent[] = ['chat', 'pc_command', 'switch_assistant'];
+/** Which stage decided the route. */
+export type RouteSource = 'rule' | 'jev' | 'llm';
+
+/** Persona id as carried in route entities ('1' | '2' | '3' | '4'). */
+export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
@@ -15,12 +20,21 @@ export interface RouterInput {
   };
 }
 
-export interface RouterOutput {
-  intent: Intent;
+interface RouteBase {
   confidence: number;
-  entities?: Record<string, string>;
-  provider: 'rule' | 'jev' | 'llm';
+  provider: RouteSource;
 }
+
+/**
+ * Discriminated on `intent`: each intent carries its own (optional) entities, so narrowing on
+ * `route.intent` gives handlers typed fields instead of a free-form string map.
+ */
+export type RouterOutput =
+  | (RouteBase & { intent: 'chat'; entities?: undefined })
+  | (RouteBase & { intent: 'pc_command'; entities?: { action: string; target: string } })
+  | (RouteBase & { intent: 'switch_assistant'; entities?: { persona: PersonaEntity } });
+
+export type RouteOf<I extends Intent> = Extract<RouterOutput, { intent: I }>;
 
 export interface Classifier {
   /** null = no opinion (let the next classifier decide). */
@@ -34,6 +48,9 @@ export interface HandlerResult {
   persona: Persona;
 }
 
-export interface IntentHandler {
-  handle(input: RouterInput, route: RouterOutput): Promise<HandlerResult>;
+export interface IntentHandler<I extends Intent = Intent> {
+  handle(input: RouterInput, route: RouteOf<I>): Promise<HandlerResult>;
 }
+
+/** One handler per intent, each receiving only its own route variant. */
+export type IntentHandlers = { [I in Intent]: IntentHandler<I> };

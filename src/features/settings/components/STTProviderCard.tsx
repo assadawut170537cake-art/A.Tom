@@ -11,14 +11,13 @@ import { TestConnectionButton } from './TestConnectionButton';
 import { Card } from './ui';
 import { VoiceExtraFields } from './voiceFields';
 
-/** One STT provider: enable, credentials and connection test. */
-export function STTProviderCard({
-  provider,
-  meta,
-}: {
+interface STTProviderCardProps {
   provider: STTProvider;
   meta: VoiceProviderMeta<STTProviderId>;
-}) {
+}
+
+/** One STT provider: enable, credentials and connection test. */
+export function STTProviderCard({ provider, meta }: STTProviderCardProps) {
   const [enabled, setEnabled] = useState(true);
 
   useEffect(

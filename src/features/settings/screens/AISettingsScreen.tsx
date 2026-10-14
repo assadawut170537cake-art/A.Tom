@@ -28,9 +28,9 @@ function useLLMPriority() {
     []
   );
 
-  const change = (ids: string[]) => {
-    setOrder(ids as AIProviderId[]);
-    ProviderSettings.setPriority(ids as AIProviderId[]);
+  const change = (ids: AIProviderId[]) => {
+    setOrder(ids);
+    ProviderSettings.setPriority(ids);
   };
 
   const items = order.map((id) => {

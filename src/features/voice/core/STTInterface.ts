@@ -11,7 +11,8 @@ export const STT_LANGUAGE_SHORT = 'th';
 
 /** Lower-case file extension of an audio URI ('' when there is none); query strings ignored. */
 export function audioExtension(uri: string): string {
-  return uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+  const path = uri.split('?')[0] ?? '';
+  return path.split('.').pop()?.toLowerCase() ?? '';
 }
 
 /** Recordings from expo-audio's default presets are AAC in an .m4a container. */

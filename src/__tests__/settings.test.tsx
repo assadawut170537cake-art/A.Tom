@@ -6,6 +6,7 @@ import { SecureKeyStore } from '../core/storage/SecureKeyStore';
 import { registerAIProviders } from '../features/ai';
 import { registerVoiceProviders } from '../features/voice';
 import { RootNavigator } from '../navigation/RootNavigator';
+import { nth } from '../test-utils/nth';
 
 const METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
@@ -50,21 +51,21 @@ test('AI settings: cards, key save, test connection, toggle, priority', async ()
 
   // No key yet → test reports the missing key without touching the network
   const fetchSpy = jest.spyOn(globalThis, 'fetch');
-  await fireEvent.press(screen.getAllByText('ทดสอบการเชื่อมต่อ')[0]);
+  await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 0));
   expect(await screen.findByText(/\[gemini\] ยังไม่ได้ตั้งค่า API key/)).toBeTruthy();
   expect(fetchSpy).not.toHaveBeenCalled();
 
   // Save a key → stored in SecureStore, UI only shows that one exists
-  await fireEvent.changeText(screen.getAllByLabelText('API key')[0], 'test-key');
-  await fireEvent.press(screen.getAllByText('บันทึก')[0]);
+  await fireEvent.changeText(nth(screen.getAllByLabelText('API key'), 0), 'test-key');
+  await fireEvent.press(nth(screen.getAllByText('บันทึก'), 0));
   expect(await screen.findByLabelText('API key บันทึกแล้ว')).toBeTruthy();
   expect(await SecureKeyStore.get('ai.gemini')).toBe('test-key');
 
   // Test connection with the key against a mocked endpoint
   fetchSpy.mockResolvedValue(new Response(JSON.stringify({ models: [] })));
-  await fireEvent.press(screen.getAllByText('ทดสอบการเชื่อมต่อ')[0]);
+  await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 0));
   expect(await screen.findByText('✓ เชื่อมต่อได้')).toBeTruthy();
-  expect(String(fetchSpy.mock.calls[0][0])).toContain('generativelanguage.googleapis.com');
+  expect(String(nth(fetchSpy.mock.calls, 0)[0])).toContain('generativelanguage.googleapis.com');
 
   // Toggle Gemini off
   await fireEvent(screen.getByLabelText('เปิดใช้ Google Gemini'), 'valueChange', false);
@@ -92,7 +93,7 @@ test('Voice settings: 8 TTS + 8 STT providers and both priority lists', async ()
   expect(screen.getAllByLabelText('Region').length).toBeGreaterThanOrEqual(2);
 
   // On-device STT test reports it's unavailable
-  const stt = screen.getAllByText('ทดสอบการเชื่อมต่อ')[8];
+  const stt = nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 8);
   await fireEvent.press(stt);
   expect(await screen.findByText(/\[expo\] ยังไม่รองรับการถอดเสียงบนเครื่อง/)).toBeTruthy();
 });

@@ -70,7 +70,7 @@ export class AzureTTS extends BaseCloudTTS {
   }
 
   /** Cheaper than listing every voice. */
-  protected async probe(): Promise<unknown> {
+  protected override async probe(): Promise<unknown> {
     const region = await this.option('region');
     return azureIssueToken(this.id, region, await this.secret());
   }

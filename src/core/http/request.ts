@@ -1,9 +1,10 @@
+import { isRecord, parseJSON } from '../types/guards';
 import { ProviderError, describeKind, kindForStatus } from './errors';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 interface RequestOptions extends Omit<RequestInit, 'signal'> {
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /** Extra HTTP statuses to treat as success (e.g. 400 for "key valid, payload rejected" probes). */
   acceptStatus?: number[];
 }
@@ -54,6 +55,8 @@ export async function requestJson<T>(
 ): Promise<T> {
   const res = await request(providerId, url, opts);
   try {
+    // Compile-time contract with the provider's documented schema; adapters still read every
+    // field defensively (optional chaining + explicit invalid_response errors).
     return (await res.json()) as T;
   } catch {
     throw new ProviderError(providerId, 'invalid_response', 'ตอบกลับไม่ใช่ JSON');
@@ -78,27 +81,20 @@ async function readErrorDetail(res: Response): Promise<{ detail: string; raw: st
     return { detail: '', raw };
   }
   if (!raw) return { detail: '', raw };
-  try {
-    const body = JSON.parse(raw) as Record<string, unknown>;
-    const msg =
-      messageOf(body.error) ??
+  const body = parseJSON(raw, isRecord); // not a JSON object → fall back to the raw text
+  const msg =
+    body &&
+    (messageOf(body.error) ??
       messageOf(body.detail) ??
       messageOf(body.message) ??
-      messageOf(body.title);
-    if (msg) return { detail: msg.slice(0, 200), raw };
-  } catch {
-    // not JSON — fall through to raw text
-  }
-  return { detail: raw.slice(0, 200), raw };
+      messageOf(body.title));
+  return { detail: (msg || raw).slice(0, 200), raw };
 }
 
 function messageOf(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return messageOf(value[0]);
-  if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    return messageOf(obj.message) ?? messageOf(obj.msg);
-  }
+  if (isRecord(value)) return messageOf(value.message) ?? messageOf(value.msg);
   return undefined;
 }
 

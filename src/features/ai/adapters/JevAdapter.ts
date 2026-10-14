@@ -62,7 +62,7 @@ export class JevAdapter extends BaseAIProvider {
     );
   }
 
-  async getModels(): Promise<string[]> {
+  override async getModels(): Promise<string[]> {
     const data = await this.listModels();
     return data.models.map((m) => m.name);
   }

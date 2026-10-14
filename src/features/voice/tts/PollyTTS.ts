@@ -39,7 +39,7 @@ export class PollyTTS extends BaseCloudTTS {
       },
       { accessKeyId: await this.secret('accessKeyId'), secretAccessKey: await this.secret() }
     );
-    return { url, init: { method, headers, body } };
+    return { url, init: { method, headers, ...(body !== undefined && { body }) } };
   }
 
   protected async synthesize(text: string, opts: SpeakOptions): Promise<SynthesizedAudio> {

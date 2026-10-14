@@ -93,7 +93,11 @@ function AtomTab() {
   );
 }
 
-function ComingSoon({ label }: { label: string }) {
+interface ComingSoonProps {
+  label: string;
+}
+
+function ComingSoon({ label }: ComingSoonProps) {
   return (
     <View className="absolute inset-0 items-center justify-center">
       <Text className="text-lg font-semibold text-white/80">{label}</Text>

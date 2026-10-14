@@ -1,10 +1,11 @@
+import type { VoiceIdOf, VoiceKind } from '../../core/storage/ProviderSettings';
 import type { STTProviderId, TTSProviderId } from './core/types';
 
 export interface VoiceProviderMeta<Id extends string> {
   id: Id;
   name: string;
   requiresKey: boolean;
-  isDefault?: boolean;
+  isDefault?: boolean | undefined;
 }
 
 export const TTS_PROVIDERS: VoiceProviderMeta<TTSProviderId>[] = [
@@ -29,12 +30,20 @@ export const STT_PROVIDERS: VoiceProviderMeta<STTProviderId>[] = [
   { id: 'custom', name: 'Custom', requiresKey: true },
 ];
 
-/**
- * Credentials and options each provider reads. Secrets live in SecureKeyStore under
- * secretKey(scope, id, field) (field omitted = the main API key); options live in
- * ProviderSettings.getOption(`${scope}.${id}`, name).
- */
-export const VOICE_PROVIDER_FIELDS = {
+/** Extra per-provider settings beyond the main API key. */
+export type VoiceFieldName = 'accessKeyId' | 'userId' | 'region' | 'baseURL' | 'model';
+
+export interface VoiceProviderFields {
+  /** Stored in SecureKeyStore under secretKey(scope, id, field). */
+  secrets: readonly VoiceFieldName[];
+  /** Stored in ProviderSettings.getOption(`${scope}.${id}`, name). */
+  options: readonly VoiceFieldName[];
+}
+
+/** Credentials and options each provider reads (providers not listed need only an API key). */
+export const VOICE_PROVIDER_FIELDS: {
+  [K in VoiceKind]: Partial<Record<VoiceIdOf[K], VoiceProviderFields>>;
+} = {
   tts: {
     polly: { secrets: ['accessKeyId'], options: ['region'] },
     playht: { secrets: ['userId'], options: [] },
@@ -45,4 +54,12 @@ export const VOICE_PROVIDER_FIELDS = {
     azure: { secrets: [], options: ['region'] },
     custom: { secrets: [], options: ['baseURL', 'model'] },
   },
-} as const;
+};
+
+export function voiceProviderFields<K extends VoiceKind>(
+  kind: K,
+  id: VoiceIdOf[K]
+): VoiceProviderFields | undefined {
+  const table: Partial<Record<VoiceIdOf[K], VoiceProviderFields>> = VOICE_PROVIDER_FIELDS[kind];
+  return table[id];
+}

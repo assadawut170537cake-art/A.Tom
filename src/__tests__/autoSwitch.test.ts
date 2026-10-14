@@ -23,6 +23,7 @@ import {
   openRouterText,
 } from '../test-utils/mockFetch';
 import { registerAll, resetSettings, setAIKeys } from '../test-utils/setup';
+import { nth } from '../test-utils/nth';
 
 beforeAll(registerAll);
 
@@ -63,7 +64,7 @@ function fakeProvider(
     },
     async chat(req) {
       requests.push(req);
-      const step = script[Math.min(i++, script.length - 1)];
+      const step = script[Math.min(i++, script.length - 1)] ?? 'ok';
       if (step === 'ok') return { content: `reply from ${id}`, model: req.model, providerId: id };
       if (step instanceof Error) throw step;
       throw new ProviderError(id, step, `${step} failure`);
@@ -122,11 +123,11 @@ describe('AI Orchestrator — priority', () => {
     const orch = orchestratorWith(a, b);
 
     await orch.chat({ messages: MESSAGES });
-    expect(a.requests[0].model).toBe('gemini-2.5-pro');
+    expect(nth(a.requests, 0).model).toBe('gemini-2.5-pro');
 
     const res = await orch.chat({ messages: MESSAGES, providerId: 'openrouter', model: 'x/pinned' });
     expect(res.providerId).toBe('openrouter');
-    expect(b.requests[0].model).toBe('x/pinned');
+    expect(nth(b.requests, 0).model).toBe('x/pinned');
   });
 });
 
@@ -219,7 +220,7 @@ describe('AI Orchestrator — fallback', () => {
     const a = fakeProvider('gemini');
     await orchestratorWith(a).chat({ messages: MESSAGES, temperature: 0.2 });
     // resetSettings() saved a model for gemini, so that wins over the config default
-    expect(a.requests[0]).toMatchObject({ timeoutMs: 12_000, temperature: 0.2, model: 'gemini-3-flash' });
+    expect(nth(a.requests, 0)).toMatchObject({ timeoutMs: 12_000, temperature: 0.2, model: 'gemini-3-flash' });
   });
 });
 
@@ -408,7 +409,7 @@ describe('Voice Orchestrator — TTS priority + fallback', () => {
     const openai = fakeTTS('openai', 'auth');
     const eleven = fakeTTS('elevenlabs');
     await voiceWith([fakeTTS('expo'), openai, eleven]).speak('hi', 1);
-    expect(eleven.spoken[0].opts).toEqual({ voiceId: 'rachel', speed: 1.2, pitch: undefined });
+    expect(nth(eleven.spoken, 0).opts).toEqual({ voiceId: 'rachel', speed: 1.2, pitch: undefined });
   });
 
   test('disabled providers are skipped; Expo stays the last resort even when disabled', async () => {

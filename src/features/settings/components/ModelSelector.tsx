@@ -5,31 +5,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FieldLabel, SmallButton } from './ui';
 
-export interface SelectOption {
-  value: string;
+export interface SelectOption<T extends string = string> {
+  value: T;
   label: string;
-  hint?: string;
+  hint?: string | undefined;
 }
 
-interface ModelSelectorProps {
+interface ModelSelectorProps<T extends string> {
   label: string;
-  value?: string;
-  options: SelectOption[];
-  onChange: (value: string) => void;
+  value?: T | undefined;
+  options: SelectOption<T>[];
+  /** Receives the option's own value type (e.g. TTSProviderId), so callers need no casts. */
+  onChange: (value: T) => void;
   placeholder?: string;
   /** Optional live refresh (e.g. provider.getModels()); errors are shown inline. */
   onRefresh?: () => Promise<void>;
 }
 
 /** Dropdown-style picker in a bottom sheet modal. Used for models, providers and voices. */
-export function ModelSelector({
+export function ModelSelector<T extends string>({
   label,
   value,
   options,
   onChange,
   placeholder = 'เลือก…',
   onRefresh,
-}: ModelSelectorProps) {
+}: ModelSelectorProps<T>) {
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

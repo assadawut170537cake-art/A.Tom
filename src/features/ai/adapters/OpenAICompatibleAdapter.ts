@@ -59,7 +59,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
     };
   }
 
-  async getModels(): Promise<string[]> {
+  override async getModels(): Promise<string[]> {
     if (this.config.models !== 'dynamic') return super.getModels();
     const data = await requestJson<ModelListResponse>(this.config.id, this.url('/models'), {
       headers: await this.headers(),

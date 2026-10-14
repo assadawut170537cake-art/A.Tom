@@ -11,7 +11,7 @@ const MAX_HISTORY = 20;
 type SystemPromptFor = (persona: Persona) => string | undefined;
 
 /** Forwards the conversation to the AI Orchestrator with the active persona's system prompt. */
-export class ChatHandler implements IntentHandler {
+export class ChatHandler implements IntentHandler<'chat'> {
   constructor(
     private readonly orchestrator: Orchestrator = aiOrchestrator,
     private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt

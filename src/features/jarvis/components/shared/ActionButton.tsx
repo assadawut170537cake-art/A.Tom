@@ -5,7 +5,7 @@ import { Pressable } from 'react-native';
 interface ActionButtonProps {
   icon: LucideIcon;
   accessibilityLabel: string;
-  onPress?: () => void;
+  onPress?: (() => void) | undefined;
   size?: number;
   disabled?: boolean;
 }

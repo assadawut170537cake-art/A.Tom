@@ -6,7 +6,7 @@ import { PERSONA_IDS, PERSONAS } from '../../jarvis/constants';
 import { useAtomStore } from '../../jarvis/stores/useAtomStore';
 import type { Persona } from '../../jarvis/types';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
-import type { TTSProviderId, Voice } from '../../voice/core/types';
+import type { Voice } from '../../voice/core/types';
 import { TTS_PROVIDERS } from '../../voice/voice.config';
 import { whileMounted } from '../utils';
 import { ModelSelector } from './ModelSelector';
@@ -60,7 +60,7 @@ function VoiceRow({ title, color, subtitle, voice, onChange }: VoiceRowProps) {
         options={PROVIDER_OPTIONS}
         onChange={(id) => {
           setVoices([]);
-          onChange({ ...voice, providerId: id as TTSProviderId, voiceId: undefined });
+          onChange({ ...voice, providerId: id, voiceId: undefined });
         }}
       />
       <ModelSelector

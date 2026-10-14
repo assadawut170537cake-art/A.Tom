@@ -15,9 +15,10 @@ export class ExpoSpeechTTS implements TTSProvider {
     return new Promise((resolve, reject) => {
       Speech.speak(text.slice(0, Speech.maxSpeechInputLength), {
         language: TTS_LANGUAGE,
-        voice: opts.voiceId,
-        rate: opts.speed,
-        pitch: opts.pitch,
+        // expo-speech's options don't accept explicit undefined; omit what isn't set
+        ...(opts.voiceId !== undefined && { voice: opts.voiceId }),
+        ...(opts.speed !== undefined && { rate: opts.speed }),
+        ...(opts.pitch !== undefined && { pitch: opts.pitch }),
         onDone: () => resolve(),
         onStopped: () => resolve(),
         onError: (e) => reject(new ProviderError(this.id, 'unsupported', e.message)),

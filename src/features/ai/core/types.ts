@@ -23,14 +23,14 @@ export interface ChatRequest {
   temperature?: number;
   maxTokens?: number;
   /** Per-request timeout; adapters fall back to the HTTP default when omitted. */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
 }
 
 export interface ChatResponse {
   content: string;
   model: string;
   providerId: AIProviderId;
-  tokensUsed?: { input: number; output: number };
+  tokensUsed?: { input: number; output: number } | undefined;
   error?: string;
 }
 

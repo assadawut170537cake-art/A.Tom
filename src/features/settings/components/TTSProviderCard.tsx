@@ -14,14 +14,13 @@ import { Card, SmallButton } from './ui';
 import { PREVIEW_TEXT, voiceOptions } from './voiceOptions';
 import { VoiceExtraFields } from './voiceFields';
 
-/** One TTS provider: enable, credentials, default voice, connection test and a voice preview. */
-export function TTSProviderCard({
-  provider,
-  meta,
-}: {
+interface TTSProviderCardProps {
   provider: TTSProvider;
   meta: VoiceProviderMeta<TTSProviderId>;
-}) {
+}
+
+/** One TTS provider: enable, credentials, default voice, connection test and a voice preview. */
+export function TTSProviderCard({ provider, meta }: TTSProviderCardProps) {
   const scope = `tts.${provider.id}`;
   const [enabled, setEnabled] = useState(true);
   const [voiceId, setVoiceId] = useState<string | undefined>();
