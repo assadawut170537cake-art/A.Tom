@@ -1,4 +1,4 @@
-import { ChevronDown, Lock } from 'lucide-react-native';
+import { ChevronDown } from 'lucide-react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { LAYOUT, PERSONA_IDS, PERSONAS } from '../../constants';
@@ -54,9 +54,7 @@ export function PersonaDropdown() {
               >
                 <View className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: p.color }} />
                 <View className="flex-1">
-                  <Text className="text-[15px] font-medium text-white">
-                    {p.name} <Text className="text-xs tracking-widest text-white/40">{p.nameEn}</Text>
-                  </Text>
+                  <Text className="text-[15px] font-medium text-white">{p.name}</Text>
                   <Text className="mt-0.5 text-xs text-white/50">{p.desc}</Text>
                 </View>
                 {selected && <View className="h-1.5 w-1.5 rounded-full bg-white/70" />}
@@ -69,11 +67,11 @@ export function PersonaDropdown() {
           <View
             accessibilityRole="menuitem"
             accessibilityState={{ disabled: true }}
-            className="flex-row items-center gap-3 px-4 py-3 opacity-40"
+            className="flex-row items-center gap-3 px-4 py-3 opacity-50"
           >
-            <Lock size={14} color="#fff" />
+            <Text className="text-[14px]">🔒</Text>
             <Text className="flex-1 text-[15px] font-medium text-white">ประชุม</Text>
-            <Text className="text-[11px] text-white/70">เร็วๆ นี้</Text>
+            <Text className="text-[11px] text-white/70">Phase 3</Text>
           </View>
         </View>
       )}

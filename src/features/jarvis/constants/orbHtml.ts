@@ -6,6 +6,7 @@ import { LAYOUT, PERSONAS } from './index';
  * Bridge API (called from React Native via injectJavaScript):
  *   window.setOrbPersona(1 | 2 | 3 | 4)
  *   window.setOrbState('IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING')
+ *   window.setOrbAudio(0..1)   // first call switches SPEAKING pulse from auto waveform to external level
  *
  * At the end of window.onload the page posts {type:'ready'} so RN knows it can
  * start flushing its queued calls.
@@ -51,6 +52,7 @@ export const ORB_HTML = `<!DOCTYPE html>
   var cur = {}; var target = STATES.IDLE;
   for (var k = 0; k < KEYS.length; k++) cur[KEYS[k]] = STATES.IDLE[KEYS[k]];
   var color = COLORS[1].slice(); var targetColor = COLORS[1].slice(); var colorInit = false;
+  var audio = 0; var targetAudio = 0;
 
   function applyFallback() {
     var fb = document.getElementById('fallback');
@@ -70,6 +72,10 @@ export const ORB_HTML = `<!DOCTYPE html>
     var st = STATES[String(s).toUpperCase()];
     if (st) target = st;
   };
+  window.setOrbAudio = function (level) {
+    window.__externalAudioControl = true;
+    targetAudio = Math.max(0, Math.min(1, Number(level) || 0));
+  };
 
   var canvas = document.getElementById('orb');
   var gl = null;
@@ -82,7 +88,7 @@ export const ORB_HTML = `<!DOCTYPE html>
   var FRAG = [
     'precision highp float;',
     'uniform vec2 uRes; uniform float uTime; uniform vec3 uColor;',
-    'uniform float uAmp; uniform float uGlow; uniform float uRing; uniform float uSwirl; uniform float uPulse; uniform float uPhase;',
+    'uniform float uAmp; uniform float uGlow; uniform float uRing; uniform float uSwirl; uniform float uPulse; uniform float uPhase; uniform float uAudio;',
     'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}',
@@ -111,7 +117,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     '  float r=length(uv);',
     '  vec2 dir=r>0.0001?uv/r:vec2(1.0,0.0);',
     '  float t=uPhase;',
-    '  float voice=0.5+0.5*sin(uTime*9.0)*sin(uTime*3.7+1.3);',
+    '  float voice=uAudio;',
     '  float R=0.56+uPulse*0.05*voice;',
     '  float Rd=R+snoise(vec3(dir*1.3,t))*uAmp;',
     '  vec3 col=vec3(0.0); float a=0.0;',
@@ -164,7 +170,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     var loc = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase'].forEach(function (n) {
+    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase', 'uAudio'].forEach(function (n) {
       U[n] = gl.getUniformLocation(prog, n);
     });
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -191,6 +197,13 @@ export const ORB_HTML = `<!DOCTYPE html>
     for (var c = 0; c < 3; c++) color[c] += (targetColor[c] - color[c]) * f;
     time += dt;
     phase += dt * cur.speed;
+    if (!window.__externalAudioControl) {
+      // Auto voice waveform until RN drives the level via setOrbAudio
+      targetAudio = 0.5 + 0.5 * Math.sin(time * 9.0) * Math.sin(time * 3.7 + 1.3);
+      audio = targetAudio;
+    } else {
+      audio += (targetAudio - audio) * (1 - Math.exp(-dt * 20));
+    }
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(U.uRes, canvas.width, canvas.height);
     gl.uniform1f(U.uTime, time);
@@ -201,6 +214,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     gl.uniform1f(U.uRing, cur.ring);
     gl.uniform1f(U.uSwirl, cur.swirl);
     gl.uniform1f(U.uPulse, cur.pulse);
+    gl.uniform1f(U.uAudio, audio);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
