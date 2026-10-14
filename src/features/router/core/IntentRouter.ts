@@ -19,7 +19,7 @@ export const JEV_MIN_CONFIDENCE = 0.7;
 /** Used when every classifier is unavailable: treat the message as plain chat. */
 const DEFAULT_ROUTE: RouterOutput = { intent: 'chat', confidence: 0.5, provider: 'rule' };
 
-export interface IntentRouterDeps {
+interface IntentRouterDeps {
   rule?: RuleClassifier;
   jev?: Classifier;
   llm?: Classifier;

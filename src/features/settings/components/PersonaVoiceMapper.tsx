@@ -8,10 +8,11 @@ import type { Persona } from '../../jarvis/types';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
 import type { TTSProviderId, Voice } from '../../voice/core/types';
 import { TTS_PROVIDERS } from '../../voice/voice.config';
+import { whileMounted } from '../utils';
 import { ModelSelector } from './ModelSelector';
 import { ProviderToggle } from './ProviderToggle';
-import { PREVIEW_TEXT, voiceOption } from './TTSProviderCard';
 import { Card, SmallButton } from './ui';
+import { PREVIEW_TEXT, voiceOptions } from './voiceOptions';
 
 const DEFAULT_VOICE: PersonaVoice = { providerId: 'expo' };
 
@@ -35,10 +36,7 @@ function VoiceRow({ title, color, subtitle, voice, onChange }: VoiceRowProps) {
   const [error, setError] = useState<string | null>(null);
   const provider = voiceRegistry.getTTS(voice.providerId);
 
-  const options = voices.map(voiceOption);
-  if (voice.voiceId && !options.some((o) => o.value === voice.voiceId)) {
-    options.unshift({ value: voice.voiceId, label: voice.voiceId, hint: undefined });
-  }
+  const options = voiceOptions(voices, voice.voiceId);
 
   const preview = async () => {
     setError(null);
@@ -88,24 +86,24 @@ export function PersonaVoiceMapper() {
   const [shared, setShared] = useState<PersonaVoice>(DEFAULT_VOICE);
   const [byPersona, setByPersona] = useState<Partial<Record<Persona, PersonaVoice>>>({});
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const [s, sv, ...voices] = await Promise.all([
-        ProviderSettings.getSameVoiceForAll(),
-        ProviderSettings.getSharedVoice(),
-        ...PERSONA_IDS.map((p) => ProviderSettings.getTTSFor(p)),
-      ]);
-      if (!alive) return;
-      setSame(s);
-      if (sv) setShared(sv);
-      setByPersona(Object.fromEntries(PERSONA_IDS.map((p, i) => [p, voices[i]])));
-      setLoaded(true);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  useEffect(
+    () =>
+      whileMounted(
+        () =>
+          Promise.all([
+            ProviderSettings.getSameVoiceForAll(),
+            ProviderSettings.getSharedVoice(),
+            Promise.all(PERSONA_IDS.map((p) => ProviderSettings.getTTSFor(p))),
+          ]),
+        ([s, sv, voices]) => {
+          setSame(s);
+          if (sv) setShared(sv);
+          setByPersona(Object.fromEntries(PERSONA_IDS.map((p, i) => [p, voices[i]])));
+          setLoaded(true);
+        }
+      ),
+    []
+  );
 
   // The active persona's voice lives in the store; re-resolve it after every change
   const refreshActiveVoice = () => useAtomStore.getState().refreshVoice();

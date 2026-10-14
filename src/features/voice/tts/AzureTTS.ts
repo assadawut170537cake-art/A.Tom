@@ -1,4 +1,4 @@
-import { request, requestBytes, requestJson } from '../../../core/http/request';
+import { requestBytes, requestJson } from '../../../core/http/request';
 import {
   BaseCloudTTS,
   TTS_LANGUAGE,
@@ -7,6 +7,7 @@ import {
   toGender,
   type SynthesizedAudio,
 } from '../core/TTSInterface';
+import { azureIssueToken } from '../core/credentials';
 import type { SpeakOptions, Voice } from '../core/types';
 
 const DEFAULT_VOICE = 'th-TH-PremwadeeNeural';
@@ -68,13 +69,9 @@ export class AzureTTS extends BaseCloudTTS {
       }));
   }
 
-  /** Token endpoint validates key + region without listing every voice. */
+  /** Cheaper than listing every voice. */
   protected async probe(): Promise<unknown> {
     const region = await this.option('region');
-    return request(
-      this.id,
-      `https://${encodeURIComponent(region)}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
-      { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': await this.secret() } }
-    );
+    return azureIssueToken(this.id, region, await this.secret());
   }
 }

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronUp, GripVertical } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Pressable, Text, View } from 'react-native';
 
-export interface PriorityItem {
+interface PriorityItem {
   id: string;
   label: string;
   subtitle?: string;

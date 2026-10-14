@@ -5,7 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
-import { PREVIEW_TEXT } from '../features/settings/components/TTSProviderCard';
+import { PREVIEW_TEXT } from '../features/settings/components/voiceOptions';
 import { VoiceSettingsScreen } from '../features/settings/screens/VoiceSettingsScreen';
 import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { STT_PROVIDERS, TTS_PROVIDERS } from '../features/voice/voice.config';

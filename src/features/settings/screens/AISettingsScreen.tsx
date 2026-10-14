@@ -12,6 +12,7 @@ import { PriorityList } from '../components/PriorityList';
 import { ProviderCard } from '../components/ProviderCard';
 import { ProviderToggle } from '../components/ProviderToggle';
 import { Card, FieldLabel, Section, SmallButton } from '../components/ui';
+import { mergeOrder, whileMounted } from '../utils';
 
 const MAX_RETRIES = 3;
 
@@ -19,19 +20,13 @@ function useLLMPriority() {
   const llm = aiRegistry.list().filter((p) => (p.config.purpose ?? 'llm') === 'llm');
   const [order, setOrder] = useState<AIProviderId[]>(llm.map((p) => p.config.id));
 
-  useEffect(() => {
-    let alive = true;
-    ProviderSettings.getPriority().then((saved) => {
-      if (!alive) return;
-      setOrder((current) => [
-        ...saved.filter((id) => current.includes(id)),
-        ...current.filter((id) => !saved.includes(id)),
-      ]);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  useEffect(
+    () =>
+      whileMounted(ProviderSettings.getPriority, (saved) =>
+        setOrder((current) => mergeOrder(saved, current))
+      ),
+    []
+  );
 
   const change = (ids: string[]) => {
     setOrder(ids as AIProviderId[]);
@@ -49,17 +44,14 @@ function AdvancedSection() {
   const [adv, setAdv] = useState<AdvancedSettings>(DEFAULT_ADVANCED);
   const [timeoutText, setTimeoutText] = useState(String(DEFAULT_ADVANCED.timeoutMs / 1000));
 
-  useEffect(() => {
-    let alive = true;
-    ProviderSettings.getAdvanced().then((a) => {
-      if (!alive) return;
-      setAdv(a);
-      setTimeoutText(String(a.timeoutMs / 1000));
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  useEffect(
+    () =>
+      whileMounted(ProviderSettings.getAdvanced, (a) => {
+        setAdv(a);
+        setTimeoutText(String(a.timeoutMs / 1000));
+      }),
+    []
+  );
 
   const patch = (p: Partial<AdvancedSettings>) => {
     setAdv((a) => ({ ...a, ...p }));

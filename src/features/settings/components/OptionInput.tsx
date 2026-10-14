@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 
 import { ProviderSettings } from '../../../core/storage/ProviderSettings';
+import { whileMounted } from '../utils';
 import { FieldLabel } from './ui';
 
 interface OptionInputProps {
@@ -16,13 +17,14 @@ interface OptionInputProps {
 export function OptionInput({ scope, name, label, placeholder }: OptionInputProps) {
   const [value, setValue] = useState('');
 
-  useEffect(() => {
-    let alive = true;
-    ProviderSettings.getOption(scope, name).then((v) => alive && setValue(v ?? ''));
-    return () => {
-      alive = false;
-    };
-  }, [scope, name]);
+  useEffect(
+    () =>
+      whileMounted(
+        () => ProviderSettings.getOption(scope, name),
+        (v) => setValue(v ?? '')
+      ),
+    [scope, name]
+  );
 
   return (
     <View>

@@ -5,20 +5,14 @@ import { ProviderSettings } from '../../../core/storage/ProviderSettings';
 import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { TTSProvider, TTSProviderId, Voice } from '../../voice/core/types';
 import type { VoiceProviderMeta } from '../../voice/voice.config';
+import { whileMounted } from '../utils';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ModelSelector } from './ModelSelector';
 import { ProviderToggle } from './ProviderToggle';
 import { TestConnectionButton } from './TestConnectionButton';
 import { Card, SmallButton } from './ui';
+import { PREVIEW_TEXT, voiceOptions } from './voiceOptions';
 import { VoiceExtraFields } from './voiceFields';
-
-export const PREVIEW_TEXT = 'สวัสดีครับบอส นี่คือเสียงทดสอบ';
-
-export const voiceOption = (v: Voice) => ({
-  value: v.id,
-  label: v.name,
-  hint: [v.language, v.gender].filter(Boolean).join(' · ') || undefined,
-});
 
 /** One TTS provider: enable, credentials, default voice, connection test and a voice preview. */
 export function TTSProviderCard({
@@ -35,20 +29,21 @@ export function TTSProviderCard({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      ProviderSettings.getVoiceEnabled('tts', provider.id),
-      ProviderSettings.getOption(scope, 'voiceId'),
-    ]).then(([e, v]) => {
-      if (!alive) return;
-      setEnabled(e);
-      setVoiceId(v || undefined);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [provider.id, scope]);
+  useEffect(
+    () =>
+      whileMounted(
+        () =>
+          Promise.all([
+            ProviderSettings.getVoiceEnabled('tts', provider.id),
+            ProviderSettings.getOption(scope, 'voiceId'),
+          ]),
+        ([e, v]) => {
+          setEnabled(e);
+          setVoiceId(v || undefined);
+        }
+      ),
+    [provider.id, scope]
+  );
 
   const toggle = (value: boolean) => {
     setEnabled(value);
@@ -72,10 +67,7 @@ export function TTSProviderCard({
     }
   };
 
-  const options = voices.map(voiceOption);
-  if (voiceId && !options.some((o) => o.value === voiceId)) {
-    options.unshift({ value: voiceId, label: voiceId, hint: undefined });
-  }
+  const options = voiceOptions(voices, voiceId);
 
   return (
     <Card>

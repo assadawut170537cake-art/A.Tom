@@ -1,8 +1,8 @@
 import type { Persona } from '../../jarvis/types';
 import type { Classifier, RouterInput, RouterOutput } from '../core/types';
 
-/** Persona names (Thai + English) → id; also used by SwitchAssistantHandler. */
-export const PERSONA_ALIASES: { pattern: RegExp; persona: Persona }[] = [
+/** Persona names (Thai + English, incl. common misspellings) → id, for findPersona(). */
+const PERSONA_ALIASES: { pattern: RegExp; persona: Persona }[] = [
   { pattern: /อะตอม|atom/i, persona: 1 },
   { pattern: /จาร์วิส|จาวิส|jarvis/i, persona: 2 },
   { pattern: /ไฟรเดย์|ฟรายเดย์|friday/i, persona: 3 },

@@ -9,25 +9,21 @@ import { PriorityList } from '../components/PriorityList';
 import { STTProviderCard } from '../components/STTProviderCard';
 import { TTSProviderCard } from '../components/TTSProviderCard';
 import { Section } from '../components/ui';
+import { mergeOrder, whileMounted } from '../utils';
 
 const META = { tts: TTS_PROVIDERS, stt: STT_PROVIDERS } as const;
 
 function useVoicePriority(kind: VoiceKind) {
   const [order, setOrder] = useState<string[]>(META[kind].map((p) => p.id));
 
-  useEffect(() => {
-    let alive = true;
-    ProviderSettings.getVoicePriority(kind).then((saved: string[]) => {
-      if (!alive) return;
-      setOrder((current) => [
-        ...saved.filter((id) => current.includes(id)),
-        ...current.filter((id) => !saved.includes(id)),
-      ]);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [kind]);
+  useEffect(
+    () =>
+      whileMounted(
+        (): Promise<string[]> => ProviderSettings.getVoicePriority(kind),
+        (saved) => setOrder((current) => mergeOrder(saved, current))
+      ),
+    [kind]
+  );
 
   const change = (ids: string[]) => {
     setOrder(ids);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
 import { SecureKeyStore } from '../../../core/storage/SecureKeyStore';
+import { whileMounted } from '../utils';
 import { FieldLabel, SmallButton } from './ui';
 
 interface ApiKeyInputProps {
@@ -18,13 +19,10 @@ export function ApiKeyInput({ storageKey, label = 'API key', placeholder, onChan
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
-  useEffect(() => {
-    let alive = true;
-    SecureKeyStore.has(storageKey).then((v) => alive && setHasKey(v));
-    return () => {
-      alive = false;
-    };
-  }, [storageKey]);
+  useEffect(
+    () => whileMounted(() => SecureKeyStore.has(storageKey), setHasKey),
+    [storageKey]
+  );
 
   const save = async () => {
     const value = draft.trim();

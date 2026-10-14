@@ -2,7 +2,6 @@ import { GeminiAdapter } from './adapters/GeminiAdapter';
 import { JevAdapter } from './adapters/JevAdapter';
 import { OpenAICompatibleAdapter } from './adapters/OpenAICompatibleAdapter';
 import { OpenRouterAdapter } from './adapters/OpenRouterAdapter';
-import { aiOrchestrator } from './core/Orchestrator';
 import { aiRegistry, type ProviderRegistry } from './core/ProviderRegistry';
 import type { AIProvider, AIProviderConfig } from './core/types';
 import { PROVIDERS } from './providers.config';
@@ -28,5 +27,5 @@ export function registerAIProviders(registry: ProviderRegistry = aiRegistry): Pr
   return registry;
 }
 
-export { aiOrchestrator, aiRegistry, PROVIDERS };
+export { PROVIDERS };
 export type * from './core/types';

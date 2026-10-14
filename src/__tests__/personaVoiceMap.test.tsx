@@ -8,7 +8,7 @@ import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { PersonaVoiceMapper } from '../features/settings/components/PersonaVoiceMapper';
-import { PREVIEW_TEXT } from '../features/settings/components/TTSProviderCard';
+import { PREVIEW_TEXT } from '../features/settings/components/voiceOptions';
 import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { bytes, json, mockFetch } from '../test-utils/mockFetch';
 import { registerAll, resetSettings, resetStore } from '../test-utils/setup';

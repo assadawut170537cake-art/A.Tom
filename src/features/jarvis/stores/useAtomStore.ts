@@ -9,7 +9,7 @@ import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { DEFAULT_PERSONA, PERSONA_IDS } from '../constants';
 import type { Message, MessageRole, OrbMood, Persona, UIMode } from '../types';
 
-export interface PushMessageInput {
+interface PushMessageInput {
   role: MessageRole;
   content: string;
   /** Defaults to the active persona */

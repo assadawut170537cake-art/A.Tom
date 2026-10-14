@@ -4,6 +4,7 @@ import { ProviderSettings } from '../../../core/storage/ProviderSettings';
 import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { STTProvider, STTProviderId } from '../../voice/core/types';
 import type { VoiceProviderMeta } from '../../voice/voice.config';
+import { whileMounted } from '../utils';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ProviderToggle } from './ProviderToggle';
 import { TestConnectionButton } from './TestConnectionButton';
@@ -20,13 +21,10 @@ export function STTProviderCard({
 }) {
   const [enabled, setEnabled] = useState(true);
 
-  useEffect(() => {
-    let alive = true;
-    ProviderSettings.getVoiceEnabled('stt', provider.id).then((e) => alive && setEnabled(e));
-    return () => {
-      alive = false;
-    };
-  }, [provider.id]);
+  useEffect(
+    () => whileMounted(() => ProviderSettings.getVoiceEnabled('stt', provider.id), setEnabled),
+    [provider.id]
+  );
 
   const toggle = (value: boolean) => {
     setEnabled(value);

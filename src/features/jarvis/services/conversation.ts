@@ -8,7 +8,7 @@ import { useAtomStore } from '../stores/useAtomStore';
 let router: IntentRouter | null = null;
 const getRouter = () => (router ??= new IntentRouter());
 
-export interface SendResult {
+interface SendResult {
   route: RouterOutput | null;
   reply: string;
   error?: string;

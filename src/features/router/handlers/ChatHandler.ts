@@ -8,7 +8,7 @@ import type { HandlerResult, IntentHandler, RouterInput } from '../core/types';
 /** Keep prompts small: the last N turns of the persona's own history. */
 const MAX_HISTORY = 20;
 
-export type SystemPromptFor = (persona: Persona) => string | undefined;
+type SystemPromptFor = (persona: Persona) => string | undefined;
 
 /** Forwards the conversation to the AI Orchestrator with the active persona's system prompt. */
 export class ChatHandler implements IntentHandler {

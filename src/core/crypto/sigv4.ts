@@ -16,7 +16,7 @@ const K = new Uint32Array([
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
-export function sha256(data: Uint8Array): Uint8Array {
+function sha256(data: Uint8Array): Uint8Array {
   const len = data.length;
   const padded = new Uint8Array(((len + 9 + 63) >> 6) << 6);
   padded.set(data);
@@ -67,7 +67,7 @@ export function sha256(data: Uint8Array): Uint8Array {
   return out;
 }
 
-export function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
+function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
   const block = new Uint8Array(64);
   block.set(key.length > 64 ? sha256(key) : key);
   const inner = new Uint8Array(64 + data.length);
@@ -81,16 +81,16 @@ export function hmacSha256(key: Uint8Array, data: Uint8Array): Uint8Array {
   return sha256(outer);
 }
 
-export const toHex = (bytes: Uint8Array) =>
+const toHex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
-export interface SigV4Credentials {
+interface SigV4Credentials {
   accessKeyId: string;
   secretAccessKey: string;
   sessionToken?: string;
 }
 
-export interface SigV4Request {
+interface SigV4Request {
   method: string;
   url: string;
   region: string;

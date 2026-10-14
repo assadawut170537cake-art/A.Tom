@@ -2,20 +2,21 @@ import { File } from 'expo-file-system';
 
 import { ProviderError, testWith } from '../../../core/http/errors';
 import { sleep } from '../../../core/http/request';
-import { ProviderSettings } from '../../../core/storage/ProviderSettings';
-import { SecureKeyStore, secretKey } from '../../../core/storage/SecureKeyStore';
+import { providerOption, providerSecret } from './credentials';
 import type { STTProvider, STTProviderId } from './types';
-
-export type { STTProvider } from './types';
 
 /** Default recognition language (BCP-47) and its short ISO-639-1 form. */
 export const STT_LANGUAGE = 'th-TH';
 export const STT_LANGUAGE_SHORT = 'th';
 
+/** Lower-case file extension of an audio URI ('' when there is none); query strings ignored. */
+export function audioExtension(uri: string): string {
+  return uri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+}
+
 /** Recordings from expo-audio's default presets are AAC in an .m4a container. */
 export function audioMimeType(uri: string): string {
-  const ext = uri.split('?')[0].split('.').pop()?.toLowerCase();
-  switch (ext) {
+  switch (audioExtension(uri)) {
     case 'wav':
       return 'audio/wav';
     case 'mp3':
@@ -44,18 +45,12 @@ export abstract class BaseCloudSTT implements STTProvider {
     return testWith(this.id, () => this.probe());
   }
 
-  protected async secret(field?: string): Promise<string> {
-    const value = await SecureKeyStore.get(secretKey('stt', this.id, field));
-    if (!value) {
-      throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${field ?? 'API key'}`);
-    }
-    return value;
+  protected secret(field?: string): Promise<string> {
+    return providerSecret('stt', this.id, field);
   }
 
-  protected async option(name: string, fallback?: string): Promise<string> {
-    const value = (await ProviderSettings.getOption(`stt.${this.id}`, name)) ?? fallback;
-    if (!value) throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${name}`);
-    return value;
+  protected option(name: string, fallback?: string): Promise<string> {
+    return providerOption('stt', this.id, name, fallback);
   }
 
   protected audioFile(audioUri: string): File {

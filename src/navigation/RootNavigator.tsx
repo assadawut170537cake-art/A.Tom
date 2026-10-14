@@ -1,7 +1,7 @@
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { MainScreen } from '../screens/MainScreen';
+import { MainScreen } from '../features/jarvis/screens/MainScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
 import { PersonaVoiceScreen } from '../features/settings/screens/PersonaVoiceScreen';
 import { SettingsScreen } from '../features/settings/screens/SettingsScreen';

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View, type PressableProps } from 'react-native';
 
-/** Shared building blocks for the settings screens (dark NativeWind theme, matches Phase 2). */
+/** Shared building blocks for the settings screens (dark NativeWind theme, matches the main screen). */
 
 export function Section({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (

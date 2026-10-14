@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ProviderSettings } from '../../../core/storage/ProviderSettings';
 import { secretKey } from '../../../core/storage/SecureKeyStore';
 import type { AIProvider } from '../../ai/core/types';
+import { whileMounted } from '../utils';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ModelSelector, type SelectOption } from './ModelSelector';
 import { ProviderToggle } from './ProviderToggle';
@@ -20,24 +21,24 @@ export function ProviderCard({ provider, subtitle }: { provider: AIProvider; sub
     config.models === 'dynamic' ? [config.defaultModel] : config.models
   );
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const [savedEnabled, savedModel] = await Promise.all([
-        ProviderSettings.getEnabled(config.id),
-        ProviderSettings.getModelFor(config.id),
-      ]);
-      if (!alive) return;
-      setEnabled(savedEnabled ?? config.enabled);
-      if (savedModel) {
-        setModel(savedModel);
-        setModels((list) => (list.includes(savedModel) ? list : [savedModel, ...list]));
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [config]);
+  useEffect(
+    () =>
+      whileMounted(
+        () =>
+          Promise.all([
+            ProviderSettings.getEnabled(config.id),
+            ProviderSettings.getModelFor(config.id),
+          ]),
+        ([savedEnabled, savedModel]) => {
+          setEnabled(savedEnabled ?? config.enabled);
+          if (savedModel) {
+            setModel(savedModel);
+            setModels((list) => (list.includes(savedModel) ? list : [savedModel, ...list]));
+          }
+        }
+      ),
+    [config]
+  );
 
   const toggle = (value: boolean) => {
     setEnabled(value);

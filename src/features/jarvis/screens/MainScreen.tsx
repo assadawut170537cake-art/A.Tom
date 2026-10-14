@@ -3,19 +3,19 @@ import { useCallback, useEffect, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ChatLayer } from '../features/jarvis/components/chat/ChatLayer';
-import { BackgroundGradient } from '../features/jarvis/components/layout/BackgroundGradient';
-import { Header } from '../features/jarvis/components/layout/Header';
-import { TopSlot } from '../features/jarvis/components/layout/TopSlot';
-import { ActionBar } from '../features/jarvis/components/navigation/ActionBar';
-import { BottomTabs } from '../features/jarvis/components/navigation/BottomTabs';
-import { IdleGreeting } from '../features/jarvis/components/orb/IdleGreeting';
-import { ListeningIndicator } from '../features/jarvis/components/orb/ListeningIndicator';
-import { OrbLayer } from '../features/jarvis/components/orb/OrbLayer';
-import { LAYOUT, PERSONA_GREETINGS } from '../features/jarvis/constants';
-import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
-import { useTabsStore } from '../features/jarvis/stores/useTabsStore';
-import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
+import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
+import { ChatLayer } from '../components/chat/ChatLayer';
+import { BackgroundGradient } from '../components/layout/BackgroundGradient';
+import { Header } from '../components/layout/Header';
+import { TopSlot } from '../components/layout/TopSlot';
+import { ActionBar } from '../components/navigation/ActionBar';
+import { BottomTabs } from '../components/navigation/BottomTabs';
+import { IdleGreeting } from '../components/orb/IdleGreeting';
+import { ListeningIndicator } from '../components/orb/ListeningIndicator';
+import { OrbLayer } from '../components/orb/OrbLayer';
+import { LAYOUT, PERSONA_GREETINGS } from '../constants';
+import { useAtomStore } from '../stores/useAtomStore';
+import { useTabsStore } from '../stores/useTabsStore';
 
 const GREETING_TOP = LAYOUT.dropdown.top + 58;
 

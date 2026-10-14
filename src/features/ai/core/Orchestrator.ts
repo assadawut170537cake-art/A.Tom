@@ -11,7 +11,7 @@ import type { AIProvider, AIProviderId, ChatRequest, ChatResponse } from './type
 const RETRYABLE = new Set<ProviderErrorKind>(['rate_limit', 'server', 'timeout', 'network']);
 const RETRY_DELAY_MS = 800;
 
-export interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
+interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
   /** Pin a provider; it is tried first, the rest of the chain is still used as fallback. */
   providerId?: AIProviderId;
   /** Model override for the pinned provider only (models are provider-specific). */

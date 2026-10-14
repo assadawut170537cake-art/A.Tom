@@ -1,6 +1,6 @@
 import { ProviderError } from '../../../core/http/errors';
 import { request, requestJson } from '../../../core/http/request';
-import { BaseCloudSTT, STT_LANGUAGE } from '../core/STTInterface';
+import { BaseCloudSTT, STT_LANGUAGE, audioExtension } from '../core/STTInterface';
 
 const ENDPOINT = 'https://speech.googleapis.com/v1/speech:recognize';
 
@@ -28,7 +28,7 @@ export class GoogleCloudSTT extends BaseCloudSTT {
   }
 
   async transcribe(audioUri: string): Promise<string> {
-    const ext = audioUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+    const ext = audioExtension(audioUri);
     const encoding = ENCODINGS[ext];
     if (!encoding) {
       throw new ProviderError(this.id, 'unsupported', `ไม่รองรับไฟล์เสียง .${ext} (ใช้ wav/flac/ogg)`);

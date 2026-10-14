@@ -1,6 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
-import { request, requestJson } from '../../../core/http/request';
-import { BaseCloudSTT, STT_LANGUAGE } from '../core/STTInterface';
+import { requestJson } from '../../../core/http/request';
+import { BaseCloudSTT, STT_LANGUAGE, audioExtension } from '../core/STTInterface';
+import { azureIssueToken } from '../core/credentials';
 
 /** The short-audio REST API only accepts WAV (PCM) and OGG (Opus). */
 const CONTENT_TYPES: Record<string, string> = {
@@ -19,7 +20,7 @@ export class AzureSTT extends BaseCloudSTT {
   readonly name = 'Azure Speech';
 
   async transcribe(audioUri: string): Promise<string> {
-    const ext = audioUri.split('?')[0].split('.').pop()?.toLowerCase() ?? '';
+    const ext = audioExtension(audioUri);
     const contentType = CONTENT_TYPES[ext];
     if (!contentType) {
       throw new ProviderError(this.id, 'unsupported', `ไม่รองรับไฟล์เสียง .${ext} (ใช้ wav/ogg)`);
@@ -46,12 +47,8 @@ export class AzureSTT extends BaseCloudSTT {
     return this.requireText(data.DisplayText);
   }
 
-  /** Token endpoint validates key + region cheaply. */
   protected async probe(): Promise<unknown> {
-    const region = encodeURIComponent(await this.option('region'));
-    return request(this.id, `https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`, {
-      method: 'POST',
-      headers: { 'Ocp-Apim-Subscription-Key': await this.secret() },
-    });
+    const region = await this.option('region');
+    return azureIssueToken(this.id, region, await this.secret());
   }
 }

@@ -2,8 +2,6 @@ import { ProviderError, testWith } from '../../../core/http/errors';
 import { SecureKeyStore, secretKey, type KeyStore } from '../../../core/storage/SecureKeyStore';
 import type { AIProvider, AIProviderConfig, ChatRequest, ChatResponse } from './types';
 
-export type { AIProvider } from './types';
-
 /**
  * Shared plumbing for AI adapters: API-key lookup from SecureKeyStore and a uniform testConnection.
  * Adapters only implement chat() and the cheap authenticated probe used by testConnection().

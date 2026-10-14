@@ -2,11 +2,8 @@ import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
 
 import { ProviderError, testWith } from '../../../core/http/errors';
-import { ProviderSettings } from '../../../core/storage/ProviderSettings';
-import { SecureKeyStore, secretKey } from '../../../core/storage/SecureKeyStore';
+import { providerOption, providerSecret } from './credentials';
 import type { SpeakOptions, TTSProvider, TTSProviderId, Voice } from './types';
-
-export type { TTSProvider } from './types';
 
 /** Default speech language for the app. */
 export const TTS_LANGUAGE = 'th-TH';
@@ -109,17 +106,11 @@ export abstract class BaseCloudTTS implements TTSProvider {
     return testWith(this.id, () => this.probe());
   }
 
-  protected async secret(field?: string): Promise<string> {
-    const value = await SecureKeyStore.get(secretKey('tts', this.id, field));
-    if (!value) {
-      throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${field ?? 'API key'}`);
-    }
-    return value;
+  protected secret(field?: string): Promise<string> {
+    return providerSecret('tts', this.id, field);
   }
 
-  protected async option(name: string, fallback?: string): Promise<string> {
-    const value = (await ProviderSettings.getOption(`tts.${this.id}`, name)) ?? fallback;
-    if (!value) throw new ProviderError(this.id, 'missing_key', `ยังไม่ได้ตั้งค่า ${name}`);
-    return value;
+  protected option(name: string, fallback?: string): Promise<string> {
+    return providerOption('tts', this.id, name, fallback);
   }
 }

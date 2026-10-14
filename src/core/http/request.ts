@@ -1,8 +1,8 @@
 import { ProviderError, describeKind, kindForStatus } from './errors';
 
-export const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
-export interface RequestOptions extends Omit<RequestInit, 'signal'> {
+interface RequestOptions extends Omit<RequestInit, 'signal'> {
   timeoutMs?: number;
   /** Extra HTTP statuses to treat as success (e.g. 400 for "key valid, payload rejected" probes). */
   acceptStatus?: number[];
