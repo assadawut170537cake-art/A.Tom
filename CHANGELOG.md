@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **Gemini TTS** (`voice/tts/GeminiTTS.ts`): TTS ตัวที่ 9 ผ่าน `generateContent` (AUDIO) · 30 prebuilt voices · ใช้ key เดียวกับ Gemini LLM (ใส่ key แยกในการ์ด TTS ได้) · model ตั้งได้ (ค่าเริ่มต้น `gemini-3.8-flash-tts`) · PCM ดิบของรุ่น 2.5/3.1 ห่อเป็น WAV (`voice/core/wav.ts`)
 - `src/core/types/`: `persona.ts`, `message.ts`, `aiProvider.ts`, `voiceProvider.ts` — shared primitives ย้ายมาจาก features · `architecture.test.ts` กัน core import จาก features
 - **Chat UI จริง:** `ChatInput` (พิมพ์ได้หลายบรรทัด สูงสุด 4 บรรทัด, ปุ่มส่งสีตาม persona) ต่อเข้ากับ `sendMessage()` · ปุ่ม ⌨️ โฟกัสช่องพิมพ์ · แถบเตือน "ยังไม่ได้ตั้งค่า API key" แตะแล้วไปหน้า AI Providers
 - **Phase 4 scaffold — Shared Memory** (`src/core/memory/`): `MemoryStore` interface, `LocalMemoryAdapter` (AsyncStorage `atom.memory.v1.<scope>.<key>`, fallback ในหน่วยความจำ), `RemoteMemoryAdapter` (stub), `SyncQueue` (skeleton offline-first)

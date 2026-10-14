@@ -1,5 +1,5 @@
 /**
- * @file HTTP client กลางของทุก provider (AI 3 + TTS 8 + STT 8)
+ * @file HTTP client กลางของทุก provider (AI 3 + TTS 9 + STT 8)
  *
  * ทุกการเรียก API ต้องผ่าน `request()` / `requestJson()` / `requestBytes()` ในไฟล์นี้
  * เพื่อให้ได้พฤติกรรมเดียวกันทั้งแอป:

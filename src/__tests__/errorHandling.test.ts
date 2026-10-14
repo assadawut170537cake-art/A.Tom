@@ -295,6 +295,8 @@ describe('C3 — voice errors', () => {
 
   test('every TTS fails → one aggregated Thai error (no hang, no crash)', async () => {
     await SecureKeyStore.delete(secretKey('tts', 'openai'));
+    // Gemini TTS shares the Gemini LLM key set in beforeEach — make its call fail too (hermetic, no real network)
+    mockFetch([[GEMINI, () => httpError(503)]]);
     jest.mocked(Speech.speak).mockImplementationOnce((_t, opts) => {
       (opts?.onError as ((e: Error) => void) | undefined)?.(new Error('engine busy'));
     });

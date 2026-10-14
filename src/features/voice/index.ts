@@ -11,15 +11,17 @@ import { AzureTTS } from './tts/AzureTTS';
 import { CustomTTS } from './tts/CustomTTS';
 import { ElevenLabsTTS } from './tts/ElevenLabsTTS';
 import { ExpoSpeechTTS } from './tts/ExpoSpeechTTS';
+import { GeminiTTS } from './tts/GeminiTTS';
 import { GoogleCloudTTS } from './tts/GoogleCloudTTS';
 import { OpenAITTS } from './tts/OpenAITTS';
 import { PlayHTTTS } from './tts/PlayHTTTS';
 import { PollyTTS } from './tts/PollyTTS';
 
-/** Registers all 8 TTS + 8 STT providers (idempotent). Call once at app start. */
+/** Registers all 9 TTS + 8 STT providers (idempotent). Call once at app start. */
 export function registerVoiceProviders(registry: VoiceRegistry = voiceRegistry): VoiceRegistry {
   [
     new ExpoSpeechTTS(),
+    new GeminiTTS(),
     new OpenAITTS(),
     new ElevenLabsTTS(),
     new GoogleCloudTTS(),

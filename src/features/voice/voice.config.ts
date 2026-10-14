@@ -6,10 +6,18 @@ export interface VoiceProviderMeta<Id extends string> {
   name: string;
   requiresKey: boolean;
   isDefault?: boolean | undefined;
+  /** ข้อความในช่อง API key (เช่น บอกว่าใช้ key ร่วมกับ provider อื่นได้) */
+  keyPlaceholder?: string | undefined;
 }
 
 export const TTS_PROVIDERS: VoiceProviderMeta<TTSProviderId>[] = [
   { id: 'expo', name: 'Expo Speech', requiresKey: false, isDefault: true },
+  {
+    id: 'gemini',
+    name: 'Gemini TTS',
+    requiresKey: true,
+    keyPlaceholder: 'ว่างไว้ = ใช้ key ของ Gemini (AI Providers)',
+  },
   { id: 'openai', name: 'OpenAI TTS', requiresKey: true },
   { id: 'elevenlabs', name: 'ElevenLabs', requiresKey: true },
   { id: 'google', name: 'Google Cloud TTS', requiresKey: true },
@@ -45,6 +53,7 @@ export const VOICE_PROVIDER_FIELDS: {
   [K in VoiceKind]: Partial<Record<VoiceIdOf[K], VoiceProviderFields>>;
 } = {
   tts: {
+    gemini: { secrets: [], options: ['model'] },
     polly: { secrets: ['accessKeyId'], options: ['region'] },
     playht: { secrets: ['userId'], options: [] },
     azure: { secrets: [], options: ['region'] },

@@ -9,7 +9,7 @@ A.T.O.M. เป็นแอปมือถือ (iOS / Android) ที่รว
 
 - **Orb** วงกลมเรืองแสง (WebGL shader) ที่ขยับตามอารมณ์ของผู้ช่วย: `idle → listening → thinking → speaking`
 - **แชท** ที่ส่งข้อความผ่าน Intent Router ไปหา LLM (Gemini / OpenRouter) พร้อม fallback อัตโนมัติ
-- **เสียง** TTS 8 เจ้า และ STT 8 เจ้า เลือกเสียงแยกต่อ persona ได้
+- **เสียง** TTS 9 เจ้า และ STT 8 เจ้า เลือกเสียงแยกต่อ persona ได้
 
 ---
 
@@ -67,7 +67,7 @@ A.T.O.M. เป็นแอปมือถือ (iOS / Android) ที่รว
 |--------|-----------|
 | LLM | Google Gemini · OpenRouter |
 | Intent Router | Jev (TypeSafe System One) |
-| TTS (8) | Expo Speech · OpenAI · ElevenLabs · Google Cloud · Azure · Amazon Polly · Play.ht · Custom (OpenAI-compatible) |
+| TTS (9) | Expo Speech · Gemini TTS (30 เสียง, ใช้ key เดียวกับ Gemini) · OpenAI · ElevenLabs · Google Cloud · Azure · Amazon Polly · Play.ht · Custom (OpenAI-compatible) |
 | STT (8) | Expo Speech Recognition · OpenAI Whisper · Deepgram · Google Cloud · Azure · AssemblyAI · Rev AI · Custom |
 
 ---
@@ -94,7 +94,7 @@ src/
 │   ├── jarvis/                #   หน้าจอหลัก: Orb · แชท · store · conversation service
 │   ├── router/                #   Intent Router: classifiers (Rule/Jev/LLM) + handlers
 │   ├── ai/                    #   LLM: adapters · registry · Orchestrator · persona prompts
-│   ├── voice/                 #   TTS 8 + STT 8 · registry · VoiceOrchestrator
+│   ├── voice/                 #   TTS 9 + STT 8 · registry · VoiceOrchestrator
 │   └── settings/              #   หน้าตั้งค่า AI / Voice / Persona Voice Map
 │
 ├── __tests__/                 # unit + integration tests

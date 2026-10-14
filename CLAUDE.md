@@ -49,7 +49,7 @@
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
-        ├── voice/      ← 16 providers (8 TTS + 8 STT), orchestrator
+        ├── voice/      ← 17 providers (9 TTS + 8 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
         └── settings/   ← screens, components
@@ -71,7 +71,7 @@
 
 1. LLM: Gemini + OpenRouter
 2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
-3. Voice: 16 providers (TTS 8 + STT 8), Expo Speech = ตัวสุดท้าย
+3. Voice: 17 providers (TTS 9 + STT 8), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15)
 4. Router: 3 intents — `chat` / `pc_command` / `switch_assistant`
 5. Auto-Switch: Priority + Fallback + sticky lastGood
 6. Storage: SecureStore (secrets) + AsyncStorage (data)

@@ -57,15 +57,16 @@ async function unconfigure(kind: 'tts' | 'stt', id: string) {
   await SecureKeyStore.delete(secretKey(kind, id));
 }
 
-test('voice.config lists 8 TTS + 8 STT providers, all registered', () => {
+test('voice.config lists 9 TTS + 8 STT providers, all registered', () => {
   expect(TTS_PROVIDERS.map((p) => p.id)).toEqual([
-    'expo', 'openai', 'elevenlabs', 'google', 'azure', 'polly', 'playht', 'custom',
+    'expo', 'gemini', 'openai', 'elevenlabs', 'google', 'azure', 'polly', 'playht', 'custom',
   ]);
   expect(STT_PROVIDERS.map((p) => p.id)).toEqual([
     'expo', 'whisper', 'deepgram', 'google', 'azure', 'assemblyai', 'revai', 'custom',
   ]);
   expect(TTS_PROVIDERS.filter((p) => !p.requiresKey).map((p) => p.id)).toEqual(['expo']);
-  expect(voiceRegistry.listTTS()).toHaveLength(8);
+  expect(voiceRegistry.listTTS()).toHaveLength(9);
+  expect(voiceRegistry.listTTS().map((p) => p.id)).toEqual(TTS_PROVIDERS.map((p) => p.id));
   expect(voiceRegistry.listSTT()).toHaveLength(8);
 });
 

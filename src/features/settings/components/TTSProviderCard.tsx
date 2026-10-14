@@ -76,7 +76,9 @@ export function TTSProviderCard({ provider, meta }: TTSProviderCardProps) {
         value={enabled}
         onChange={toggle}
       />
-      {meta.requiresKey && <ApiKeyInput storageKey={secretKey('tts', provider.id)} />}
+      {meta.requiresKey && (
+        <ApiKeyInput storageKey={secretKey('tts', provider.id)} placeholder={meta.keyPlaceholder} />
+      )}
       <VoiceExtraFields kind="tts" id={provider.id} />
       <ModelSelector
         label="เสียงเริ่มต้น"
