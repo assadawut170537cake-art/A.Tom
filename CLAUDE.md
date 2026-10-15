@@ -43,7 +43,8 @@
     │   ├── storage/    ← ProviderSettings, ChatHistoryStorage, jsonStorage
     │   ├── types/      ← shared primitives (Persona, Message, AIProviderId, TTS/STT ids) + guards
     │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (stub)
-    │   └── modules/    ← AtomModule, ModuleRegistry (runtime), ModuleManager (จำค่าเปิด/ปิด + กฎ dependency)
+    │   ├── modules/    ← AtomModule, ModuleRegistry (runtime), ModuleManager (จำค่าเปิด/ปิด + กฎ dependency)
+    │   └── agent/      ← AgentHarness: loop คิด → เรียก tool (CommandModule) → สังเกต → ตอบ + lifecycle hooks
     │
     ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
     ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools, moduleDevTools — ติดตั้งเฉพาะ __DEV__)
@@ -187,6 +188,13 @@
 - `init()` เป็น sync หรือ async ก็ได้ — `pending` ถูกเคลียร์หลัง promise settle เสมอ (แก้ข้อ 16 แล้ว · test ใน modules.test.ts)
 - ทดสอบด้วยมือ: dev menu "A.T.O.M.: เพิ่ม module ทดสอบ" / `atomDev.addTestModules()` (module ปลอม 3 ตัว: ฐาน, ตัวที่พึ่งมัน, ตัวที่ init ล้มรอบแรก)
 
+### Agent Harness
+- `core/agent/AgentHarness.ts` รับ LLM ผ่าน `AgentLLM` (DI) เพราะ core import features ไม่ได้ — แอปใช้ `createAppAgent()` (features/ai/agent.ts = aiOrchestrator + moduleRegistry)
+- โปรโตคอล LLM: JSON `{"tool":"<id>",...}` หรือ `{"final":"..."}` · ไม่ใช่ JSON = คำตอบสุดท้าย
+- Max steps default 5 (`DEFAULT_MAX_STEPS`) · tool ล้ม/ไม่มี/ปิด → ส่งผลล้มกลับให้ LLM (ไม่ throw) · LLM ล้ม → `onError` แล้ว throw
+- ผล tool ผ่าน `redactSecrets()` · hook ที่ throw แค่ log
+- ยังไม่ได้ต่อเข้า conversation/IntentRouter (ยังไม่มี tool จริง — รอ pc-bridge)
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -286,5 +294,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-15 (Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

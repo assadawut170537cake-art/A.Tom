@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **Agent Harness** (`core/agent/`): execution loop คิด → เรียก tool (CommandModule ใน ModuleRegistry) → สังเกตผล → ตอบ · max steps guard (default 5) · hooks onStart / onStep / onToolCall / onComplete / onError · `features/ai/agent.ts` (`createAppAgent()`) ต่อกับ aiOrchestrator + moduleRegistry
 - **4.5.3 Module Manager** (ตั้งค่า › Modules ระหว่าง AI Providers กับ Voice): รายการ module + สถานะ (ทำงานอยู่ / ยังไม่เริ่ม / เริ่มไม่สำเร็จ / ปิดอยู่) · สวิตช์เปิด/ปิด · แตะดูรายละเอียด (รหัส, ต้องใช้, ใช้โดย) + ปุ่มเปิด/ปิด + "เริ่มใหม่" · ปิดตัวที่ module อื่นต้องใช้ → ถามยืนยันแล้วปิดตามทั้งหมด · เปิดตัวที่ dependency ปิดอยู่ → เปิด dependency ให้อัตโนมัติ
 - `core/modules/ModuleManager.ts`: จำค่าเปิด/ปิดใน AsyncStorage (`atom.modules.v1.enabled`) ใช้ตอน boot (`moduleManager.start()`) และกับ module ที่ลงทะเบียนทีหลัง · `ModuleRegistry.getStatus()` + `description` ของ module · `src/dev/moduleDevTools.ts`: เมนู dev "เพิ่ม module ทดสอบ" / `atomDev.addTestModules()`
 - **4.5.2 Memory UI** (`features/memory`): แท็บ Memory แทน "เร็วๆ นี้" — รายการ fact (key · ค่า · ป้ายขอบเขต · ป้ายที่มา) + filter ทั้งหมด/Global/Persona · ปุ่ม + เพิ่ม · แตะเพื่อแก้ (ย้าย key/ขอบเขตได้) · กดค้างเพื่อลบ (ถามยืนยัน) · ตรวจ key ตาม `MEMORY_KEY_PATTERN` และค่าไม่เกิน 200 ตัว
