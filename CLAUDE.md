@@ -184,7 +184,7 @@
 - เปิด/ปิด module ในโค้ดแอป → ใช้ `moduleManager.enable/disable()` (จำค่าใน AsyncStorage `atom.modules.v1.enabled`) ไม่ใช่ `moduleRegistry.enable/disable()` ตรง ๆ (ไม่จำ)
 - ลงทะเบียน module → `moduleManager.register()` หรือ `loadModule()` เพื่อให้ค่าที่บอสบันทึกไว้มีผล · boot เรียก `moduleManager.start()` (ใช้ค่าที่บันทึก → `initAll()`)
 - ปิดตัวที่ module อื่นต้องใช้ → UI ถามก่อนแล้ว**ปิดตามทั้งหมด** · เปิดตัวที่ dependency ปิดอยู่ → **เปิด dependency ให้อัตโนมัติ**
-- ⚠️ `init()` แบบ sync ที่จบ/throw ทันทีใน module ที่ไม่มี dependency → registry init ซ้ำไม่ได้ (ข้อ 16) — module ให้ใช้ `async init()` ไปก่อน
+- `init()` เป็น sync หรือ async ก็ได้ — `pending` ถูกเคลียร์หลัง promise settle เสมอ (แก้ข้อ 16 แล้ว · test ใน modules.test.ts)
 - ทดสอบด้วยมือ: dev menu "A.T.O.M.: เพิ่ม module ทดสอบ" / `atomDev.addTestModules()` (module ปลอม 3 ตัว: ฐาน, ตัวที่พึ่งมัน, ตัวที่ init ล้มรอบแรก)
 
 ### Network
@@ -225,11 +225,10 @@
 15. **สี Atom vs Ultron ต่างชัด** — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
     (ค่า `PERSONAS` ถูก lock ไว้ตั้งแต่ Phase 2 — เปลี่ยนต้องให้ Boss อนุมัติ)
 
-### Findings ระหว่างทำ 4.5.3 — รอ Boss อนุมัติ
-16. **ModuleRegistry: `pending` ค้างเมื่อ `init()` เป็น sync** — ใน `initOne()` async IIFE รันจนจบ (รวม `finally { pending = undefined }`)
-    ก่อนบรรทัด `entry.pending = (...)()` จะ assign เสร็จ ถ้า module ไม่มี dependency และ `init()` คืนค่า/throw ทันที
-    → `pending` ค้างเป็น promise เก่า: init ล้มแล้ว "เริ่มใหม่" ไม่ได้ / ปิดแล้วเปิดใหม่ไม่ init ซ้ำ
-    (test เดิมใช้ `async` init ทุกตัวจึงไม่เจอ) — แก้ได้ 1 บรรทัด เช่นให้ IIFE `await` ก่อนเริ่มงาน แต่ 4.5.3 ห้ามแตะ logic ของ registry
+### Findings ระหว่างทำ 4.5.3
+16. ✅ **ModuleRegistry: `pending` ค้างเมื่อ `init()` แบบ sync throw** (module ไม่มี dependency) — IIFE จบก่อน assign
+    `entry.pending` → finally เคลียร์ก่อน แล้ว promise ที่ reject ถูก assign ทับ → "เริ่มใหม่" / ปิด-เปิดใหม่ init ไม่ได้อีก
+    (sync ที่สำเร็จไม่โดน เพราะ `await undefined` ยัง yield) · แก้: assign `pending` ก่อน แล้วเคลียร์หลัง `await run` (Boss อนุมัติ)
 
 ---
 
@@ -287,5 +286,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-15 (fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

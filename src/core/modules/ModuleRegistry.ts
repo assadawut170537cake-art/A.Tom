@@ -147,7 +147,7 @@ export class ModuleRegistry {
     if (entry.state === 'ready') return;
     if (entry.pending) return entry.pending;
 
-    entry.pending = (async () => {
+    const run = (async () => {
       entry.state = 'initializing';
       try {
         for (const dep of entry.module.dependencies ?? []) {
@@ -165,11 +165,16 @@ export class ModuleRegistry {
         entry.state = 'failed';
         entry.error = message(e);
         throw e;
-      } finally {
-        entry.pending = undefined;
       }
     })();
-    return entry.pending;
+    // เคลียร์ pending ที่นี่ ไม่ใช่ใน finally ของ IIFE: ถ้า init() แบบ sync throw (module ไม่มี dependency)
+    // IIFE จะจบก่อนบรรทัด assign นี้ → finally เคลียร์ก่อน แล้ว assign promise ที่ reject แล้วทับ → init ซ้ำไม่ได้อีก
+    entry.pending = run;
+    try {
+      await run;
+    } finally {
+      entry.pending = undefined;
+    }
   }
 
   private async disposeWithDependents(id: string): Promise<void> {

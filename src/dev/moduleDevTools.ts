@@ -20,13 +20,11 @@ export const DEV_TEST_MODULE_IDS = ['dev-transport', 'dev-pc-bridge', 'dev-flaky
 
 /**
  * transport ← pc-bridge (พึ่ง transport) · flaky = init ล้มรอบแรก สำเร็จเมื่อกด "เริ่มใหม่"
- *
- * init เป็น async ทุกตัวโดยตั้งใจ: ModuleRegistry.initOne() ตอนนี้จำ `pending` ค้างไว้ถ้า init() แบบ sync
- * จบ/throw ทันที (module ที่ไม่มี dependency) → init ซ้ำไม่ได้ (CLAUDE.md §9 ข้อ 16 — รอ Boss อนุมัติแก้)
+ * (init แบบ sync — flaky ที่ throw ทันทีคือกรณีที่เคยทำให้ registry init ซ้ำไม่ได้)
  */
 export function createTestModules(): AtomModule[] {
   let flakyAttempts = 0;
-  const noop = async () => {};
+  const noop = () => {};
   return [
     {
       id: 'dev-transport',
@@ -50,7 +48,7 @@ export function createTestModules(): AtomModule[] {
       name: 'ทดสอบ: เริ่มรอบแรกไม่สำเร็จ',
       description: 'init ล้มครั้งแรก — กด "เริ่มใหม่" แล้วจะทำงาน',
       enabled: true,
-      init: async () => {
+      init: () => {
         flakyAttempts += 1;
         if (flakyAttempts === 1) throw new Error('จำลอง: ต่ออุปกรณ์ไม่ได้');
       },

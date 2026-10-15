@@ -32,6 +32,9 @@
 - ย้าย `loader.ts` จาก `src/core/modules/` → `src/modules/` · `AGENTS.md` ใช้ `@react-navigation/native-stack` ตาม ADR-009
 - boot เรียก `moduleManager.start()` แทน `moduleRegistry.initAll()` ตรง ๆ · `loadModule()` ลงทะเบียนผ่าน `moduleManager` (ค่าที่บอสบันทึกไว้มีผลทันที)
 
+### Fixed
+- `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ
+
 ### Security
 - `redactSecrets` ปิดบัง AWS access key id (`AKIA` + 16) ด้วย · memory fact ผ่าน `toPromptLine()` (บีบ `\r \n \v \f` U+0085 U+2028 U+2029 ให้เป็นบรรทัดเดียว ทั้ง key และ value)
 

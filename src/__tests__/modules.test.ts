@@ -216,6 +216,54 @@ describe('ModuleRegistry', () => {
     await expect(registry.ensureReady('missing')).rejects.toThrow('ไม่พบ module "missing"');
   });
 
+  // init() แบบ sync ใน module ที่ไม่มี dependency เคยทำให้ pending ค้าง (CLAUDE.md §9 ข้อ 16)
+  test('sync init that throws → can be retried (ensureReady, initAll, disable → enable)', async () => {
+    let attempts = 0;
+    const init = jest.fn(() => {
+      attempts += 1;
+      if (attempts < 3) throw new Error(`fail ${attempts}`);
+    });
+    const { registry } = registryWith({ id: 'sync', name: 'Sync', enabled: true, init, dispose: jest.fn() });
+    await expect(registry.ensureReady('sync')).rejects.toThrow('fail 1');
+    await expect(registry.initAll()).resolves.toEqual({ ready: [], failed: [{ id: 'sync', reason: 'fail 2' }] });
+    await registry.disable('sync');
+    registry.enable('sync');
+    await registry.ensureReady('sync');
+    expect(init).toHaveBeenCalledTimes(3);
+    expect(registry.list()[0]).toMatchObject({ state: 'ready' });
+    expect(registry.list()[0]?.error).toBeUndefined();
+  });
+
+  test('sync init that succeeds → initialises again after disable → enable', async () => {
+    const init = jest.fn();
+    const dispose = jest.fn();
+    const { registry } = registryWith({ id: 'sync', name: 'Sync', enabled: true, init, dispose });
+    await registry.initAll();
+    await registry.disable('sync');
+    expect(registry.getStatus('sync')).toBe('disabled');
+    registry.enable('sync');
+    await registry.ensureReady('sync');
+    expect(init).toHaveBeenCalledTimes(2);
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(registry.getStatus('sync')).toBe('enabled');
+  });
+
+  test('concurrent callers still share one in-flight async init', async () => {
+    let release: () => void = () => {};
+    const slow = fakeModule('slow');
+    slow.init.mockImplementation(
+      () =>
+        new Promise<void>((r) => {
+          release = () => r();
+        })
+    );
+    const { registry } = registryWith(slow);
+    const both = Promise.all([registry.ensureReady('slow'), registry.ensureReady('slow')]);
+    release();
+    await both;
+    expect(slow.init).toHaveBeenCalledTimes(1);
+  });
+
   test('isCommandModule, default logger and app-wide registry', () => {
     expect(isCommandModule(fakeModule('a'))).toBe(false);
     const withExecute: CommandModule = { ...fakeModule('b'), execute: async () => ({ reply: '' }) };
