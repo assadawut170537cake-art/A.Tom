@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { bootApp, startServices } from '../boot';
 import { localMemory } from '../core/memory/LocalMemoryAdapter';
 import type { MemoryStore } from '../core/memory/types';
+import { ModuleManager } from '../core/modules/ModuleManager';
 import { ModuleRegistry } from '../core/modules/ModuleRegistry';
 import { ALL_MEMORY_TARGETS } from '../core/memory/types';
 import {
@@ -109,8 +110,9 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
 });
 
 describe('boot', () => {
+  const newRegistry = () => new ModuleRegistry({ memory: localMemory, logger: { info: jest.fn(), error: jest.fn() } });
   const fakeDeps = (overrides: Partial<Parameters<typeof startServices>[0]> = {}) => ({
-    modules: new ModuleRegistry({ memory: localMemory, logger: { info: jest.fn(), error: jest.fn() } }),
+    modules: new ModuleManager(newRegistry()),
     memory: localMemory,
     dev: false,
     installDevTools: jest.fn(),
@@ -120,9 +122,9 @@ describe('boot', () => {
   test('initialises modules and counts memory facts', async () => {
     await localMemory.save({ scope: 'global' }, 'a', '1');
     await localMemory.save({ scope: 'persona', persona: 4 }, 'b', '2');
-    const modules = new ModuleRegistry({ memory: localMemory, logger: { info: jest.fn(), error: jest.fn() } });
+    const modules = new ModuleManager(newRegistry());
     const init = jest.fn();
-    modules.register({ id: 'demo', name: 'Demo', enabled: true, init, dispose: jest.fn() });
+    await modules.register({ id: 'demo', name: 'Demo', enabled: true, init, dispose: jest.fn() });
 
     const report = await startServices(fakeDeps({ modules }));
 
@@ -133,7 +135,7 @@ describe('boot', () => {
   test('module init blowing up never crashes boot', async () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     const report = await startServices(
-      fakeDeps({ modules: { initAll: () => Promise.reject(new Error('registry broken')) } })
+      fakeDeps({ modules: { start: () => Promise.reject(new Error('registry broken')) } })
     );
     expect(report.modules).toBeNull();
     expect(error).toHaveBeenCalledWith('[boot] เริ่ม module ไม่สำเร็จ — แอปทำงานต่อได้ (ไม่มี module)', expect.any(Error));

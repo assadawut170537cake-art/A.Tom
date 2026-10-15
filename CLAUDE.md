@@ -43,11 +43,11 @@
     │   ├── storage/    ← ProviderSettings, ChatHistoryStorage, jsonStorage
     │   ├── types/      ← shared primitives (Persona, Message, AIProviderId, TTS/STT ids) + guards
     │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (stub)
-    │   └── modules/    ← AtomModule, ModuleRegistry
+    │   └── modules/    ← AtomModule, ModuleRegistry (runtime), ModuleManager (จำค่าเปิด/ปิด + กฎ dependency)
     │
     ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
-    ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools — ติดตั้งเฉพาะ __DEV__)
-    ├── boot.ts         ← ลำดับเปิดแอป: register providers → initAll modules → นับ memory facts
+    ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools, moduleDevTools — ติดตั้งเฉพาะ __DEV__)
+    ├── boot.ts         ← ลำดับเปิดแอป: register providers → moduleManager.start() → นับ memory facts
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
@@ -55,7 +55,7 @@
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
-        └── settings/   ← screens, components
+        └── settings/   ← screens (Hub, AI, Modules, Voice, Persona Voice), components
 
 ### Dependency Direction
 - ✅ `features/` → `core/` (ถูก)
@@ -180,6 +180,13 @@
 - Memory UI: key ตาม `MEMORY_KEY_PATTERN` · value ≤ `MAX_FACT_LENGTH` (200, export จาก ChatHandler) · key ซ้ำในขอบเขตเดียวกัน = ปฏิเสธ (ไม่ทับเงียบ ๆ)
 - ไม่มี swipe-to-delete เพราะต้องเพิ่ม react-native-gesture-handler (ต้องขอ Boss) → ใช้ long-press
 
+### Modules (4.5.3)
+- เปิด/ปิด module ในโค้ดแอป → ใช้ `moduleManager.enable/disable()` (จำค่าใน AsyncStorage `atom.modules.v1.enabled`) ไม่ใช่ `moduleRegistry.enable/disable()` ตรง ๆ (ไม่จำ)
+- ลงทะเบียน module → `moduleManager.register()` หรือ `loadModule()` เพื่อให้ค่าที่บอสบันทึกไว้มีผล · boot เรียก `moduleManager.start()` (ใช้ค่าที่บันทึก → `initAll()`)
+- ปิดตัวที่ module อื่นต้องใช้ → UI ถามก่อนแล้ว**ปิดตามทั้งหมด** · เปิดตัวที่ dependency ปิดอยู่ → **เปิด dependency ให้อัตโนมัติ**
+- ⚠️ `init()` แบบ sync ที่จบ/throw ทันทีใน module ที่ไม่มี dependency → registry init ซ้ำไม่ได้ (ข้อ 16) — module ให้ใช้ `async init()` ไปก่อน
+- ทดสอบด้วยมือ: dev menu "A.T.O.M.: เพิ่ม module ทดสอบ" / `atomDev.addTestModules()` (module ปลอม 3 ตัว: ฐาน, ตัวที่พึ่งมัน, ตัวที่ init ล้มรอบแรก)
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -201,7 +208,7 @@
 5. SyncQueue.flush() + persist
 6. Module `pc-bridge` จริง
 7. ✅ UI Memory (4.5.2) — แท็บ Memory: list + filter + เพิ่ม/แก้ (แตะ) / ลบ (กดค้าง หรือปุ่มในฟอร์ม)
-8. UI Module Manager
+8. ✅ UI Module Manager (4.5.3) — ตั้งค่า › Modules: สวิตช์เปิด/ปิด (จำค่า) + รายละเอียด + เริ่มใหม่ + กฎ dependency
 
 ### หลัง Phase 4.5
 9. Prettier config + format
@@ -217,6 +224,12 @@
 14. **Orb แยก shape/animation** — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
 15. **สี Atom vs Ultron ต่างชัด** — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
     (ค่า `PERSONAS` ถูก lock ไว้ตั้งแต่ Phase 2 — เปลี่ยนต้องให้ Boss อนุมัติ)
+
+### Findings ระหว่างทำ 4.5.3 — รอ Boss อนุมัติ
+16. **ModuleRegistry: `pending` ค้างเมื่อ `init()` เป็น sync** — ใน `initOne()` async IIFE รันจนจบ (รวม `finally { pending = undefined }`)
+    ก่อนบรรทัด `entry.pending = (...)()` จะ assign เสร็จ ถ้า module ไม่มี dependency และ `init()` คืนค่า/throw ทันที
+    → `pending` ค้างเป็น promise เก่า: init ล้มแล้ว "เริ่มใหม่" ไม่ได้ / ปิดแล้วเปิดใหม่ไม่ init ซ้ำ
+    (test เดิมใช้ `async` init ทุกตัวจึงไม่เจอ) — แก้ได้ 1 บรรทัด เช่นให้ IIFE `await` ก่อนเริ่มงาน แต่ 4.5.3 ห้ามแตะ logic ของ registry
 
 ---
 
@@ -237,7 +250,8 @@
 - Voice Orchestrator: `src/features/voice/core/VoiceOrchestrator.ts`
 - Intent Router: `src/features/router/core/IntentRouter.ts`
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
-- Module: `src/core/modules/ModuleRegistry.ts` · loader: `src/modules/loader.ts`
+- Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`
+- Modules UI: `src/features/settings/screens/ModulesScreen.tsx`
 - Shared types: `src/core/types/`
 - Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`
 
@@ -273,5 +287,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-15 (4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

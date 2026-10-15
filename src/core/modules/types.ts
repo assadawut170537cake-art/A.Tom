@@ -28,6 +28,8 @@ export interface AtomModule {
   readonly id: string;
   /** Display name. */
   readonly name: string;
+  /** คำอธิบายสั้น ๆ แสดงในหน้า ตั้งค่า › Modules */
+  readonly description?: string | undefined;
   /** Initial state on register(); ModuleRegistry.enable()/disable() change it afterwards. */
   readonly enabled: boolean;
   /** Ids of modules that must be initialised first. */
@@ -59,9 +61,19 @@ export function isCommandModule(module: AtomModule): module is CommandModule {
 
 export type ModuleState = 'idle' | 'initializing' | 'ready' | 'failed';
 
+/**
+ * สถานะที่บอสเห็นใน UI (ย่อจาก enabled + state):
+ * - `enabled` = เปิดและ init สำเร็จ (ทำงานอยู่)
+ * - `disabled` = ปิดอยู่ (ไม่ว่า state จะเป็นอะไร)
+ * - `error` = เปิดอยู่แต่ init ล้ม
+ * - `not-initialized` = เปิดอยู่แต่ยังไม่ได้ init (หรือกำลัง init)
+ */
+export type ModuleStatus = 'enabled' | 'disabled' | 'error' | 'not-initialized';
+
 export interface ModuleInfo {
   id: string;
   name: string;
+  description?: string | undefined;
   enabled: boolean;
   state: ModuleState;
   dependencies: readonly string[];

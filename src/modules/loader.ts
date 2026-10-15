@@ -8,15 +8,24 @@
  * Metro (React Native bundler) resolve ได้เฉพาะ `import('...')` ที่เป็น string คงที่
  * จึงต้องลงทะเบียน factory ของแต่ละ id ไว้ใน {@link MODULE_LOADERS} ล่วงหน้า แทนการต่อ path เอง
  *
+ * ลงทะเบียนผ่าน `moduleManager` (ค่าเริ่มต้น) → ค่าเปิด/ปิดที่บอสบันทึกไว้มีผลทันที และ init ให้ถ้าเปิดอยู่
+ *
  * TODO(phase-4.5):
  *   - เพิ่ม `'pc-bridge': () => import('../features/pc-bridge').then((m) => m.default)` เมื่อ module แรกพร้อม
- *   - โหลด module ที่บอสเปิดไว้ตอนเปิดแอป แล้วเรียก moduleRegistry.initAll()
+ *   - โหลด module ที่บอสเปิดไว้ตอนเปิดแอป ก่อน `moduleManager.start()` (src/boot.ts)
  */
 
-import { moduleRegistry, type ModuleRegistry } from '../core/modules/ModuleRegistry';
+import { moduleManager } from '../core/modules/ModuleManager';
+import type { ModuleRegistry } from '../core/modules/ModuleRegistry';
 import type { AtomModule } from '../core/modules/types';
 
 export type ModuleFactory = () => Promise<AtomModule>;
+
+/** ที่ลงทะเบียน module: แอปใช้ ModuleManager (จำค่าเปิด/ปิด) · test ส่ง ModuleRegistry ตรง ๆ ได้ */
+export interface ModuleHost {
+  get: ModuleRegistry['get'];
+  register(module: AtomModule): void | Promise<void>;
+}
 
 /** id → lazy factory. Empty until the first real module lands (see TODO above). */
 export const MODULE_LOADERS: Readonly<Record<string, ModuleFactory>> = {};
@@ -27,7 +36,7 @@ export const MODULE_LOADERS: Readonly<Record<string, ModuleFactory>> = {};
  */
 export async function loadModule(
   id: string,
-  registry: ModuleRegistry = moduleRegistry,
+  registry: ModuleHost = moduleManager,
   loaders: Readonly<Record<string, ModuleFactory>> = MODULE_LOADERS
 ): Promise<AtomModule> {
   const existing = registry.get(id);
@@ -40,6 +49,6 @@ export async function loadModule(
   if (module.id !== id) {
     throw new Error(`[modules] loader ของ "${id}" คืน module "${module.id}"`);
   }
-  registry.register(module);
+  await registry.register(module);
   return module;
 }

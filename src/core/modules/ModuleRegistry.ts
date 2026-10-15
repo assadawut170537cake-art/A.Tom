@@ -7,11 +7,20 @@
  *   พร้อมเหตุผล ไม่ทำให้ module อื่นหรือแอปล้มตาม (`console.error` ผ่าน logger)
  * - `disable()` dispose module นั้นและทุก module ที่พึ่งมันอยู่
  *
- * `initAll()` ถูกเรียกตอนเปิดแอปใน src/boot.ts · TODO(phase-4.5): หน้าตั้งค่าเปิด/ปิด module
+ * registry เก็บสถานะเฉพาะตอนรัน (in-memory) — ค่าเปิด/ปิดที่บอสตั้งและต้องจำข้ามการเปิดแอป
+ * อยู่ใน {@link ./ModuleManager.ts} ซึ่งเรียก `initAll()` ตอนเปิดแอป (src/boot.ts) และใช้กับหน้า ตั้งค่า › Modules
  */
 
 import { localMemory } from '../memory/LocalMemoryAdapter';
-import type { AtomModule, InitReport, ModuleContext, ModuleInfo, ModuleLogger, ModuleState } from './types';
+import type {
+  AtomModule,
+  InitReport,
+  ModuleContext,
+  ModuleInfo,
+  ModuleLogger,
+  ModuleState,
+  ModuleStatus,
+} from './types';
 
 interface Entry {
   module: AtomModule;
@@ -23,6 +32,13 @@ interface Entry {
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** enabled + state → สถานะที่แสดงใน UI (ดู {@link ModuleStatus}) */
+export function statusOf({ enabled, state }: { enabled: boolean; state: ModuleState }): ModuleStatus {
+  if (!enabled) return 'disabled';
+  if (state === 'failed') return 'error';
+  return state === 'ready' ? 'enabled' : 'not-initialized';
+}
 
 export class ModuleRegistry {
   private readonly entries = new Map<string, Entry>();
@@ -58,6 +74,12 @@ export class ModuleRegistry {
     return this.entries.get(id)?.enabled ?? false;
   }
 
+  /** undefined = ไม่มี module id นี้ */
+  getStatus(id: string): ModuleStatus | undefined {
+    const entry = this.entries.get(id);
+    return entry && statusOf(entry);
+  }
+
   /** Allows the module to be initialised (by initAll / ensureReady). */
   enable(id: string): boolean {
     const entry = this.entries.get(id);
@@ -80,6 +102,7 @@ export class ModuleRegistry {
     return [...this.entries.values()].map(({ module, enabled, state, error }) => ({
       id: module.id,
       name: module.name,
+      ...(module.description !== undefined && { description: module.description }),
       enabled,
       state,
       dependencies: module.dependencies ?? [],
@@ -183,5 +206,8 @@ export const consoleLogger: ModuleLogger = {
   error: (msg, error) => console.error(msg, error),
 };
 
-/** App-wide registry (initAll ตอน boot). TODO(phase-4.5): ลงทะเบียน module จริงผ่าน src/modules/loader.ts */
+/**
+ * App-wide registry. แอปควรสั่งผ่าน `moduleManager` (ModuleManager.ts) ซึ่งจำค่าเปิด/ปิดของบอสไว้ให้
+ * TODO(phase-4.5): ลงทะเบียน module จริงผ่าน src/modules/loader.ts
+ */
 export const moduleRegistry = new ModuleRegistry({ memory: localMemory, logger: consoleLogger });

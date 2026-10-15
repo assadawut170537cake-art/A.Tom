@@ -3,40 +3,45 @@
  *
  * 1. ลงทะเบียน AI + voice providers (sync — หน้าแรกต้องใช้ทันที)
  * 2. เริ่ม services แบบ async ไม่บล็อก UI:
- *    - `moduleRegistry.initAll()` — module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้
+ *    - `moduleManager.start()` — ใช้ค่าเปิด/ปิด module ที่บอสบันทึกไว้ แล้ว `initAll()`
+ *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
- *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory (src/dev/memoryDevTools.ts)
+ *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory/module (src/dev/)
  *
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
  */
 
 import { localMemory } from './core/memory/LocalMemoryAdapter';
 import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
-import { moduleRegistry } from './core/modules/ModuleRegistry';
+import { moduleManager, type ModuleManager } from './core/modules/ModuleManager';
 import type { InitReport } from './core/modules/types';
 import { installMemoryDevTools } from './dev/memoryDevTools';
+import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
 
 export interface BootReport {
-  /** null = initAll() เองล้ม (log แล้ว) */
+  /** null = start() เองล้ม (log แล้ว) */
   modules: InitReport | null;
   /** จำนวน facts ทั้งหมด (global + ทุก persona); null = อ่าน memory ไม่ได้ */
   memoryFacts: number | null;
 }
 
 interface BootDeps {
-  modules: Pick<typeof moduleRegistry, 'initAll'>;
+  modules: Pick<ModuleManager, 'start'>;
   memory: MemoryStore;
   dev: boolean;
   installDevTools: (memory: MemoryStore) => unknown;
 }
 
 const DEFAULT_DEPS: BootDeps = {
-  modules: moduleRegistry,
+  modules: moduleManager,
   memory: localMemory,
   dev: __DEV__,
-  installDevTools: (memory) => installMemoryDevTools(memory),
+  installDevTools: (memory) => {
+    installMemoryDevTools(memory);
+    installModuleDevTools(moduleManager);
+  },
 };
 
 let started: Promise<BootReport> | null = null;
@@ -51,7 +56,7 @@ export function bootApp(): Promise<BootReport> {
 export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<BootReport> {
   let modules: InitReport | null = null;
   try {
-    modules = await deps.modules.initAll();
+    modules = await deps.modules.start();
   } catch (e) {
     console.error('[boot] เริ่ม module ไม่สำเร็จ — แอปทำงานต่อได้ (ไม่มี module)', e);
   }

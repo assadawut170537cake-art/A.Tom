@@ -84,7 +84,7 @@ src/
 │   ├── storage/               #   SecureKeyStore · ProviderSettings · ChatHistoryStorage · jsonStorage
 │   ├── network/               #   isOffline()
 │   ├── memory/                #   Shared Memory: MemoryStore · LocalMemoryAdapter · remote/sync stubs (Phase 4)
-│   ├── modules/               #   Module System: AtomModule · ModuleRegistry (Phase 4)
+│   ├── modules/               #   Module System: AtomModule · ModuleRegistry · ModuleManager (จำค่าเปิด/ปิด)
 │   ├── crypto/                #   SigV4 (สำหรับ Amazon Polly)
 │   └── types/                 #   shared primitives (Persona, Message, provider ids) + runtime type guards
 │
@@ -96,7 +96,7 @@ src/
 │   ├── router/                #   Intent Router: classifiers (Rule/Jev/LLM) + handlers
 │   ├── ai/                    #   LLM: adapters · registry · Orchestrator · persona prompts
 │   ├── voice/                 #   TTS 9 + STT 8 · registry · VoiceOrchestrator
-│   └── settings/              #   หน้าตั้งค่า AI / Voice / Persona Voice Map
+│   └── settings/              #   หน้าตั้งค่า AI / Modules / Voice / Persona Voice Map
 │
 ├── __tests__/                 # unit + integration tests
 └── test-utils/                # mockFetch, setup helpers

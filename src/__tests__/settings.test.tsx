@@ -34,9 +34,10 @@ async function openSettings(entry?: string) {
   if (entry) await fireEvent.press(screen.getByLabelText(entry));
 }
 
-test('settings hub lists the three entries', async () => {
+test('settings hub lists the four entries', async () => {
   await openSettings();
   expect(screen.getByText('AI Providers')).toBeTruthy();
+  expect(screen.getByText('Modules')).toBeTruthy();
   expect(screen.getByText('Voice (TTS + STT)')).toBeTruthy();
   expect(screen.getByText('Persona Voice Map')).toBeTruthy();
 });

@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
+import { ModulesScreen } from '../features/settings/screens/ModulesScreen';
 import { PersonaVoiceScreen } from '../features/settings/screens/PersonaVoiceScreen';
 import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
 import { VoiceSettingsScreen } from '../features/settings/screens/VoiceSettingsScreen';
@@ -32,6 +33,7 @@ export function RootNavigator() {
         <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'ตั้งค่า' }} />
         <Stack.Screen name="AISettings" component={AISettingsScreen} options={{ title: 'AI Providers' }} />
+        <Stack.Screen name="Modules" component={ModulesScreen} options={{ title: 'Modules' }} />
         <Stack.Screen
           name="VoiceSettings"
           component={VoiceSettingsScreen}
