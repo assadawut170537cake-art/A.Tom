@@ -44,7 +44,7 @@
     │   ├── types/      ← shared primitives (Persona, Message, AIProviderId, TTS/STT ids) + guards
     │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (stub)
     │   ├── modules/    ← AtomModule, ModuleRegistry (runtime), ModuleManager (จำค่าเปิด/ปิด + กฎ dependency)
-    │   └── agent/      ← AgentHarness: loop คิด → เรียก tool (CommandModule) → สังเกต → ตอบ + lifecycle hooks
+    │   └── agent/      ← AgentHarness (loop + hooks) · MCPClientBridge · SkillEngine · DeviceControlBridge
     │
     ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
     ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools, moduleDevTools — ติดตั้งเฉพาะ __DEV__)
@@ -55,6 +55,7 @@
         ├── voice/      ← 17 providers (9 TTS + 8 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
+        ├── marketplace/← ตั้งค่า › Marketplace: MCP servers · Plugins · Skills · ควบคุมอุปกรณ์ (ค้นหา/กรอง/เปิดปิด/ติดตั้ง)
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
         └── settings/   ← screens (Hub, AI, Modules, Voice, Persona Voice), components
 
@@ -193,7 +194,12 @@
 - โปรโตคอล LLM: JSON `{"tool":"<id>",...}` หรือ `{"final":"..."}` · ไม่ใช่ JSON = คำตอบสุดท้าย
 - Max steps default 5 (`DEFAULT_MAX_STEPS`) · tool ล้ม/ไม่มี/ปิด → ส่งผลล้มกลับให้ LLM (ไม่ throw) · LLM ล้ม → `onError` แล้ว throw
 - ผล tool ผ่าน `redactSecrets()` · hook ที่ throw แค่ log
-- ยังไม่ได้ต่อเข้า conversation/IntentRouter (ยังไม่มี tool จริง — รอ pc-bridge)
+- tool มาจาก ModuleRegistry ก่อน แล้วค่อย `providers` (SkillEngine → MCPClientBridge → DeviceControlBridge) · id ซ้ำ = ตัวแรกชนะ
+- `memory` → แนบ facts (global + persona) ผ่าน `toPromptLine()` (ย้ายไป `core/memory/promptLine.ts`, ChatHandler re-export)
+- **MCP:** Streamable HTTP JSON-RPC ผ่าน fetch (ไม่มี dep ใหม่) · รายการ server = AsyncStorage `atom.mcp.v1.servers` · token = SecureStore `mcp.<id>` · server ใหม่**ปิดไว้ก่อน** · tool id `mcp.<server>.<tool>` · https เท่านั้น (ยกเว้น localhost)
+- **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
+- **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · driver เริ่มต้นใช้แค่ `Linking` → volume / brightness / clipboard = "ยังไม่รองรับ" จนกว่าจะเพิ่ม expo-brightness / expo-clipboard ฯลฯ (ต้องขอ Boss) · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
+- ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
 
 ### Network
 - `isOffline()` fail-open
@@ -259,6 +265,7 @@
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
 - Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`
 - Modules UI: `src/features/settings/screens/ModulesScreen.tsx`
+- Agent: `src/core/agent/` · app wiring `src/features/ai/agent.ts` · Marketplace: `src/features/marketplace/screens/PluginMarketplaceScreen.tsx`
 - Shared types: `src/core/types/`
 - Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`
 
@@ -294,5 +301,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-15 (MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

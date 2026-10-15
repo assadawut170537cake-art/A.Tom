@@ -1,3 +1,4 @@
+import { MAX_PROMPT_LINE, toPromptLine } from '../../../core/memory/promptLine';
 import type { MemoryFact, MemoryStore } from '../../../core/memory/types';
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
@@ -11,21 +12,10 @@ const MAX_HISTORY = 20;
 /** Most recently updated memory facts appended to the system prompt. */
 export const MAX_MEMORY_FACTS = 20;
 /** ค่าของ fact ยาวสุดที่ส่งเข้า prompt — Memory UI ใช้ค่าเดียวกันเป็น maxLength */
-export const MAX_FACT_LENGTH = 200;
+export const MAX_FACT_LENGTH = MAX_PROMPT_LINE;
 
-/**
- * อักขระขึ้นบรรทัดใหม่ทุกแบบที่ LLM อาจตีความเป็นบรรทัดใหม่ — รวม \v \f NEL (U+0085)
- * LINE/PARAGRAPH SEPARATOR (U+2028/2029) ไม่ใช่แค่ \r\n
- */
-const LINE_BREAKS = /[\r\n\v\f\u0085\u2028\u2029]+/g;
-
-/**
- * บีบ fact ให้อยู่บรรทัดเดียว: fact ที่มี "\n\nSystem: ..." จะสร้างบรรทัดที่หน้าตาเหมือนคำสั่งระบบใน prompt ไม่ได้
- * (กันได้แค่การปลอมโครงสร้าง — เนื้อหาในบรรทัดเดียวกันยังเป็นข้อความจากผู้ใช้ ดู ADR-011)
- */
-export function toPromptLine(text: string, max: number = MAX_FACT_LENGTH): string {
-  return text.replace(LINE_BREAKS, ' ').trim().slice(0, max);
-}
+// toPromptLine ย้ายไป core (agent ก็ใช้) — re-export ไว้ให้ import จากที่เดิมได้
+export { toPromptLine };
 
 type SystemPromptFor = (persona: Persona) => string | undefined;
 

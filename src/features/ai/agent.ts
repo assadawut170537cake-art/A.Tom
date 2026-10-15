@@ -1,10 +1,14 @@
 /**
- * ต่อ AgentHarness (core) เข้ากับ aiOrchestrator + moduleRegistry ของแอป
+ * ต่อ AgentHarness (core) เข้ากับ aiOrchestrator + moduleRegistry + MCP / Skills / Device + Shared Memory ของแอป
  * (core ห้าม import features จึงประกอบที่นี่)
  */
 
 import { AgentHarness } from '../../core/agent/AgentHarness';
-import type { AgentHarnessOptions, AgentLLM } from '../../core/agent/types';
+import { deviceControl } from '../../core/agent/DeviceControlBridge';
+import { mcpBridge } from '../../core/agent/MCPClientBridge';
+import { skillEngine } from '../../core/agent/SkillEngine';
+import type { AgentHarnessOptions, AgentHooks, AgentLLM } from '../../core/agent/types';
+import { localMemory } from '../../core/memory/LocalMemoryAdapter';
 import { moduleRegistry } from '../../core/modules/ModuleRegistry';
 import { aiOrchestrator, type Orchestrator } from './core/Orchestrator';
 
@@ -13,6 +17,42 @@ export function orchestratorLLM(orchestrator: Pick<Orchestrator, 'chat'> = aiOrc
   return { chat: async (messages) => (await orchestrator.chat({ messages, temperature: 0 })).content };
 }
 
-export function createAppAgent(options: AgentHarnessOptions = {}): AgentHarness {
-  return new AgentHarness(orchestratorLLM(), moduleRegistry, options);
+/** รวม hooks หลายชุดเป็นชุดเดียว (เรียกตามลำดับ) */
+export function combineHooks(...sets: (AgentHooks | undefined)[]): AgentHooks {
+  const list = sets.filter((h): h is AgentHooks => h !== undefined);
+  return {
+    onStart: async (...a) => {
+      for (const h of list) await h.onStart?.(...a);
+    },
+    onStep: async (...a) => {
+      for (const h of list) await h.onStep?.(...a);
+    },
+    onToolCall: async (...a) => {
+      for (const h of list) await h.onToolCall?.(...a);
+    },
+    onComplete: async (...a) => {
+      for (const h of list) await h.onComplete?.(...a);
+    },
+    onError: async (...a) => {
+      for (const h of list) await h.onError?.(...a);
+    },
+  };
+}
+
+/**
+ * agent ของแอป — โหลดรายการ skill / device / MCP ก่อน (listTools ของแต่ละตัวอ่านจาก cache)
+ * `learn: true` = ให้ SkillEngine สังเคราะห์ทักษะใหม่หลังงานสำเร็จ (ปิดไว้ รอบอสอนุมัติ)
+ */
+export async function createAppAgent(
+  options: AgentHarnessOptions & { learn?: boolean | undefined } = {}
+): Promise<AgentHarness> {
+  const { learn, hooks, ...rest } = options;
+  await Promise.all([skillEngine.load(), deviceControl.load(), mcpBridge.connectAll()]);
+  const llm = orchestratorLLM();
+  return new AgentHarness(llm, moduleRegistry, {
+    providers: [skillEngine, mcpBridge, deviceControl],
+    memory: localMemory,
+    ...rest,
+    hooks: combineHooks(skillEngine.hooks(learn ? llm : undefined), hooks),
+  });
 }

@@ -71,6 +71,8 @@
       "src/features/router/**/*.ts",
       "src/features/memory/**/*.ts",
       "src/features/memory/**/*.tsx",
+      "src/features/marketplace/**/*.ts",
+      "src/features/marketplace/**/*.tsx",
       "src/features/jarvis/stores/useAtomStore.ts",
       "src/features/jarvis/services/**/*.ts",
       "src/features/settings/**/*.tsx",

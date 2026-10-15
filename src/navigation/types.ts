@@ -5,6 +5,7 @@ export type RootStackParamList = {
   Settings: undefined;
   AISettings: undefined;
   Modules: undefined;
+  Marketplace: undefined;
   VoiceSettings: undefined;
   PersonaVoice: undefined;
 };

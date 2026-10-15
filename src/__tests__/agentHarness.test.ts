@@ -214,8 +214,8 @@ describe('app wiring (aiOrchestrator + moduleRegistry)', () => {
     expect(body.contents).toEqual([{ role: 'user', parts: [{ text: 'สวัสดี' }] }]);
   });
 
-  test('createAppAgent uses the app registry (no modules yet → no tools)', () => {
-    const agent = createAppAgent({ maxSteps: 3 });
+  test('createAppAgent uses the app registry (no modules yet → no tools)', async () => {
+    const agent = await createAppAgent({ maxSteps: 3 });
     expect(agent.maxSteps).toBe(3);
     expect(agent.availableTools()).toEqual([]);
   });

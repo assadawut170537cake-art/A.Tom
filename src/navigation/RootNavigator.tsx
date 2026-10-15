@@ -2,6 +2,7 @@ import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/na
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
+import { PluginMarketplaceScreen } from '../features/marketplace/screens/PluginMarketplaceScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
 import { ModulesScreen } from '../features/settings/screens/ModulesScreen';
 import { PersonaVoiceScreen } from '../features/settings/screens/PersonaVoiceScreen';
@@ -34,6 +35,7 @@ export function RootNavigator() {
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'ตั้งค่า' }} />
         <Stack.Screen name="AISettings" component={AISettingsScreen} options={{ title: 'AI Providers' }} />
         <Stack.Screen name="Modules" component={ModulesScreen} options={{ title: 'Modules' }} />
+        <Stack.Screen name="Marketplace" component={PluginMarketplaceScreen} options={{ title: 'Marketplace' }} />
         <Stack.Screen
           name="VoiceSettings"
           component={VoiceSettingsScreen}
