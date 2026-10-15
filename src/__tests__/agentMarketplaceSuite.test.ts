@@ -618,7 +618,10 @@ describe('marketplace model', () => {
 
 const renderMarket = async (deps: MarketplaceDeps) => {
   await render(createElement(PluginMarketplaceScreen, { deps }));
-  await settle();
+  // รอรายการแรก (มีการ์ด "ควบคุมอุปกรณ์" เสมอ) หรือข้อความโหลดไม่ได้ — ไม่พึ่งเวลาตายตัว
+  await waitFor(() =>
+    expect(screen.queryByRole('button', { name: 'ควบคุมอุปกรณ์' }) ?? screen.queryByRole('alert')).toBeTruthy()
+  );
   await settle();
 };
 const switchOf = (title: string) => screen.getByLabelText(`เปิดใช้ ${title}`);
@@ -679,16 +682,13 @@ describe('PluginMarketplaceScreen', () => {
 
   test('enabling an unreachable MCP server explains why', async () => {
     const deps = await marketplaceDeps();
-    await renderMarket(deps);
-    await fireEvent(switchOf('Offline Server'), 'valueChange', true);
-    await settle();
-    // the fake server only answers https://mcp.example — any URL works in the fake, so force an error
     const failing = new MCPClientBridge(fakeMcpServer({ status: 503 }).fetchImpl);
     await failing.addServer({ id: 'down', name: 'Down', url: 'https://down.example' });
     await renderMarket({ ...deps, mcp: failing });
     await fireEvent(switchOf('Down'), 'valueChange', true);
-    await settle();
-    expect(screen.getByText('เปิดแล้ว แต่เชื่อมต่อไม่ได้: HTTP 503: เชื่อมต่อ server ไม่ได้')).toBeTruthy();
+    // การเปิด MCP ต้องผ่าน fetch (initialize) → รอข้อความจริง ไม่ใช่รอเวลาตายตัว (เคย flaky ตอนเครื่องช้า)
+    expect(await screen.findByText('เปิดแล้ว แต่เชื่อมต่อไม่ได้: HTTP 503: เชื่อมต่อ server ไม่ได้')).toBeTruthy();
+    expect((await failing.listServers())[0]?.config.enabled).toBe(true);
   });
 
   test('install a suggested skill', async () => {
