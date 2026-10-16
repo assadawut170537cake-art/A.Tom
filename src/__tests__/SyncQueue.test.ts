@@ -160,7 +160,7 @@ describe('local changes while paired', () => {
 });
 
 describe('flush()', () => {
-  test('success: pushes the queue, empties it, stores the server time as lastSyncAt', async () => {
+  test('success: pushes the queue, empties it, stores the server time of the pull as lastSyncAt', async () => {
     const server = fakeRemote();
     queue.setRemote(server.remote);
     await memory.save(GLOBAL, 'a', '1');
@@ -169,13 +169,14 @@ describe('flush()', () => {
     await expect(queue.flush()).resolves.toEqual({ ok: true, pushed: 2, pulled: 0, conflicts: 0, pending: 0 });
     expect(server.pulls).toEqual([0]);
     expect(nth(server.pushes, 0).facts.map((f) => f.key)).toEqual(['a', 'b']);
+    expect(nth(server.pushes, 0).lastSyncAt).toBe(1_000_001); // = เวลาตอน pull รอบนี้ (เห็นถึงตรงนั้นแล้ว)
     expect(nth(server.pushes, 0).facts[0]).toEqual({ target: GLOBAL, key: 'a', value: '1', updatedAt: expect.any(Number), deleted: false });
-    expect(queue.getSnapshot()).toMatchObject({ queue: [], lastSyncAt: 1_000_002, currentlySyncing: false, lastError: null });
+    expect(queue.getSnapshot()).toMatchObject({ queue: [], lastSyncAt: 1_000_001, currentlySyncing: false, lastError: null });
     await settle();
-    expect(await AsyncStorage.getItem(SYNC_STORAGE_KEYS.lastSyncAt)).toBe('1000002');
+    expect(await AsyncStorage.getItem(SYNC_STORAGE_KEYS.lastSyncAt)).toBe('1000001');
 
     await queue.flush();
-    expect(server.pulls).toEqual([0, 1_000_002]); // next pull starts from the server time
+    expect(server.pulls).toEqual([0, 1_000_001]); // next pull starts from the pull's server time
     expect(server.pushes).toHaveLength(1); // nothing pending → no push
   });
 

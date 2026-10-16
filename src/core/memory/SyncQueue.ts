@@ -8,7 +8,7 @@
  * trigger (เปิดแอปกลับมา / เน็ตกลับมา / ปุ่ม / ทุก 30s) ──▶ flush()
  *    1. pull(lastSyncAt)   → เทียบกับคิว → ใช้ฉบับที่ชนะ (applyRemote ไม่แจ้งกลับ)
  *    2. push(ที่เหลือในคิว) → server ไม่รับตัวไหน (ของ server ใหม่กว่า) → ใช้ของ server
- *    3. dequeue ที่ส่งสำเร็จ · lastSyncAt = เวลาของ server
+ *    3. dequeue ที่ส่งสำเร็จ · lastSyncAt = เวลาของ server **ตอน pull** (ไม่ใช่ตอน push — ดูเหตุผลใน doFlush)
  *    ล้ม → attempts++ แล้วลองใหม่แบบ backoff (5s → 10s → … ≤ 5 นาที) · 401 = ไม่ลองใหม่ ต้องจับคู่ใหม่
  * ```
  *
@@ -267,7 +267,8 @@ export class SyncQueue {
       restored: true,
       queue: [...restoredQueue, ...this.state.queue],
       lastSyncAt: lastSyncAt ?? this.state.lastSyncAt,
-      conflicts: conflicts ?? this.state.conflicts,
+      // เผื่อข้อมูลเก่าที่บันทึกไว้ยาวเกิน (เช่น จากรุ่นที่ไม่ได้ตัด) — เก็บแค่ล่าสุด
+      conflicts: (conflicts ?? this.state.conflicts).slice(0, MAX_CONFLICT_LOG),
       autoSyncEnabled: autoSync ?? this.state.autoSyncEnabled,
     });
     this.refreshAutoTimer();
@@ -304,6 +305,7 @@ export class SyncQueue {
 
   /** ล้างคิว + lastSyncAt + conflict (ตอนยกเลิกการจับคู่ — server ใหม่ต้องเริ่มจากศูนย์) */
   async reset(): Promise<void> {
+    await this.restore(); // ไม่งั้นค่าที่บันทึกไว้ (โหลดเสร็จทีหลัง) จะทับสิ่งที่เพิ่งตั้ง
     this.update({ queue: [], lastSyncAt: 0, conflicts: [], lastError: null });
     await this.persist([SYNC_STORAGE_KEYS.queue, SYNC_STORAGE_KEYS.lastSyncAt, SYNC_STORAGE_KEYS.conflicts]);
   }
@@ -351,12 +353,14 @@ export class SyncQueue {
   }
 
   async setAutoSync(enabled: boolean): Promise<void> {
+    await this.restore(); // ไม่งั้นค่าที่บันทึกไว้ (โหลดเสร็จทีหลัง) จะทับสิ่งที่เพิ่งตั้ง
     this.update({ autoSyncEnabled: enabled });
     this.refreshAutoTimer();
     await this.persist([SYNC_STORAGE_KEYS.autoSync]);
   }
 
   async clearConflicts(): Promise<void> {
+    await this.restore(); // ไม่งั้นค่าที่บันทึกไว้ (โหลดเสร็จทีหลัง) จะทับสิ่งที่เพิ่งตั้ง
     this.update({ conflicts: [] });
     await this.persist([SYNC_STORAGE_KEYS.conflicts]);
   }
@@ -385,7 +389,10 @@ export class SyncQueue {
     try {
       // 1. pull — ใช้ของ server ที่ชนะ
       const pull = await remote.pull(this.state.lastSyncAt);
-      let serverTime = pull.serverTimestamp;
+      // รอบหน้าเริ่มจากเวลาตอน pull ไม่ใช่ตอน push: เครื่องอื่นที่ push เข้ามา "ระหว่าง" pull กับ push ของเรา
+      // มี syncedAt อยู่ในช่วงนั้น ถ้าเริ่มจากเวลาตอน push จะไม่มีวันได้ของพวกนั้น · ของที่เราเพิ่ง push
+      // จะวนกลับมาในรอบหน้า แต่ applyPulled ข้ามเพราะค่า + updatedAt ตรงกัน
+      let nextSince = pull.serverTimestamp;
       for (const server of pull.facts) {
         const outcome = await this.applyPulled(server);
         if (outcome !== 'skipped') pulled++;
@@ -395,10 +402,13 @@ export class SyncQueue {
       // 2. push ที่เหลือในคิว
       const batch = [...this.state.queue];
       if (batch.length > 0) {
-        const res = await remote.push(batch.map(toSyncFact), this.state.lastSyncAt);
-        serverTime = res.serverTimestamp;
+        // lastSyncAt ที่ส่ง = เวลาตอน pull รอบนี้: บอก server ว่าเราเห็นทุกอย่างถึงตรงนั้นแล้ว → ฉบับบน server
+        // ที่เก่ากว่านี้ไม่ใช่ conflict (เช่น ลบ fact ที่เคยซิงก์แล้ว ต้องลบได้ ไม่ใช่ "แก้ชนะลบ")
+        const res = await remote.push(batch.map(toSyncFact), pull.serverTimestamp);
         for (const conflict of res.conflicts) {
           if (await this.applyRejected(conflict, batch)) conflicts++;
+          // server ไม่รับแต่ไม่ส่งฉบับของมันมา → ดึงใหม่ทั้งหมดรอบหน้า (ฉบับนั้นอาจเก่ากว่า lastSyncAt จึงไม่มาใน pull ปกติ)
+          if (!conflict.server) nextSince = 0;
         }
         const rejected = new Set(res.conflicts.map((c) => slotKey(c.target, c.key)));
         for (const item of batch) {
@@ -408,7 +418,7 @@ export class SyncQueue {
       }
 
       this.failures = 0;
-      this.update({ lastSyncAt: serverTime, lastError: null });
+      this.update({ lastSyncAt: nextSince, lastError: null });
       await this.persist([SYNC_STORAGE_KEYS.lastSyncAt, SYNC_STORAGE_KEYS.queue]);
       return { ok: true, pushed, pulled, conflicts, pending: this.state.queue.length };
     } catch (e) {
