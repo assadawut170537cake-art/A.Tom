@@ -5,7 +5,8 @@
  * - เขียนทีละรายการผ่านคิวเดียว → save/remove ที่ยิงพร้อมกันไม่ทับกัน
  * - **ไม่ทำให้แอป crash:** storage อ่าน/เขียนไม่ได้ → ใช้ข้อมูลในหน่วยความจำต่อ, `isPersistent()` = false,
  *   และ `console.error` · ข้อมูลเสีย → ตัดทิ้งพร้อม `console.error`
- * - `sync()` เป็น no-op (ไม่มี remote) — ดู RemoteMemoryAdapter / SyncQueue
+ * - `sync()` เป็น no-op — การ sync กับ Mark 55 ทำผ่าน SyncQueue ซึ่ง `subscribe()` ฟังการเปลี่ยนแปลงจากที่นี่
+ *   แล้วเขียนของที่ดึงจาก server กลับด้วย `applyRemote()` (ไม่แจ้ง listener → ไม่ส่งกลับขึ้น server ซ้ำ)
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,8 +19,12 @@ import {
   type MemorySource,
   type MemoryStore,
   type MemoryTarget,
+  type SyncFact,
   type SyncResult,
 } from './types';
+
+/** แจ้งเมื่อ fact ถูกเพิ่ม/แก้/ลบในเครื่อง (ลบ = `deleted: true`) */
+export type MemoryChangeListener = (change: SyncFact) => void;
 
 export const MEMORY_KEY_PREFIX = 'atom.memory.v1.';
 
@@ -46,6 +51,7 @@ export class LocalMemoryAdapter implements MemoryStore {
   private readonly mirror = new Map<string, MemoryFact>();
   private writeChain: Promise<unknown> = Promise.resolve();
   private persistent = true;
+  private readonly listeners = new Set<MemoryChangeListener>();
 
   constructor(private readonly prefix: string = MEMORY_KEY_PREFIX) {}
 
@@ -74,6 +80,7 @@ export class LocalMemoryAdapter implements MemoryStore {
       };
       this.mirror.set(storageKey, fact);
       await this.attempt('บันทึก', () => AsyncStorage.setItem(storageKey, JSON.stringify(fact)));
+      this.emit({ target, key, value, updatedAt: now, deleted: false });
       return fact;
     });
   }
@@ -113,6 +120,7 @@ export class LocalMemoryAdapter implements MemoryStore {
       const existed = (await this.read(storageKey)) !== null;
       this.mirror.delete(storageKey);
       await this.attempt('ลบ', () => AsyncStorage.removeItem(storageKey));
+      if (existed) this.emit({ target, key, value: '', updatedAt: Date.now(), deleted: true });
       return existed;
     });
   }
@@ -120,17 +128,60 @@ export class LocalMemoryAdapter implements MemoryStore {
   async clear(target: MemoryTarget): Promise<void> {
     const prefix = this.scopePrefix(target);
     return this.enqueue(async () => {
-      for (const k of [...this.mirror.keys()]) if (k.startsWith(prefix)) this.mirror.delete(k);
+      // จด key ที่หายไปทั้งหมด (ทั้งใน mirror และ storage) เพื่อแจ้ง listener เป็น tombstone ทีละตัว
+      const removed = new Set<string>();
+      for (const k of [...this.mirror.keys()]) {
+        if (!k.startsWith(prefix)) continue;
+        this.mirror.delete(k);
+        removed.add(k);
+      }
       await this.attempt('ล้าง', async () => {
         const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(prefix));
+        for (const k of keys) removed.add(k);
         if (keys.length) await AsyncStorage.multiRemove(keys);
       });
+      const now = Date.now();
+      for (const k of removed) this.emit({ target, key: k.slice(prefix.length), value: '', updatedAt: now, deleted: true });
     });
   }
 
-  /** Local-only: nothing to reconcile. TODO(phase-4.5): delegate to SyncQueue + RemoteMemoryAdapter. */
+  /** Local-only: nothing to reconcile here — Mark 55 sync goes through SyncQueue. */
   async sync(): Promise<SyncResult> {
     return { pushed: 0, pulled: 0, pending: 0 };
+  }
+
+  /** ฟังการเปลี่ยนแปลงจาก save/remove/clear (ไม่รวม applyRemote) — คืนฟังก์ชันเลิกฟัง */
+  subscribe(listener: MemoryChangeListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * เขียน fact ที่ได้จาก server ตามที่ server บอก (คง `updatedAt` ของ server ไว้ ไม่ใช้เวลาเครื่อง)
+   * และ**ไม่แจ้ง listener** — ไม่งั้น SyncQueue จะส่งของที่เพิ่งดึงมากลับขึ้นไปอีกรอบ
+   */
+  async applyRemote(change: SyncFact): Promise<void> {
+    const storageKey = this.storageKey(change.target, change.key);
+    return this.enqueue(async () => {
+      if (change.deleted) {
+        this.mirror.delete(storageKey);
+        await this.attempt('ลบ', () => AsyncStorage.removeItem(storageKey));
+        return;
+      }
+      const existing = await this.read(storageKey);
+      const fact: MemoryFact = {
+        id: existing?.id ?? createId(),
+        key: change.key,
+        value: change.value,
+        source: existing?.source ?? 'user',
+        createdAt: existing?.createdAt ?? change.updatedAt,
+        updatedAt: change.updatedAt,
+      };
+      this.mirror.set(storageKey, fact);
+      await this.attempt('บันทึก', () => AsyncStorage.setItem(storageKey, JSON.stringify(fact)));
+    });
   }
 
   // ---- internals ------------------------------------------------------------------------------
@@ -174,6 +225,17 @@ export class LocalMemoryAdapter implements MemoryStore {
       this.persistent = true;
     } catch (e) {
       this.fail(action, e);
+    }
+  }
+
+  /** listener ที่ throw ไม่ทำให้การบันทึกล้ม */
+  private emit(change: SyncFact): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(change);
+      } catch (e) {
+        console.error('[memory] listener ล้ม', e);
+      }
     }
   }
 

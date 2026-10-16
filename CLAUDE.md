@@ -42,7 +42,7 @@
     │   ├── http/       ← errors, request, redaction
     │   ├── storage/    ← ProviderSettings, ChatHistoryStorage, jsonStorage
     │   ├── types/      ← shared primitives (Persona, Message, AIProviderId, TTS/STT ids) + guards
-    │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (stub)
+    │   ├── memory/     ← MemoryStore, LocalMemoryAdapter, RemoteMemoryAdapter (Mark 55), SyncQueue, MemorySync
     │   ├── modules/    ← AtomModule, ModuleRegistry (runtime), ModuleManager (จำค่าเปิด/ปิด + กฎ dependency)
     │   └── agent/      ← AgentHarness (loop + hooks) · MCPClientBridge · SkillEngine · DeviceControlBridge
     │
@@ -57,7 +57,7 @@
         ├── jarvis/     ← MainScreen, conversation service
         ├── marketplace/← ตั้งค่า › Marketplace: MCP servers · Plugins · Skills · ควบคุมอุปกรณ์ (ค้นหา/กรอง/เปิดปิด/ติดตั้ง)
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
-        └── settings/   ← screens (Hub, AI, Modules, Voice, Persona Voice), components
+        └── settings/   ← screens (Hub, AI, Modules, Sync, Voice, Persona Voice), components
 
 ### Dependency Direction
 - ✅ `features/` → `core/` (ถูก)
@@ -201,6 +201,17 @@
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · driver เริ่มต้นใช้แค่ `Linking` → volume / brightness / clipboard = "ยังไม่รองรับ" จนกว่าจะเพิ่ม expo-brightness / expo-clipboard ฯลฯ (ต้องขอ Boss) · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
 - ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
 
+### Sync กับ Mark 55 (4.5.4.2)
+- `memorySync` (core/memory/MemorySync.ts) = ตัวเดียวทั้งแอป: Server URL · pair/unpair · testConnection · เป็นเจ้าของ `SyncQueue` · boot เรียก `start()`
+- ไม่จับคู่ = ไม่ฟัง memory ไม่มี timer → แอปเครื่องเดียวเหมือนเดิม · จับคู่ครั้งแรก → `enqueueAll()` ส่ง fact ที่มีอยู่ขึ้นไปด้วย
+- token: SecureStore `mark55.auth.token` (เท่านั้น) · AsyncStorage `mark55.sync.{serverUrl,device,queue,lastSyncAt,conflicts,autoSync}`
+- LocalMemoryAdapter `subscribe()` → คิว · ของจาก server เขียนด้วย `applyRemote()` (ไม่แจ้ง listener — กันส่งกลับซ้ำ, คง `updatedAt` ของ server)
+- conflict: ตัวตน = target+key · แก้ชนะลบ · ไม่งั้น `updatedAt` ใหม่กว่าชนะ (เท่ากัน = local) · server ชนะ → จด conflict log (เก็บ 50)
+- retry อยู่ใน SyncQueue เท่านั้น (backoff 5s→5 นาที, 401 ไม่ retry) · RemoteMemoryAdapter ไม่ retry, timeout 10s
+- Server URL: http ได้เฉพาะ LAN/localhost/.local/Tailscale (100.64/10) · ที่อยู่สาธารณะต้อง https (`normalizeServerUrl`)
+- ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
+- ⚠️ release build Android บล็อก http (cleartext) เป็นค่าเริ่มต้น — Expo Go/dev build ใช้ได้; release ต้องตั้ง `usesCleartextTraffic` (ต้องขอ Boss เพราะต้องเพิ่ม expo-build-properties)
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -218,8 +229,8 @@
 3. ✅ ย้าย `loader.ts` → app-level (`src/modules/loader.ts`)
 
 ### ระหว่าง Phase 4.5
-4. Remote Memory Adapter
-5. SyncQueue.flush() + persist
+4. ✅ Remote Memory Adapter (4.5.4.2a — Mark 55)
+5. ✅ SyncQueue.flush() + persist (4.5.4.2c) + หน้า ตั้งค่า › Sync (4.5.4.2b)
 6. Module `pc-bridge` จริง
 7. ✅ UI Memory (4.5.2) — แท็บ Memory: list + filter + เพิ่ม/แก้ (แตะ) / ลบ (กดค้าง หรือปุ่มในฟอร์ม)
 8. ✅ UI Module Manager (4.5.3) — ตั้งค่า › Modules: สวิตช์เปิด/ปิด (จำค่า) + รายละเอียด + เริ่มใหม่ + กฎ dependency
@@ -265,6 +276,7 @@
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
 - Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`
 - Modules UI: `src/features/settings/screens/ModulesScreen.tsx`
+- Sync: `src/core/memory/MemorySync.ts` · `SyncQueue.ts` · `RemoteMemoryAdapter.ts` · UI `src/features/settings/screens/SyncScreen.tsx`
 - Agent: `src/core/agent/` · app wiring `src/features/ai/agent.ts` · Marketplace: `src/features/marketplace/screens/PluginMarketplaceScreen.tsx`
 - Shared types: `src/core/types/`
 - Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`
@@ -301,5 +313,5 @@
 
 ---
 
-**Last updated:** 2026-10-15 (MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-16 (4.5.4.2: Mark 55 sync — RemoteMemoryAdapter · SyncQueue · Sync screen · MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

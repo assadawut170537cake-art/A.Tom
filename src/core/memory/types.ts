@@ -9,8 +9,8 @@
  *
  * Implementation:
  * - {@link ./LocalMemoryAdapter} — AsyncStorage, ใช้งานได้แล้ว
- * - {@link ./RemoteMemoryAdapter} — stub (Phase 4.5+)
- * - {@link ./SyncQueue} — skeleton ของคิว offline-first (Phase 4.5+)
+ * - {@link ./RemoteMemoryAdapter} — HTTP client ของ Mark 55 (pair / pull / push / health)
+ * - {@link ./SyncQueue} — คิว offline-first ที่ส่งการเปลี่ยนแปลงขึ้น Mark 55 (4.5.4.2)
  *
  * @see ../../../docs/DECISIONS.md — ADR-011
  */
@@ -72,3 +72,20 @@ export const ALL_MEMORY_TARGETS: readonly MemoryTarget[] = [
   { scope: 'global' },
   ...PERSONA_IDS.map((persona): MemoryTarget => ({ scope: 'persona', persona })),
 ];
+
+/**
+ * fact ตามที่ sync กับ server (Mark 55) — ระบุตัวตนด้วย `target + key` (id ในเครื่องไม่ถูกส่ง
+ * เพราะแต่ละเครื่องสร้าง id เอง) · ลบ = tombstone `deleted: true` เพื่อให้เครื่องอื่นรู้ว่าต้องลบตาม
+ */
+export interface SyncFact {
+  target: MemoryTarget;
+  key: string;
+  /** ว่างได้เมื่อ `deleted` */
+  value: string;
+  /** epoch ms ตามนาฬิกาของเครื่องที่แก้ */
+  updatedAt: number;
+  deleted: boolean;
+}
+
+/** fact ตัวเดียวกันไหม (ขอบเขต + key เดียวกัน) */
+export const slotKey = (target: MemoryTarget, key: string) => `${scopeSegment(target)}.${key}`;

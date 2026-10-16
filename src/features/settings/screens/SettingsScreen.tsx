@@ -1,4 +1,4 @@
-import { ChevronRight, Cpu, Mic, Puzzle, Store, Users, type LucideIcon } from 'lucide-react-native';
+import { ChevronRight, Cpu, Mic, Puzzle, RefreshCw, Store, Users, type LucideIcon } from 'lucide-react-native';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import type { RootScreenProps, RootStackParamList } from '../../../navigation/types';
@@ -19,6 +19,7 @@ const ENTRIES: Entry[] = [
   },
   { route: 'Modules', title: 'Modules', subtitle: 'เปิด/ปิดความสามารถเสริม · ดูสถานะ module', icon: Puzzle },
   { route: 'Marketplace', title: 'Marketplace', subtitle: 'MCP servers · Plugins · Skills · ควบคุมอุปกรณ์', icon: Store },
+  { route: 'Sync', title: 'Sync', subtitle: 'ซิงก์ความจำกับ Mark 55 · จับคู่อุปกรณ์', icon: RefreshCw },
   { route: 'VoiceSettings', title: 'Voice (TTS + STT)', subtitle: 'ผู้ให้บริการเสียงพูดและถอดเสียง', icon: Mic },
   { route: 'PersonaVoice', title: 'Persona Voice Map', subtitle: 'เสียงของแต่ละผู้ช่วย', icon: Users },
 ];

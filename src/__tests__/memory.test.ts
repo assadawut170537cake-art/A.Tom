@@ -1,10 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LocalMemoryAdapter, MEMORY_KEY_PREFIX } from '../core/memory/LocalMemoryAdapter';
-import { MEMORY_NOT_IMPLEMENTED, RemoteMemoryAdapter } from '../core/memory/RemoteMemoryAdapter';
-import { MemorySyncQueue } from '../core/memory/SyncQueue';
 import type { MemoryFact, MemoryTarget } from '../core/memory/types';
-import { nth } from '../test-utils/nth';
 
 const GLOBAL: MemoryTarget = { scope: 'global' };
 const ATOM: MemoryTarget = { scope: 'persona', persona: 1 };
@@ -154,29 +151,43 @@ describe('LocalMemoryAdapter — errors and fallback', () => {
   });
 });
 
-describe('RemoteMemoryAdapter (stub) + SyncQueue (skeleton)', () => {
-  test('every remote method rejects with "Not implemented (Phase 4.5+)"', async () => {
-    const remote = new RemoteMemoryAdapter({ baseURL: 'https://memory.example' });
-    const calls = [
-      remote.save(GLOBAL, 'k', 'v'),
-      remote.load(GLOBAL, 'k'),
-      remote.list(GLOBAL),
-      remote.remove(GLOBAL, 'k'),
-      remote.clear(GLOBAL),
-      remote.sync(),
-    ];
-    for (const call of calls) await expect(call).rejects.toThrow(MEMORY_NOT_IMPLEMENTED);
+describe('LocalMemoryAdapter — change feed for SyncQueue', () => {
+  test('save / remove / clear notify subscribers (remove + clear as tombstones)', async () => {
+    const changes: unknown[] = [];
+    const stop = memory.subscribe((c) => changes.push(c));
+    const fact = await memory.save(GLOBAL, 'a', '1');
+    await memory.save(ATOM, 'b', '2');
+    await memory.remove(GLOBAL, 'a');
+    await memory.remove(GLOBAL, 'missing'); // nothing removed → no event
+    await memory.clear(ATOM);
+    stop();
+    await memory.save(GLOBAL, 'c', '3'); // after unsubscribe → not seen
+    expect(changes).toEqual([
+      { target: GLOBAL, key: 'a', value: '1', updatedAt: fact.updatedAt, deleted: false },
+      { target: ATOM, key: 'b', value: '2', updatedAt: expect.any(Number), deleted: false },
+      { target: GLOBAL, key: 'a', value: '', updatedAt: expect.any(Number), deleted: true },
+      { target: ATOM, key: 'b', value: '', updatedAt: expect.any(Number), deleted: true },
+    ]);
   });
 
-  test('SyncQueue records changes in order; flush is not implemented yet', async () => {
-    const queue = new MemorySyncQueue();
-    const fact = await memory.save(GLOBAL, 'k', 'v');
-    await queue.enqueue({ kind: 'save', target: GLOBAL, fact });
-    await queue.enqueue({ kind: 'remove', target: ATOM, key: 'x' });
-    const pending = await queue.pending();
-    expect(pending.map((c) => [c.id, c.op.kind, c.attempts])).toEqual([[1, 'save', 0], [2, 'remove', 0]]);
-    nth(pending, 0).attempts = 99; // a copy — the queue itself is untouched
-    expect(nth(await queue.pending(), 0).attempts).toBe(0);
-    await expect(queue.flush(new RemoteMemoryAdapter({ baseURL: 'x' }))).rejects.toThrow(MEMORY_NOT_IMPLEMENTED);
+  test('a throwing listener is logged and does not break the save', async () => {
+    memory.subscribe(() => {
+      throw new Error('boom');
+    });
+    await expect(memory.save(GLOBAL, 'a', '1')).resolves.toMatchObject({ value: '1' });
+    expect(errorSpy).toHaveBeenCalledWith('[memory] listener ล้ม', expect.any(Error));
+  });
+
+  test('applyRemote keeps the server updatedAt, keeps id/createdAt, and does not notify', async () => {
+    const listener = jest.fn();
+    const original = await memory.save(JARVIS, 'k', 'old', 'assistant');
+    memory.subscribe(listener);
+    await memory.applyRemote({ target: JARVIS, key: 'k', value: 'new', updatedAt: 42, deleted: false });
+    expect(await memory.load(JARVIS, 'k')).toEqual({ ...original, value: 'new', updatedAt: 42 });
+    await memory.applyRemote({ target: GLOBAL, key: 'fresh', value: 'v', updatedAt: 7, deleted: false });
+    expect(await memory.load(GLOBAL, 'fresh')).toMatchObject({ source: 'user', createdAt: 7, updatedAt: 7 });
+    await memory.applyRemote({ target: JARVIS, key: 'k', value: '', updatedAt: 50, deleted: true });
+    expect(await memory.load(JARVIS, 'k')).toBeNull();
+    expect(listener).not.toHaveBeenCalled();
   });
 });
