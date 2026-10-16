@@ -1,4 +1,4 @@
-import type { Intent, RouteSource, RouterOutput } from '../core/types';
+import type { ModelIntent, RouteSource, RouterOutput } from '../core/types';
 import { findPersona } from './RuleClassifier';
 
 /**
@@ -6,7 +6,7 @@ import { findPersona } from './RuleClassifier';
  * so the switch target is taken from the text itself; other intents carry no entities.
  */
 export function routeFor(
-  intent: Intent,
+  intent: ModelIntent,
   confidence: number,
   provider: RouteSource,
   text: string

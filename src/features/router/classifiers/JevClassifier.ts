@@ -2,10 +2,11 @@ import { ProviderSettings, type ProviderSettingsStore } from '../../../core/stor
 import { isOneOf } from '../../../core/types/guards';
 import { JevAdapter } from '../../ai/adapters/JevAdapter';
 import { aiRegistry, type ProviderRegistry } from '../../ai/core/ProviderRegistry';
-import { INTENTS, type Classifier, type Intent, type RouterInput, type RouterOutput } from '../core/types';
+import { MODEL_INTENTS, type Classifier, type ModelIntent, type RouterInput, type RouterOutput } from '../core/types';
 import { routeFor } from './routeFor';
 
-const CRITERIA: Record<Intent, string> = {
+// 'agent' ไม่อยู่ในนี้: Jev บอกไม่ได้ว่าเป็น agent ตัวไหน — AgentClassifier ทำหน้าที่นั้นก่อนถึง Jev
+const CRITERIA: Record<ModelIntent, string> = {
   chat: 'General conversation, questions, or anything that is not a device command or assistant switch.',
   pc_command: "A command to control the user's computer (open/close apps, shut down, run something).",
   switch_assistant:
@@ -50,7 +51,7 @@ export class JevClassifier implements Classifier {
     );
 
     const answer = answers.intent;
-    if (answer?.type !== 'choice' || !isOneOf(INTENTS, answer.choice)) return null;
+    if (answer?.type !== 'choice' || !isOneOf(MODEL_INTENTS, answer.choice)) return null;
     const intent = answer.choice;
     const confidence = answer.confidence ?? answer.probabilities?.[intent] ?? 0;
     return routeFor(intent, confidence, 'jev', input.text);
