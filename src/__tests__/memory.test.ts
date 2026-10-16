@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LocalMemoryAdapter, MEMORY_KEY_PREFIX } from '../core/memory/LocalMemoryAdapter';
-import { MEMORY_NOT_IMPLEMENTED, RemoteMemoryAdapter } from '../core/memory/RemoteMemoryAdapter';
-import { MemorySyncQueue } from '../core/memory/SyncQueue';
+import { MEMORY_NOT_IMPLEMENTED, MemorySyncQueue } from '../core/memory/SyncQueue';
 import type { MemoryFact, MemoryTarget } from '../core/memory/types';
 import { nth } from '../test-utils/nth';
 
@@ -154,20 +153,7 @@ describe('LocalMemoryAdapter — errors and fallback', () => {
   });
 });
 
-describe('RemoteMemoryAdapter (stub) + SyncQueue (skeleton)', () => {
-  test('every remote method rejects with "Not implemented (Phase 4.5+)"', async () => {
-    const remote = new RemoteMemoryAdapter({ baseURL: 'https://memory.example' });
-    const calls = [
-      remote.save(GLOBAL, 'k', 'v'),
-      remote.load(GLOBAL, 'k'),
-      remote.list(GLOBAL),
-      remote.remove(GLOBAL, 'k'),
-      remote.clear(GLOBAL),
-      remote.sync(),
-    ];
-    for (const call of calls) await expect(call).rejects.toThrow(MEMORY_NOT_IMPLEMENTED);
-  });
-
+describe('SyncQueue (skeleton)', () => {
   test('SyncQueue records changes in order; flush is not implemented yet', async () => {
     const queue = new MemorySyncQueue();
     const fact = await memory.save(GLOBAL, 'k', 'v');
@@ -177,6 +163,6 @@ describe('RemoteMemoryAdapter (stub) + SyncQueue (skeleton)', () => {
     expect(pending.map((c) => [c.id, c.op.kind, c.attempts])).toEqual([[1, 'save', 0], [2, 'remove', 0]]);
     nth(pending, 0).attempts = 99; // a copy — the queue itself is untouched
     expect(nth(await queue.pending(), 0).attempts).toBe(0);
-    await expect(queue.flush(new RemoteMemoryAdapter({ baseURL: 'x' }))).rejects.toThrow(MEMORY_NOT_IMPLEMENTED);
+    await expect(queue.flush(memory)).rejects.toThrow(MEMORY_NOT_IMPLEMENTED);
   });
 });

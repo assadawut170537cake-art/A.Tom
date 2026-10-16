@@ -20,8 +20,9 @@
  *   - trigger อัตโนมัติเมื่อกลับมาออนไลน์ (expo-network listener)
  */
 
-import { MEMORY_NOT_IMPLEMENTED } from './RemoteMemoryAdapter';
 import type { MemoryFact, MemoryStore, MemoryTarget, SyncResult } from './types';
+
+export const MEMORY_NOT_IMPLEMENTED = 'Not implemented (Phase 4.5+)';
 
 export type SyncOperation =
   | { kind: 'save'; target: MemoryTarget; fact: MemoryFact }
