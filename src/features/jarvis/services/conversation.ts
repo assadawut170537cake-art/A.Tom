@@ -1,5 +1,6 @@
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
 import { isOffline } from '../../../core/network/connectivity';
+import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { aiOrchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { getAppRouter } from '../../router/appRouter';
@@ -14,6 +15,8 @@ interface SendResult {
   route: RouterOutput | null;
   reply: string;
   error?: string;
+  /** agent ที่ขอเปิด UI ในรอบนี้ (Agent Panel เปิดให้แล้ว) */
+  agentScreen?: { agentId: string };
 }
 
 /**
@@ -48,6 +51,8 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
     });
     // A switch moves the reply (the new persona's greeting) into the new persona's history
     useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
+    if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);
     // Keys rejected along the way (e.g. Gemini 401 while OpenRouter answered) still need fixing
     for (const notice of aiOrchestrator.takeNotices()) {
       useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${redactSecrets(notice)}`, persona: result.persona });
@@ -59,7 +64,9 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
         // Speech is best-effort; the text reply is already on screen
       });
     }
-    return { route, reply: result.reply };
+    return result.agentScreen
+      ? { route, reply: result.reply, agentScreen: result.agentScreen }
+      : { route, reply: result.reply };
   } catch (e) {
     aiOrchestrator.takeNotices(); // already listed in the aggregated error below
     const err = toProviderError('conversation', e);

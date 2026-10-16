@@ -1,11 +1,19 @@
 import type { ChatMessage } from '../../ai/core/types';
 import type { Persona } from '../../../core/types/persona';
 
-export const INTENTS = ['chat', 'pc_command', 'switch_assistant'] as const;
+export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
 export type Intent = (typeof INTENTS)[number];
 
+/**
+ * Intents that Jev / the LLM classifier may answer. `agent` is left out on purpose: a model label
+ * alone can't say *which* agent, so only AgentClassifier (pattern match on registered capabilities)
+ * produces agent routes.
+ */
+export const MODEL_INTENTS = ['chat', 'pc_command', 'switch_assistant'] as const satisfies readonly Intent[];
+export type ModelIntent = (typeof MODEL_INTENTS)[number];
+
 /** Which stage decided the route. */
-export type RouteSource = 'rule' | 'jev' | 'llm';
+export type RouteSource = 'rule' | 'agent' | 'jev' | 'llm';
 
 /** Persona id as carried in route entities ('1' | '2' | '3' | '4'). */
 export type PersonaEntity = `${Persona}`;
@@ -32,7 +40,15 @@ interface RouteBase {
 export type RouterOutput =
   | (RouteBase & { intent: 'chat'; entities?: undefined })
   | (RouteBase & { intent: 'pc_command'; entities?: { action: string; target: string } })
-  | (RouteBase & { intent: 'switch_assistant'; entities?: { persona: PersonaEntity } });
+  | (RouteBase & { intent: 'switch_assistant'; entities?: { persona: PersonaEntity } })
+  | (RouteBase & { intent: 'agent'; entities: AgentEntities });
+
+/** agent ที่ต้องรัน + เนื้อคำสั่ง (เช่น "จดบันทึกว่า ซื้อนม" → commandText "ซื้อนม") */
+export interface AgentEntities {
+  agentId: string;
+  commandText: string;
+  capabilityId?: string | undefined;
+}
 
 export type RouteOf<I extends Intent> = Extract<RouterOutput, { intent: I }>;
 
@@ -46,6 +62,8 @@ export interface HandlerResult {
   reply: string;
   /** Persona that should own the reply (differs from the input persona after a switch). */
   persona: Persona;
+  /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
+  agentScreen?: { agentId: string } | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

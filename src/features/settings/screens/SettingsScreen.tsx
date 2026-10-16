@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import type { RootScreenProps, RootStackParamList } from '../../../navigation/types';
 
 interface Entry {
-  route: Exclude<keyof RootStackParamList, 'Main' | 'Settings'>;
+  route: Exclude<keyof RootStackParamList, 'Main' | 'Settings' | 'Agent'>;
   title: string;
   subtitle: string;
   icon: LucideIcon;

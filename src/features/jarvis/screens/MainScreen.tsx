@@ -3,6 +3,8 @@ import { useCallback, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AgentPanel } from '../../agents/components/AgentPanel';
+import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { MemoryScreen } from '../../memory/screens/MemoryScreen';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
@@ -46,8 +48,12 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const persona = PERSONAS[useAtomStore((s) => s.activePersona)];
   const keyStatus = useAIKeyStatus();
 
+  const agentId = useAgentPanelStore((s) => s.agentId);
+  const closeAgent = useAgentPanelStore((s) => s.close);
+
   const inputRef = useRef<TextInput>(null);
   const [composerHeight, setComposerHeight] = useState(0);
+  const [panelHeight, setPanelHeight] = useState(0);
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
 
   const enterConversation = useCallback(() => {
@@ -65,6 +71,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
       // Orb เล็ก → กลับหน้าเลือกผู้ช่วย; หยุดเสียงที่พูดค้าง แล้ว sendMessage จะคืน mood เป็น idle เอง
       voiceOrchestrator.stop();
       Keyboard.dismiss();
+      useAgentPanelStore.getState().close();
       useAtomStore.getState().setUIMode('idle');
     }
   }, [enterConversation, focusInput]);
@@ -75,7 +82,12 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   }, []);
 
   const composerBottom = keyboardOverlap > 0 ? keyboardOverlap + GAP : COMPOSER_BOTTOM;
-  const chatBottom = Math.max(LAYOUT.chat.bottomPadding, composerBottom + composerHeight + GAP);
+  // Agent Panel อยู่เหนือช่องพิมพ์ → ดันรายการแชทขึ้นตามความสูง panel
+  const panelBottom = composerBottom + composerHeight + GAP;
+  const chatBottom = Math.max(
+    LAYOUT.chat.bottomPadding,
+    panelBottom + (agentId ? panelHeight + GAP : 0)
+  );
 
   return (
     <>
@@ -101,6 +113,14 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           accentColor={persona.color}
         />
       </View>
+      {agentId && (
+        <AgentPanel
+          agentId={agentId}
+          onClose={closeAgent}
+          bottom={panelBottom}
+          onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+        />
+      )}
       {dropdownOpen && (
         <Pressable
           accessibilityLabel="ปิดเมนู"

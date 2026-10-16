@@ -9,6 +9,8 @@ export type RootStackParamList = {
   Marketplace: undefined;
   VoiceSettings: undefined;
   PersonaVoice: undefined;
+  /** UI ของ agent แบบเต็มจอ */
+  Agent: { agentId: string };
 };
 
 export type RootScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<

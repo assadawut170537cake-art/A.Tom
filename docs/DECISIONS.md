@@ -172,3 +172,15 @@ ADR-001 – 010: การตัดสินใจที่ **lock** ไว้�
 | **Cursor** (4.5.4.3) | `lastSyncAt` = เวลา server **ตอน pull** (ไม่ใช่ตอน push — ไม่งั้นของที่เครื่องอื่น push เข้ามาระหว่างนั้นหาย) และส่งค่านี้ไปกับ push ให้ server แยก "ฉบับที่ client เห็นแล้ว" (ไม่ขัดแย้ง → รับ) กับ "ฉบับที่ยังไม่เห็น" (ขัดแย้งจริง → แก้ชนะลบ / ใหม่กว่าชนะ) — ถ้าไม่แยก การลบ fact ที่ซิงก์แล้วจะไม่มีวันไปถึงเครื่องอื่น |
 | **Consequences** | ➕ หลายเครื่องเห็นความจำเดียวกัน, ใช้ออฟไลน์ได้ · ยืนยันด้วย test 2 เครื่องผ่าน `FakeMark55Server` · ➖ ชื่อ field ของ API อิงจาก spec (โค้ด server ไม่อยู่ใน repo นี้) และ server ต้องทำตามข้อตกลงใน [SYNC_PROTOCOL §12](SYNC_PROTOCOL.md#12-ข้อตกลงที่-server-ต้องทำตาม) · ➖ clock skew > 1 วัน = การเปลี่ยนแปลงค้างจนกว่าจะแก้นาฬิกา · ➖ release build Android ต้องเปิด cleartext ถึงจะคุยกับ `http://<IP>` ได้ |
 | **Spec** | ขั้นตอน ไดอะแกรม wire format endpoint และตารางกติกาฉบับเต็ม → [docs/SYNC_PROTOCOL.md](SYNC_PROTOCOL.md) |
+
+---
+
+## ADR-013 — Agent intent + Agent Panel
+
+| | |
+|---|---|
+| **Decision** | เพิ่ม intent ที่ 4 `agent` · agent = ผู้ช่วยเฉพาะทางที่ประกาศ capability + regex ของคำสั่ง และมี UI แบบ lazy ได้ (`core/agents/`: `AgentRegistry` singleton, `AgentErrorBoundary`) · `AgentClassifier` อยู่ **หลัง Rule ก่อน Jev/LLM** · `AgentHandler` คืน `agentScreen` → เปิด **Agent Panel** บนหน้าหลัก (ขยายเป็นหน้า `Agent` ได้) · ตัวอย่าง: agent "โน้ต" (`src/modules/agents/sample-agent.ts`) |
+| **Status** | 🧪 Proposed (2026-10-16) — PR `feature/agent-screen` รอ FRIDAY review |
+| **Rationale** | • pattern ของ agent ฟรี ออฟไลน์ได้ และแม่นกว่าให้ model เดา จึงมาก่อน Jev/LLM<br>• Jev / LLM ตอบได้แค่ `MODEL_INTENTS` (3 ตัวเดิม) เพราะ label อย่างเดียวบอกไม่ได้ว่า agent ตัวไหน — prompt/criteria เดิมจึงไม่เปลี่ยน<br>• agent ล้ม → ตอบเป็นข้อความไทย (ไม่ throw) เพราะไม่ใช่ปัญหาเน็ต/API key คำแนะนำแบบ provider จะชี้ผิดทาง<br>• UI ของ agent ครอบด้วย error boundary + ปุ่มลองใหม่ → agent พังไม่ลากหน้าหลักล้ม<br>• ไม่มี agent ลงทะเบียน = router ทำงานเหมือนเดิมทุกอย่าง |
+| **Consequences** | ➕ เพิ่มความสามารถที่มี UI ได้โดยไม่แตะ ChatHandler / PCCommandHandler / SwitchAssistantHandler<br>➖ Rule มาก่อน Agent → คำสั่ง agent ที่บังเอิญมีคำว่า "เปิด/ปิด…เครื่อง/คอม" ถูก `pc_command` แย่งไป (เช่น "จดบันทึกว่าปิดคอมตอนสี่ทุ่ม")<br>➖ pattern ต้องเขียนให้แคบ ไม่งั้นแย่งข้อความคุยปกติก่อนถึง LLM |
+

@@ -1,7 +1,7 @@
 /**
  * @file ลำดับการเปิดแอป (เรียกครั้งเดียวจาก App.tsx ก่อน render)
  *
- * 1. ลงทะเบียน AI + voice providers (sync — หน้าแรกต้องใช้ทันที)
+ * 1. ลงทะเบียน AI + voice providers + sample agent "โน้ต" (sync — หน้าแรกต้องใช้ทันที)
  * 2. เริ่ม services แบบ async ไม่บล็อก UI:
  *    - `moduleManager.start()` — ใช้ค่าเปิด/ปิด module ที่บอสบันทึกไว้ แล้ว `initAll()`
  *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
@@ -21,6 +21,7 @@ import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
+import { registerSampleAgents } from './modules/agents/sample-agent';
 
 export interface BootReport {
   /** null = start() เองล้ม (log แล้ว) */
@@ -54,6 +55,7 @@ let started: Promise<BootReport> | null = null;
 export function bootApp(): Promise<BootReport> {
   registerAIProviders();
   registerVoiceProviders();
+  registerSampleAgents();
   return (started ??= startServices());
 }
 

@@ -1,6 +1,7 @@
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AgentScreen } from '../features/agents/screens/AgentScreen';
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
 import { PluginMarketplaceScreen } from '../features/marketplace/screens/PluginMarketplaceScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
@@ -48,6 +49,7 @@ export function RootNavigator() {
           component={PersonaVoiceScreen}
           options={{ title: 'Persona Voice Map' }}
         />
+        <Stack.Screen name="Agent" component={AgentScreen} options={{ title: 'ผู้ช่วย' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,6 +1,6 @@
 import { isOneOf, isRecord, parseJSON } from '../../../core/types/guards';
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
-import { INTENTS, type Classifier, type Intent, type RouterInput, type RouterOutput } from '../core/types';
+import { MODEL_INTENTS, type Classifier, type ModelIntent, type RouterInput, type RouterOutput } from '../core/types';
 import { routeFor } from './routeFor';
 
 export const CLASSIFIER_SYSTEM_PROMPT =
@@ -8,12 +8,12 @@ export const CLASSIFIER_SYSTEM_PROMPT =
   'Reply with JSON: {intent, confidence}';
 
 /** Extracts the first JSON object from a reply that may be wrapped in prose or ``` fences. */
-export function parseClassification(text: string): { intent: Intent; confidence: number } | null {
+export function parseClassification(text: string): { intent: ModelIntent; confidence: number } | null {
   const match = text.match(/\{[\s\S]*?\}/);
   const data = parseJSON(match?.[0], isRecord);
   if (!data) return null;
   const intent = String(data.intent ?? '').trim();
-  if (!isOneOf(INTENTS, intent)) return null;
+  if (!isOneOf(MODEL_INTENTS, intent)) return null;
   const raw = Number(data.confidence);
   const confidence = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw > 1 ? raw / 100 : raw)) : 0.5;
   return { intent, confidence };
