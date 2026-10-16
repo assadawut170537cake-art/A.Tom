@@ -201,12 +201,16 @@
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · driver เริ่มต้นใช้แค่ `Linking` → volume / brightness / clipboard = "ยังไม่รองรับ" จนกว่าจะเพิ่ม expo-brightness / expo-clipboard ฯลฯ (ต้องขอ Boss) · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
 - ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
 
-### Sync กับ Mark 55 (4.5.4.2)
+### Sync กับ Mark 55 (4.5.4.2–4.5.4.3) — สเปกเต็ม `docs/SYNC_PROTOCOL.md`
 - `memorySync` (core/memory/MemorySync.ts) = ตัวเดียวทั้งแอป: Server URL · pair/unpair · testConnection · เป็นเจ้าของ `SyncQueue` · boot เรียก `start()`
 - ไม่จับคู่ = ไม่ฟัง memory ไม่มี timer → แอปเครื่องเดียวเหมือนเดิม · จับคู่ครั้งแรก → `enqueueAll()` ส่ง fact ที่มีอยู่ขึ้นไปด้วย
 - token: SecureStore `mark55.auth.token` (เท่านั้น) · AsyncStorage `mark55.sync.{serverUrl,device,queue,lastSyncAt,conflicts,autoSync}`
 - LocalMemoryAdapter `subscribe()` → คิว · ของจาก server เขียนด้วย `applyRemote()` (ไม่แจ้ง listener — กันส่งกลับซ้ำ, คง `updatedAt` ของ server)
 - conflict: ตัวตน = target+key · แก้ชนะลบ · ไม่งั้น `updatedAt` ใหม่กว่าชนะ (เท่ากัน = local) · server ชนะ → จด conflict log (เก็บ 50)
+- `lastSyncAt` = เวลา server **ตอน pull** และส่งค่านี้ไปกับ push (server ใช้แยก conflict จริง) — ห้ามเปลี่ยนเป็นเวลาตอน push (ของเครื่องอื่นจะหาย) · server ปฏิเสธแบบไม่ส่งฉบับมา → `lastSyncAt = 0`
+- ⚠️ Mark 55 ต้องใช้ "แก้ชนะลบ" เฉพาะฉบับที่ `syncedAt > lastSyncAt` ไม่งั้นการลบไม่ไปถึงเครื่องอื่น ([SYNC_PROTOCOL §12](docs/SYNC_PROTOCOL.md))
+- conflict log: `clearConflicts()` / `setAutoSync()` / `reset()` รอ `restore()` ก่อน · โหลดมาเกิน 50 ตัดทิ้ง
+- ทดสอบกติกาด้วย `FakeMark55Server` (src/test-utils/fakeMark55.ts) + `syncConflict.test.ts` — server จริงเปลี่ยนกติกา → แก้ตัวจำลองตาม
 - retry อยู่ใน SyncQueue เท่านั้น (backoff 5s→5 นาที, 401 ไม่ retry) · RemoteMemoryAdapter ไม่ retry, timeout 10s
 - Server URL: http ได้เฉพาะ LAN/localhost/.local/Tailscale (100.64/10) · ที่อยู่สาธารณะต้อง https (`normalizeServerUrl`)
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
@@ -308,10 +312,11 @@
 ## 12. REFERENCE
 
 - ADR: `docs/DECISIONS.md`
+- Sync protocol: `docs/SYNC_PROTOCOL.md`
 - Architecture: `docs/ARCHITECTURE.md`
 - Changelog: `CHANGELOG.md`
 
 ---
 
-**Last updated:** 2026-10-16 (4.5.4.2: Mark 55 sync — RemoteMemoryAdapter · SyncQueue · Sync screen · MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-16 (4.5.4.3: ตรวจ conflict/LWW/tombstone + SYNC_PROTOCOL.md · 4.5.4.2: Mark 55 sync — RemoteMemoryAdapter · SyncQueue · Sync screen · MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0
