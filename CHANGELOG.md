@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **4.5.4.3 Sync docs + verification:** `docs/SYNC_PROTOCOL.md` (ภาพรวม · pairing · wire format · endpoint · รอบ flush · ตารางกติกา LWW + tombstone · conflict log · retry · storage · security · ข้อตกลงที่ server ต้องทำตาม · การทดสอบ) · ADR-012 เพิ่มเรื่อง cursor · `FakeMark55Server` + `syncConflict.test.ts` (2 เครื่องซิงก์ผ่าน server จำลอง, ตาราง LWW ครบ, conflict log 50 + ล้าง, clock skew)
 - **4.5.4.2 Sync กับ Mark 55:** `RemoteMemoryAdapter` (pair / verify / pull / push / health ผ่าน `request()`, timeout 10s, ข้อความ error ไทย) · `SyncQueue` (คิว persist ใน AsyncStorage, pull → resolve conflict → push, conflict log, retry backoff, trigger: เปิดแอปกลับมา / เน็ตกลับมา / ปุ่ม / อัตโนมัติ 30s) · `MemorySync` (Server URL, จับคู่ด้วยรหัส 6 หลัก → token ใน SecureStore) · หน้า **ตั้งค่า › Sync** (สถานะ 🟢🟡🔴, ทดสอบการเชื่อมต่อ, Pair / ยกเลิก Pair, รอส่ง, ซิงก์ตอนนี้, ซิงก์อัตโนมัติ, ประวัติ Conflict) · `LocalMemoryAdapter.subscribe()` + `applyRemote()`
 - **MCP / Skills / Device Control / Marketplace:** `core/agent/MCPClientBridge.ts` (MCP Streamable HTTP: initialize → tools/prompts/resources, tools/call, token ใน SecureStore) · `SkillEngine.ts` (ทักษะแนะนำ + ทักษะที่ AI สังเคราะห์จากงานที่สำเร็จ — ปิดไว้รออนุมัติ, วิเคราะห์ tool ที่ล้มซ้ำ) · `DeviceControlBridge.ts` (ปิดเป็นค่าเริ่มต้น, safety guards, driver แบบเสียบได้) · AgentHarness รับ `providers` + `memory` + `args` · หน้า **ตั้งค่า › Marketplace** (ค้นหา, กรอง, เปิด/ปิด, ติดตั้งทักษะ, เพิ่ม/ลบ MCP server, ดู tools) · `toPromptLine` ย้ายไป `core/memory/promptLine.ts`
 - **Agent Harness** (`core/agent/`): execution loop คิด → เรียก tool (CommandModule ใน ModuleRegistry) → สังเกตผล → ตอบ · max steps guard (default 5) · hooks onStart / onStep / onToolCall / onComplete / onError · `features/ai/agent.ts` (`createAppAgent()`) ต่อกับ aiOrchestrator + moduleRegistry
@@ -36,6 +37,7 @@
 - boot เรียก `moduleManager.start()` แทน `moduleRegistry.initAll()` ตรง ๆ · `loadModule()` ลงทะเบียนผ่าน `moduleManager` (ค่าที่บอสบันทึกไว้มีผลทันที)
 
 ### Fixed
+- **Sync:** ของที่เครื่องอื่น push เข้ามาระหว่าง pull กับ push ของเราไม่หายแล้ว (`lastSyncAt` = เวลาตอน pull) · push ส่ง `lastSyncAt` ตอน pull ให้ server แยก conflict จริง → การลบ fact ที่ซิงก์แล้วไปถึงเครื่องอื่นได้ · server ปฏิเสธโดยไม่ส่งฉบับมา → ดึงใหม่ทั้งหมดรอบหน้า · กด "ล้างประวัติ" / เปิด auto-sync ก่อนค่าที่บันทึกไว้โหลดเสร็จ ไม่ถูกโหลดทับอีก · conflict log ที่โหลดมาเกิน 50 ถูกตัด
 - `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ
 
 ### Security

@@ -295,6 +295,8 @@ text ─▶ RuleClassifier (regex, ฟรี, ไม่ใช้เน็ต)
 | การตั้งค่า (enabled, priority, model, voice map, advanced) | AsyncStorage (JSON ก้อนเดียว + cache ในหน่วยความจำ) | `atom.providerSettings.v1` | `core/storage/ProviderSettings.ts` |
 | ประวัติแชท | AsyncStorage แยก key ต่อ persona (สูงสุด 500 ข้อความ) | `atom.history.v1.<1-4>` | `core/storage/ChatHistoryStorage.ts` |
 | persona / uiMode ที่เลือก | AsyncStorage ผ่าน Zustand `persist` | `atom-store` | `features/jarvis/stores/useAtomStore.ts` |
+| Shared Memory (facts) | AsyncStorage หนึ่ง key ต่อ fact | `atom.memory.v1.<global\|persona.N>.<key>` | `core/memory/LocalMemoryAdapter.ts` |
+| Sync กับ Mark 55 (token / คิว / conflict log) | SecureStore `mark55.auth.token` + AsyncStorage `mark55.sync.*` | ดู [SYNC_PROTOCOL §10](SYNC_PROTOCOL.md#10-ที่เก็บข้อมูล) | `core/memory/SyncQueue.ts` · `MemorySync.ts` |
 
 **เมื่อ storage มีปัญหา**
 
