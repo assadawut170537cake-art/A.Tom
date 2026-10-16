@@ -21,5 +21,8 @@ export function routeFor(
         ? { intent, confidence, provider, entities: { persona: `${persona}` } }
         : { intent, confidence, provider };
     }
+    case 'agent':
+      return { intent, confidence, provider };
   }
+  return { intent: intent as Intent, confidence, provider } as RouterOutput;
 }

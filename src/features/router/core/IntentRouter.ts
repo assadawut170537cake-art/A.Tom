@@ -24,9 +24,11 @@
  * @see ../../../../docs/DECISIONS.md — ADR-005, ADR-006
  */
 
+import { AgentClassifier } from '../classifiers/AgentClassifier';
 import { JevClassifier } from '../classifiers/JevClassifier';
 import { LLMClassifier } from '../classifiers/LLMClassifier';
 import { RuleClassifier } from '../classifiers/RuleClassifier';
+import { AgentHandler } from '../handlers/AgentHandler';
 import { ChatHandler } from '../handlers/ChatHandler';
 import { PCCommandHandler } from '../handlers/PCCommandHandler';
 import { SwitchAssistantHandler } from '../handlers/SwitchAssistantHandler';
@@ -46,6 +48,7 @@ const DEFAULT_ROUTE: RouterOutput = { intent: 'chat', confidence: 0.5, provider:
 
 interface IntentRouterDeps {
   rule?: RuleClassifier;
+  agent?: Classifier;
   jev?: Classifier;
   llm?: Classifier;
   handlers?: Partial<IntentHandlers>;
@@ -57,20 +60,23 @@ interface IntentRouterDeps {
  */
 export class IntentRouter {
   private readonly rule: RuleClassifier;
+  private readonly agent: Classifier;
   private readonly jev: Classifier;
   private readonly llm: Classifier;
   private readonly handlers: IntentHandlers;
 
   constructor(deps: IntentRouterDeps = {}) {
     this.rule = deps.rule ?? new RuleClassifier();
+    this.agent = deps.agent ?? new AgentClassifier();
     this.jev = deps.jev ?? new JevClassifier();
     this.llm = deps.llm ?? new LLMClassifier();
     this.handlers = {
       chat: new ChatHandler(),
       pc_command: new PCCommandHandler(),
       switch_assistant: new SwitchAssistantHandler(),
+      agent: new AgentHandler(),
       ...deps.handlers,
-    };
+    } as IntentHandlers;
   }
 
   async route(input: RouterInput): Promise<RouterOutput> {
@@ -79,6 +85,9 @@ export class IntentRouter {
 
     const byRule = this.rule.check(text);
     if (byRule) return byRule;
+
+    const byAgent = await this.agent.classify(input).catch(() => null);
+    if (byAgent) return byAgent;
 
     const byJev = await this.jev.classify(input).catch(() => null);
     if (byJev && byJev.confidence >= JEV_MIN_CONFIDENCE) return byJev;
@@ -102,6 +111,9 @@ export class IntentRouter {
         return this.handlers.pc_command.handle(input, route);
       case 'switch_assistant':
         return this.handlers.switch_assistant.handle(input, route);
+      case 'agent':
+        return this.handlers.agent.handle(input, route);
     }
+    return this.handlers.chat.handle(input, route);
   }
 }

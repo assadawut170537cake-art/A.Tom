@@ -21,6 +21,8 @@ import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
+import { agentRegistry } from './core/agents/AgentRegistry';
+import { routeEscortAgent } from './modules/agents/route-escort';
 
 export interface BootReport {
   /** null = start() เองล้ม (log แล้ว) */
@@ -54,6 +56,11 @@ let started: Promise<BootReport> | null = null;
 export function bootApp(): Promise<BootReport> {
   registerAIProviders();
   registerVoiceProviders();
+  try {
+    agentRegistry.register(routeEscortAgent);
+  } catch (e) {
+    console.error('[boot] ลงทะเบียน routeEscortAgent ไม่สำเร็จ', e);
+  }
   return (started ??= startServices());
 }
 

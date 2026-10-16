@@ -10,6 +10,7 @@ const CRITERIA: Record<Intent, string> = {
   pc_command: "A command to control the user's computer (open/close apps, shut down, run something).",
   switch_assistant:
     'A request to switch to or call another assistant persona: ATOM (อะตอม), JARVIS (จาร์วิส), FRIDAY (ไฟรเดย์), ULTRON (อัลตรอน).',
+  agent: 'A request to use a specialist agent capability (e.g. create a note, send email, control PC).',
 };
 
 /** Jev (TypeSafe System One) choice question → intent + confidence. Skipped when Jev is off. */
