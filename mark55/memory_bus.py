@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import threading
 import uuid
 from collections.abc import Callable
@@ -27,8 +28,34 @@ class TaskStatus(str, Enum):
     FAILED = "FAILED"
 
 
+def parse_timestamp(value: datetime | str | None) -> datetime | None:
+    """แปลง timestamptz จาก Supabase เป็น datetime ที่มี timezone
+
+    Python 3.10 `fromisoformat` อ่าน "Z" และเศษวินาทีที่ไม่ครบ 6 หลักไม่ได้ (Postgres ตัดเลข 0 ท้ายทิ้ง เช่น `.34238`)
+    จึงต้องเติมให้ครบก่อน · ไม่มี timezone = ถือว่าเป็น UTC
+    """
+    if value is None or isinstance(value, datetime):
+        parsed = value
+    else:
+        text = value.strip().replace(" ", "T", 1)
+        if text.endswith(("Z", "z")):
+            text = text[:-1] + "+00:00"
+        match = _FRACTION_RE.search(text)
+        if match:
+            text = text[: match.start()] + "." + match.group(1).ljust(6, "0")[:6] + text[match.end():]
+        text = _SHORT_OFFSET_RE.sub(r"\1:00", text)
+        parsed = datetime.fromisoformat(text)
+    if parsed is not None and parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+_SHORT_OFFSET_RE = re.compile(r"([+-]\d{2})$")
+_FRACTION_RE = re.compile(r"\.(\d+)(?=[+-]\d{2}:?\d{2}$|$)")
+
+
 class MemoryTask:
-    """งานหนึ่งชิ้นบน blackboard · แปลงเป็น/จาก dict ที่ serialize เป็น JSON ได้"""
+    """งานหนึ่งชิ้นบน blackboard · field ตรงกับคอลัมน์ของตาราง `memory_tasks` (sql/001_init.sql)"""
 
     def __init__(
         self,
@@ -37,58 +64,67 @@ class MemoryTask:
         target: str,
         payload: dict[str, Any] | None = None,
         container_tag: str = "atom_core",
-        task_id: str | None = None,
+        task_id: str | uuid.UUID | None = None,
         status: TaskStatus | str = TaskStatus.PENDING,
-        created_at: str | None = None,
+        created_at: datetime | str | None = None,
         result: dict[str, Any] | None = None,
         claimed_by: str | None = None,
+        claimed_at: datetime | str | None = None,
+        completed_at: datetime | str | None = None,
     ) -> None:
-        self.task_id = task_id or f"task_{uuid.uuid4()}"
+        # คอลัมน์ task_id เป็น UUID — id ผิดรูปแบบจะ raise ValueError ที่นี่ แทนที่จะไปพังตอน insert
+        self.task_id = str(uuid.UUID(str(task_id))) if task_id else str(uuid.uuid4())
         self.instruction = instruction
         self.sender = sender
         self.target = target
         self.payload = payload or {}
         self.container_tag = container_tag
-        # รับ str ได้ด้วย เพราะข้อมูลที่อ่านกลับมาจาก store เป็น str — ค่าที่ไม่รู้จักจะ raise ValueError
+        # รับ str ได้ด้วย เพราะข้อมูลที่อ่านกลับมาจากตารางเป็น str — ค่าที่ไม่รู้จักจะ raise ValueError
         self.status = TaskStatus(status)
-        self.created_at = created_at or datetime.now(timezone.utc).isoformat()
+        self.created_at = parse_timestamp(created_at) or datetime.now(timezone.utc)
         self.result = result or {}
         self.claimed_by = claimed_by
+        self.claimed_at = parse_timestamp(claimed_at)
+        self.completed_at = parse_timestamp(completed_at)
 
     def to_dict(self) -> dict[str, Any]:
-        """แปลงเป็น dict ตาม schema (ใช้ key `containerTag` ตามสเปก)"""
+        """แปลงเป็น dict ที่ serialize เป็น JSON ได้ · key = ชื่อคอลัมน์ · เวลาเป็น ISO 8601"""
         return {
             "task_id": self.task_id,
             "instruction": self.instruction,
             "sender": self.sender,
             "target": self.target,
             "status": self.status.value,
-            "containerTag": self.container_tag,
-            "created_at": self.created_at,
+            "container_tag": self.container_tag,
+            "created_at": self.created_at.isoformat(),
             "payload": self.payload,
             "result": self.result,
             "claimed_by": self.claimed_by,
+            "claimed_at": self.claimed_at.isoformat() if self.claimed_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> MemoryTask:
-        """สร้าง task จาก dict ที่ได้จาก to_dict() หรือจาก store"""
+        """สร้าง task จากแถวของตาราง หรือจาก to_dict()"""
         return cls(
             task_id=data.get("task_id"),
             instruction=data.get("instruction", ""),
             sender=data.get("sender", ""),
             target=data.get("target", ""),
             payload=data.get("payload") or {},
-            container_tag=data.get("containerTag", "atom_core"),
+            container_tag=data.get("container_tag", "atom_core"),
             status=data.get("status", TaskStatus.PENDING.value),
             created_at=data.get("created_at"),
             result=data.get("result") or {},
             claimed_by=data.get("claimed_by"),
+            claimed_at=data.get("claimed_at"),
+            completed_at=data.get("completed_at"),
         )
 
 
 class GatewayClient(Protocol):
-    """สิ่งที่ watcher ต้องการจาก gateway — แยกเป็น Protocol เพื่อสลับ mock/cloud ได้โดยไม่แก้ watcher"""
+    """สิ่งที่ watcher ต้องการจาก gateway — แยกเป็น Protocol เพื่อสลับ backend (Supabase / ตัวปลอมใน test) ได้โดยไม่แก้ watcher"""
 
     def fetch_pending_tasks(self, target_node_id: str) -> list[MemoryTask]: ...
 

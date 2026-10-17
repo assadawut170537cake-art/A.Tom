@@ -1,1 +1,3 @@
-# stdlib only — ไม่มี dependency ภายนอก (Python >= 3.10)
+# Python >= 3.10
+supabase>=2.0.0
+python-dotenv>=1.0.0
