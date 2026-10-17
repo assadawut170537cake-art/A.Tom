@@ -21,6 +21,7 @@ import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
+import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 
 export interface BootReport {
@@ -56,6 +57,7 @@ export function bootApp(): Promise<BootReport> {
   registerAIProviders();
   registerVoiceProviders();
   registerSampleAgents();
+  registerRouteEscortAgent();
   return (started ??= startServices());
 }
 
