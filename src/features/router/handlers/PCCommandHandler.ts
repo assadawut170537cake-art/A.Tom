@@ -12,7 +12,7 @@ export const PC_BRIDGE_STUB_REPLY = 'Phase 4 ครับ';
 /**
  * Hands PC commands to the `pc-bridge` module when it is registered, enabled and can execute
  * commands (initialising it on first use). Otherwise keeps the Phase 3 stub reply.
- * TODO(phase-4.5): the pc-bridge module itself (desktop companion + transport).
+ * The app loads src/features/pc-bridge at boot (Memory Bus → Mark 55, Phase 4.5.5.3).
  */
 export class PCCommandHandler implements IntentHandler<'pc_command'> {
   constructor(private readonly modules: ModuleRegistry = moduleRegistry) {}

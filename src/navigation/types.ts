@@ -6,6 +6,7 @@ export type RootStackParamList = {
   AISettings: undefined;
   Modules: undefined;
   Sync: undefined;
+  PcBridge: undefined;
   Marketplace: undefined;
   VoiceSettings: undefined;
   PersonaVoice: undefined;

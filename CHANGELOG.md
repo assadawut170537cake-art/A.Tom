@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **4.5.5.3 สั่งงาน Mark 55 จากแชท (Memory Bus):** module `pc-bridge` (`features/pc-bridge/`) โหลดตอน boot → intent `pc_command` ส่งงานเข้า Supabase ผ่าน RPC `mobile_submit_task` แล้วรอผลด้วย `mobile_get_task` (fetch ตรง ไม่มี dependency ใหม่) · คำสั่งที่รองรับ: เช็กเครื่อง (`RUN_DIAGNOSTICS`) · บิลด์ (`EXECUTE_BUILD`) · หน้า **ตั้งค่า › Mark 55 Bus** (Project URL · anon/publishable key · token เครื่อง ใน SecureStore · ทดสอบการเชื่อมต่อ) · `mark55/sql/002_mobile_rpc.sql` (token เก็บเป็น hash, instruction allowlist, จำกัด 20 งาน/นาที/เครื่อง, เห็นเฉพาะงานของเครื่องตัวเอง)
 - **Agent Screen Navigation:** intent ที่ 4 `agent` · `core/agents/` (`AgentRegistry` singleton: register / getAgent / list / run / lazy `getScreenComponent` · `AgentErrorBoundary` ข้อความไทย + ลองใหม่) · `AgentClassifier` (หลัง Rule ก่อน Jev) + `AgentHandler` · **Agent Panel** บนหน้าหลัก (ปิด / ขยายเต็มจอ) + หน้า `Agent` (`features/agents/`) · sample agent **"โน้ต"** ("จดบันทึกว่า …" / "ดูโน้ต", เก็บใน `atom.agents.v1.notes`) ลงทะเบียนตอน boot ([ADR-013](docs/DECISIONS.md#adr-013--agent-intent--agent-panel))
 - **4.5.4.3 Sync docs + verification:** `docs/SYNC_PROTOCOL.md` (ภาพรวม · pairing · wire format · endpoint · รอบ flush · ตารางกติกา LWW + tombstone · conflict log · retry · storage · security · ข้อตกลงที่ server ต้องทำตาม · การทดสอบ) · ADR-012 เพิ่มเรื่อง cursor · `FakeMark55Server` + `syncConflict.test.ts` (2 เครื่องซิงก์ผ่าน server จำลอง, ตาราง LWW ครบ, conflict log 50 + ล้าง, clock skew)
 - **4.5.4.2 Sync กับ Mark 55:** `RemoteMemoryAdapter` (pair / verify / pull / push / health ผ่าน `request()`, timeout 10s, ข้อความ error ไทย) · `SyncQueue` (คิว persist ใน AsyncStorage, pull → resolve conflict → push, conflict log, retry backoff, trigger: เปิดแอปกลับมา / เน็ตกลับมา / ปุ่ม / อัตโนมัติ 30s) · `MemorySync` (Server URL, จับคู่ด้วยรหัส 6 หลัก → token ใน SecureStore) · หน้า **ตั้งค่า › Sync** (สถานะ 🟢🟡🔴, ทดสอบการเชื่อมต่อ, Pair / ยกเลิก Pair, รอส่ง, ซิงก์ตอนนี้, ซิงก์อัตโนมัติ, ประวัติ Conflict) · `LocalMemoryAdapter.subscribe()` + `applyRemote()`
@@ -42,6 +43,7 @@
 - `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ
 
 ### Security
+- `redactSecrets()` ซ่อน token เครื่องของ Mark 55 Bus (`atm_…`) ด้วย
 - `redactSecrets` ปิดบัง AWS access key id (`AKIA` + 16) ด้วย · memory fact ผ่าน `toPromptLine()` (บีบ `\r \n \v \f` U+0085 U+2028 U+2029 ให้เป็นบรรทัดเดียว ทั้ง key และ value)
 
 ### Removed
