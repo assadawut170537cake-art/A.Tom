@@ -20,11 +20,10 @@ export class RevAISTT extends BaseCloudSTT {
   }
 
   async transcribe(audioUri: string): Promise<string> {
-    const file = this.audioFile(audioUri);
     const headers = await this.auth();
 
     const form = new FormData();
-    form.append('media', file, file.name);
+    form.append('media', this.audioFormPart(audioUri));
     form.append('options', JSON.stringify({ language: STT_LANGUAGE_SHORT }));
     const job = await requestJson<Job>(this.id, `${BASE}/jobs`, {
       method: 'POST',
