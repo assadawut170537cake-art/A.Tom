@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import * as Brightness from 'expo-brightness';
+import * as Clipboard from 'expo-clipboard';
 import { createElement } from 'react';
 import { Alert, Linking, Platform, type AlertButton } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -9,6 +11,7 @@ import {
   DEVICE_ENABLED_KEY,
   DeviceControlBridge,
   checkAppUrl,
+  defaultDriver,
   linkingDriver,
   parseLevel,
   type DeviceDriver,
@@ -534,7 +537,7 @@ describe('DeviceControlBridge', () => {
     expect(parseLevel({ tool: 'x', text: '0.25' })).toBe(0.25);
   });
 
-  test('default Linking driver: volume / brightness / clipboard unsupported (need native modules); wifi opens settings', async () => {
+  test('default driver: only volume unsupported (needs our native module); wifi opens settings', async () => {
     const device = new DeviceControlBridge();
     await device.setEnabled(true);
     expect(
@@ -542,7 +545,7 @@ describe('DeviceControlBridge', () => {
         .capabilities()
         .filter((c) => !c.supported)
         .map((c) => c.id),
-    ).toEqual(['device.volume', 'device.brightness', 'device.clipboard']);
+    ).toEqual(['device.volume']);
     await expect(device.call({ tool: 'device.volume', text: '50' })).resolves.toEqual({
       ok: false,
       output: 'เครื่องนี้ยังไม่รองรับ "ปรับเสียง"',
@@ -561,6 +564,45 @@ describe('DeviceControlBridge', () => {
     expect(openURL).toHaveBeenCalledWith('https://example.com');
     await linkingDriver.openSettings?.();
     expect(openSettings).toHaveBeenCalled();
+  });
+
+  test('default driver: clipboard → expo-clipboard', async () => {
+    jest.clearAllMocks();
+    await defaultDriver.setClipboard?.('สวัสดี');
+    expect(Clipboard.setStringAsync).toHaveBeenCalledWith('สวัสดี');
+  });
+
+  test('default driver brightness: Android with WRITE_SETTINGS → system brightness', async () => {
+    jest.clearAllMocks();
+    jest.replaceProperty(Platform, 'OS', 'android');
+    await defaultDriver.setBrightness?.(0.4);
+    expect(Brightness.setSystemBrightnessAsync).toHaveBeenCalledWith(0.4);
+    expect(Brightness.setBrightnessAsync).not.toHaveBeenCalled();
+  });
+
+  test('default driver brightness: Android asks once, denied → app-window brightness only', async () => {
+    jest.clearAllMocks();
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const denied = {
+      granted: false,
+      status: Brightness.PermissionStatus.DENIED,
+      canAskAgain: true,
+      expires: 'never' as const,
+    };
+    jest.mocked(Brightness.getPermissionsAsync).mockResolvedValueOnce(denied);
+    jest.mocked(Brightness.requestPermissionsAsync).mockResolvedValueOnce(denied);
+    await defaultDriver.setBrightness?.(0.7);
+    expect(Brightness.requestPermissionsAsync).toHaveBeenCalled();
+    expect(Brightness.setSystemBrightnessAsync).not.toHaveBeenCalled();
+    expect(Brightness.setBrightnessAsync).toHaveBeenCalledWith(0.7);
+  });
+
+  test('default driver brightness: iOS → setBrightnessAsync without permission prompt', async () => {
+    jest.clearAllMocks();
+    jest.replaceProperty(Platform, 'OS', 'ios');
+    await defaultDriver.setBrightness?.(1);
+    expect(Brightness.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(Brightness.setBrightnessAsync).toHaveBeenCalledWith(1);
   });
 
   test('unreadable setting → stays OFF (logged)', async () => {

@@ -12,6 +12,10 @@
 
 ## [Unreleased]
 
+### ควบคุมเครื่องเต็มรูปแบบ ([ADR-015](docs/DECISIONS.md#adr-015--บทบาท-4-persona-ข้ามอุปกรณ์--ควบคุมเครื่องเต็มรูปแบบ))
+- **Docs:** ADR-015 — บทบาท 4 persona บนมือถือ/PC (อะตอม ↔ Mark 55 · ไฟรเดย์ ↔ Gemini/Gemini Spark · จาร์วิส ↔ Hermes · อัลตรอน = เบื้องหลัง + sandbox บน PC) และแผนควบคุมเครื่อง 3 ระดับ · Boss อนุมัติ dev build + native code
+- **Device (ระดับ A):** ปรับความสว่างได้จริง (expo-brightness — Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก, ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป) · คัดลอกไปคลิปบอร์ดได้จริง (expo-clipboard) · ปรับเสียงยัง "ยังไม่รองรับ" (รอ native module)
+
 ### Parking Lot Cleanup (Phase 4.5 pre-5)
 - **Security (A1, [ADR-014](docs/DECISIONS.md#adr-014--prompt-injection-guard-v2)):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` เมื่อเจอ "ignore previous/all instructions", `system:` (word boundary), `<|...|>` — มีผลกับ memory fact · skill ที่ AI สร้าง · ผลจาก MCP · tool result ที่ผ่านฟังก์ชันนี้
 - **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ

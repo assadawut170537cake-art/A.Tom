@@ -68,6 +68,18 @@ jest.mock('expo-audio', () => ({
   requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
 }));
 
+jest.mock('expo-brightness', () => ({
+  PermissionStatus: { GRANTED: 'granted', DENIED: 'denied', UNDETERMINED: 'undetermined' },
+  getPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+  setSystemBrightnessAsync: jest.fn(async () => undefined),
+  setBrightnessAsync: jest.fn(async () => undefined),
+}));
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(async () => true),
+}));
+
 const ONLINE = { type: 'WIFI', isConnected: true, isInternetReachable: true };
 jest.mock('expo-network', () => ({
   getNetworkStateAsync: jest.fn(async () => ONLINE),
