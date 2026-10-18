@@ -7,10 +7,10 @@ import type { OrbBridgeState, OrbMood, PersonaMeta, TabMeta } from '../types';
 export { DEFAULT_PERSONA, PERSONA_IDS } from '../../../core/types/persona';
 
 export const PERSONAS: Record<Persona, PersonaMeta> = {
-  1: { id: 1, name: 'อะตอม', nameEn: 'ATOM', color: '#d35400', desc: 'นักเลง 2499' },
+  1: { id: 1, name: 'อะตอม', nameEn: 'ATOM', color: '#E67E22', desc: 'นักเลง 2499' },
   2: { id: 2, name: 'จาร์วิส', nameEn: 'JARVIS', color: '#3b82f6', desc: 'พระเอกสุขุม' },
   3: { id: 3, name: 'ไฟรเดย์', nameEn: 'FRIDAY', color: '#00d4ff', desc: 'เนี๊ยบ ไร้ที่ติ' },
-  4: { id: 4, name: 'อัลตรอน', nameEn: 'ULTRON', color: '#ff0033', desc: 'ดุดัน พร้อมบวก' },
+  4: { id: 4, name: 'อัลตรอน', nameEn: 'ULTRON', color: '#C0392B', desc: 'ดุดัน พร้อมบวก' },
 };
 
 export const TABS: TabMeta[] = [

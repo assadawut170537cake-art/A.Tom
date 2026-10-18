@@ -20,9 +20,8 @@ export class WhisperSTT extends BaseCloudSTT {
   }
 
   async transcribe(audioUri: string): Promise<string> {
-    const file = this.audioFile(audioUri);
     const form = new FormData();
-    form.append('file', file, file.name);
+    form.append('file', this.audioFormPart(audioUri));
     form.append('model', await this.model());
     form.append('language', STT_LANGUAGE_SHORT);
     form.append('response_format', 'json');

@@ -1,6 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
 import { requestJson } from '../../../core/http/request';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { parseJevModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
 /**
@@ -62,16 +63,20 @@ export class JevAdapter extends BaseAIProvider {
     );
   }
 
-  override async getModels(): Promise<string[]> {
-    const data = await this.listModels();
-    return data.models.map((m) => m.name);
-  }
-
-  protected probe(): Promise<unknown> {
+  override getModels(): Promise<string[]> {
     return this.listModels();
   }
 
-  private async listModels(): Promise<{ models: { name: string }[] }> {
-    return requestJson(this.config.id, this.url('/v1/models'), { headers: await this.headers() });
+  /** `GET /v1/models` → `models[].name` */
+  async listModels(): Promise<string[]> {
+    return parseJevModels(this.config.id, await this.fetchModels());
+  }
+
+  protected probe(): Promise<unknown> {
+    return this.fetchModels();
+  }
+
+  private async fetchModels(): Promise<unknown> {
+    return requestJson<unknown>(this.config.id, this.url('/v1/models'), { headers: await this.headers() });
   }
 }

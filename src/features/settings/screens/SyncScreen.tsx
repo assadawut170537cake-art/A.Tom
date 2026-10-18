@@ -3,9 +3,11 @@ import { Alert, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 
 import { memorySync, type MemorySync } from '../../../core/memory/MemorySync';
 import { syncErrorText } from '../../../core/memory/RemoteMemoryAdapter';
+import { SUPERMEMORY_KEY_NAME } from '../../../core/memory/SuperMemorySync';
 import type { ConflictLogEntry, SyncState } from '../../../core/memory/SyncQueue';
 import { PERSONAS } from '../../jarvis/constants';
 import { targetLabel } from '../../memory/factModel';
+import { ApiKeyInput } from '../components/ApiKeyInput';
 import { Card, FieldLabel, Section, SmallButton } from '../components/ui';
 
 const ACCENT = PERSONAS[1].color;
@@ -252,6 +254,17 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
           </View>
         </Section>
       )}
+
+      <Section title="Supermemory" hint="ส่งความจำที่เพิ่ม/แก้ขึ้น space ร่วมของทีมอัตโนมัติ — ส่งไม่ผ่านก็ไม่กระทบแชท">
+        <Card>
+          <ApiKeyInput
+            storageKey={SUPERMEMORY_KEY_NAME}
+            label="Supermemory API key"
+            placeholder="sm_…"
+            keyUrl="https://console.supermemory.ai"
+          />
+        </Card>
+      </Section>
     </ScrollView>
   );
 }

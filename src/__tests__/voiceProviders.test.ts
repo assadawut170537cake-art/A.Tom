@@ -20,6 +20,19 @@ beforeEach(async () => {
 
 afterEach(() => jest.restoreAllMocks());
 
+/**
+ * ไฟล์ที่ provider append ลง FormData — FormData ของ Node แปลง object `{ uri, name, type }` เป็น string
+ * จึงต้องดักที่ append แทน `form.get()` (บน RN object นี้คือ part ไฟล์จริง)
+ */
+function uploadedPart(field: string): unknown {
+  const call = appendSpy?.mock.calls.find(([key]) => key === field);
+  return call?.[1];
+}
+let appendSpy: jest.SpyInstance | undefined;
+beforeEach(() => {
+  appendSpy = jest.spyOn(FormData.prototype, 'append');
+});
+
 const tts = (id: TTSProviderId) => voiceRegistry.getTTS(id)!;
 const stt = (id: STTProviderId) => voiceRegistry.getSTT(id)!;
 
@@ -432,7 +445,8 @@ const STT_CASES: STTCase[] = [
       const form = c.body as FormData;
       expect(form.get('model')).toBe('whisper-1');
       expect(form.get('language')).toBe('th');
-      expect((form.get('file') as File).name).toBe('rec.m4a');
+      // RN ส่งไฟล์ได้เฉพาะ part แบบ { uri, name, type } — ไม่ใช่ File/Blob ของ expo-file-system
+      expect(uploadedPart('file')).toEqual({ uri: 'file:///cache/rec.m4a', name: 'rec.m4a', type: 'audio/mp4' });
     },
   },
   {
@@ -552,6 +566,7 @@ const STT_CASES: STTCase[] = [
         '/speechtotext/v1/jobs/j1/transcript',
       ]);
       expect(JSON.parse((nth(calls, 0).body as FormData).get('options') as string)).toEqual({ language: 'th' });
+      expect(uploadedPart('media')).toEqual({ uri: 'file:///cache/rec.m4a', name: 'rec.m4a', type: 'audio/mp4' });
       expect(nth(calls, 2).headers.Accept).toBe('text/plain');
     },
   },
