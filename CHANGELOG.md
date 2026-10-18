@@ -13,6 +13,7 @@
 ## [Unreleased]
 
 ### Added
+- **Build แอป Android (APK ติดตั้งเองได้):** `eas.json` (profile `preview` = APK, `production` = AAB) · package `com.atom.assistant` · `plugins/withCleartextTraffic.js` ให้ release build ต่อ Sync server แบบ http ใน LAN ได้ (ใช้ expo/config-plugins ที่มากับ expo — ไม่มี dependency ใหม่)
 - **4.5.5.3 สั่งงาน Mark 55 จากแชท (Memory Bus):** module `pc-bridge` (`features/pc-bridge/`) โหลดตอน boot → intent `pc_command` ส่งงานเข้า Supabase ผ่าน RPC `mobile_submit_task` แล้วรอผลด้วย `mobile_get_task` (fetch ตรง ไม่มี dependency ใหม่) · คำสั่งที่รองรับ: เช็กเครื่อง (`RUN_DIAGNOSTICS`) · บิลด์ (`EXECUTE_BUILD`) · หน้า **ตั้งค่า › Mark 55 Bus** (Project URL · anon/publishable key · token เครื่อง ใน SecureStore · ทดสอบการเชื่อมต่อ) · `mark55/sql/002_mobile_rpc.sql` (token เก็บเป็น hash, instruction allowlist, จำกัด 20 งาน/นาที/เครื่อง, เห็นเฉพาะงานของเครื่องตัวเอง)
 - **Agent Screen Navigation:** intent ที่ 4 `agent` · `core/agents/` (`AgentRegistry` singleton: register / getAgent / list / run / lazy `getScreenComponent` · `AgentErrorBoundary` ข้อความไทย + ลองใหม่) · `AgentClassifier` (หลัง Rule ก่อน Jev) + `AgentHandler` · **Agent Panel** บนหน้าหลัก (ปิด / ขยายเต็มจอ) + หน้า `Agent` (`features/agents/`) · sample agent **"โน้ต"** ("จดบันทึกว่า …" / "ดูโน้ต", เก็บใน `atom.agents.v1.notes`) ลงทะเบียนตอน boot ([ADR-013](docs/DECISIONS.md#adr-013--agent-intent--agent-panel))
 - **4.5.4.3 Sync docs + verification:** `docs/SYNC_PROTOCOL.md` (ภาพรวม · pairing · wire format · endpoint · รอบ flush · ตารางกติกา LWW + tombstone · conflict log · retry · storage · security · ข้อตกลงที่ server ต้องทำตาม · การทดสอบ) · ADR-012 เพิ่มเรื่อง cursor · `FakeMark55Server` + `syncConflict.test.ts` (2 เครื่องซิงก์ผ่าน server จำลอง, ตาราง LWW ครบ, conflict log 50 + ล้าง, clock skew)
@@ -39,6 +40,7 @@
 - boot เรียก `moduleManager.start()` แทน `moduleRegistry.initAll()` ตรง ๆ · `loadModule()` ลงทะเบียนผ่าน `moduleManager` (ค่าที่บอสบันทึกไว้มีผลทันที)
 
 ### Fixed
+- build Android ล้มเพราะ Gradle 9 ห้ามชื่อโปรเจกต์ `A.T.O.M.` (ขึ้นต้น/ลงท้ายด้วย ".") → `plugins/withAndroidProjectName.js` ตั้งชื่อ Gradle เป็น `atom`
 - **Sync:** ของที่เครื่องอื่น push เข้ามาระหว่าง pull กับ push ของเราไม่หายแล้ว (`lastSyncAt` = เวลาตอน pull) · push ส่ง `lastSyncAt` ตอน pull ให้ server แยก conflict จริง → การลบ fact ที่ซิงก์แล้วไปถึงเครื่องอื่นได้ · server ปฏิเสธโดยไม่ส่งฉบับมา → ดึงใหม่ทั้งหมดรอบหน้า · กด "ล้างประวัติ" / เปิด auto-sync ก่อนค่าที่บันทึกไว้โหลดเสร็จ ไม่ถูกโหลดทับอีก · conflict log ที่โหลดมาเกิน 50 ถูกตัด
 - `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ
 

@@ -10,6 +10,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.atom.assistant",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#05060a",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -24,8 +26,15 @@
     "backgroundColor": "#05060a",
     "plugins": [
       "expo-secure-store",
-      ["expo-audio", { "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง" }],
-      "expo-asset"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
+        }
+      ],
+      "expo-asset",
+      "./plugins/withCleartextTraffic",
+      "./plugins/withAndroidProjectName"
     ]
   }
 }
