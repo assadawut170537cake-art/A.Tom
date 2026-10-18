@@ -254,6 +254,12 @@
 - `VoiceOrchestrator` รวม error ของ chain: ล้มเพราะ "ยังไม่ตั้งค่า" ทั้งหมด → `missing_key` (เดิม `commonKind` ได้ `server` เพราะ Expo STT = unsupported ปนกับ missing_key)
 - test: `liveVoice.test.ts` (fake timers + fake recorder) · mock `useAudioRecorder` อยู่ใน `jest.setup.js` (metering -160 = เงียบ)
 
+### เลือกโมเดล AI (ตั้งค่า › AI)
+- `ModelPicker` (settings/components) เรียก `provider.listModels?.()` — ดึงสดเท่านั้น ล้ม = throw ProviderError (ไม่ fallback รายการใน config) · `getModels()` เดิมยังอยู่ใน interface (รายการ config ได้)
+- parser รายชื่อโมเดลอยู่ `features/ai/core/modelLists.ts` (type guard, ไม่ cast) · Gemini ส่ง key ทาง header `x-goog-api-key` ไม่ใช่ `?key=`
+- cache = `modelListCache` (หน่วยความจำ, ต่อ provider, ทั้ง session) · บันทึก/ลบ key → ProviderCard ล้าง cache + remount picker (`key={keyVersion}`)
+- "พิมพ์ชื่อเอง" ต้องมีเสมอ (Boss ขอ) — ค่าที่บันทึกยังเป็น string เดียวใน `ProviderSettings.models[id]`
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -318,6 +324,7 @@
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
 - Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`
 - Modules UI: `src/features/settings/screens/ModulesScreen.tsx`
+- เลือกโมเดล AI: `src/features/settings/components/ModelPicker.tsx` · parser `src/features/ai/core/modelLists.ts`
 - Mark 55 Bus: `src/features/pc-bridge/` · UI `src/features/settings/screens/PcBridgeScreen.tsx` · SQL `mark55/sql/002_mobile_rpc.sql`
 - Supermemory: `src/core/memory/SuperMemorySync.ts`
 - Sync: `src/core/memory/MemorySync.ts` · `SyncQueue.ts` · `RemoteMemoryAdapter.ts` · UI `src/features/settings/screens/SyncScreen.tsx`
