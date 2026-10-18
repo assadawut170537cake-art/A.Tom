@@ -1,16 +1,13 @@
 import { ProviderError } from '../../../core/http/errors';
 import { requestJson } from '../../../core/http/request';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { parseOpenAIModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
 interface ChatCompletionResponse {
   model?: string;
   choices?: { message?: { content?: string | null } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
-}
-
-interface ModelListResponse {
-  data?: { id: string }[];
 }
 
 /** Base for any OpenAI-compatible /chat/completions API (OpenRouter, custom gateways, …). */
@@ -61,10 +58,15 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
 
   override async getModels(): Promise<string[]> {
     if (this.config.models !== 'dynamic') return super.getModels();
-    const data = await requestJson<ModelListResponse>(this.config.id, this.url('/models'), {
+    return this.listModels();
+  }
+
+  /** `GET {baseURL}/models` → `data[].id` (มาตรฐาน OpenAI — OpenRouter/gateway ส่วนใหญ่ใช้รูปแบบนี้) */
+  async listModels(): Promise<string[]> {
+    const data = await requestJson<unknown>(this.config.id, this.url('/models'), {
       headers: await this.headers(),
     });
-    return (data.data ?? []).map((m) => m.id).sort();
+    return parseOpenAIModels(this.config.id, data);
   }
 
   protected probe(): Promise<unknown> {
