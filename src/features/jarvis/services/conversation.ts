@@ -23,7 +23,17 @@ interface SendResult {
  * One user turn: route the text → run the handler → append the reply to the (possibly new)
  * persona's own history → speak it with that persona's voice. Drives the orb mood throughout.
  */
-export async function sendMessage(text: string, opts: { speak?: boolean } = {}): Promise<SendResult> {
+interface SendOptions {
+  /** false = ไม่พูดคำตอบ (ค่าเริ่มต้นพูด) */
+  speak?: boolean;
+  /**
+   * เรียกก่อนเริ่มพูด — คืน false = ไม่ต้องพูดแล้ว (โหมดคุยด้วยเสียงถูกปิดระหว่างรอ AI ตอบ)
+   * ใช้ให้โหมดไลฟ์รู้ว่าเข้าช่วง "กำลังพูด" แล้วด้วย
+   */
+  onSpeaking?: () => boolean;
+}
+
+export async function sendMessage(text: string, opts: SendOptions = {}): Promise<SendResult> {
   const content = text.trim();
   if (!content) return { route: null, reply: '' };
 
@@ -58,7 +68,7 @@ export async function sendMessage(text: string, opts: { speak?: boolean } = {}):
       useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${redactSecrets(notice)}`, persona: result.persona });
     }
 
-    if (opts.speak !== false && result.reply) {
+    if (opts.speak !== false && result.reply && (opts.onSpeaking?.() ?? true)) {
       if (isLatest()) useAtomStore.getState().setMood('speaking');
       await voiceOrchestrator.speak(result.reply, result.persona).catch(() => {
         // Speech is best-effort; the text reply is already on screen

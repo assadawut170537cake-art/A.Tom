@@ -11,13 +11,17 @@ const { nativeSize, idleScale, conversationScale, idleCenterY, conversationTop }
 
 interface OrbLayerProps {
   onPress?: () => void;
+  /** กดค้าง = เข้าโหมดคุยด้วยเสียง */
+  onLongPress?: () => void;
+  /** โหมดคุยด้วยเสียงทำงานอยู่ — แตะ Orb = หยุด */
+  liveActive?: boolean;
 }
 
 /**
  * The Orb is always rendered at its native 180px; idle <-> conversation only
  * animates transform (translateY + scale) to avoid layout thrashing.
  */
-export function OrbLayer({ onPress }: OrbLayerProps) {
+export function OrbLayer({ onPress, onLongPress, liveActive = false }: OrbLayerProps) {
   const persona = useAtomStore((s) => s.activePersona);
   const mood = useAtomStore((s) => s.mood);
   const isConversation = useAtomStore((s) => s.uiMode === 'conversation');
@@ -58,8 +62,12 @@ export function OrbLayer({ onPress }: OrbLayerProps) {
       <OrbWebView persona={persona} mood={mood} />
       <Pressable
         onPress={onPress}
+        onLongPress={onLongPress}
         accessibilityRole="button"
-        accessibilityLabel={isConversation ? 'กลับหน้าเลือกผู้ช่วย' : 'แตะเพื่อเริ่มคุย'}
+        accessibilityLabel={
+          liveActive ? 'แตะเพื่อหยุดคุยด้วยเสียง' : isConversation ? 'กลับหน้าเลือกผู้ช่วย' : 'แตะเพื่อเริ่มคุย'
+        }
+        accessibilityHint={onLongPress && !liveActive ? 'กดค้างเพื่อคุยด้วยเสียง' : undefined}
         style={StyleSheet.absoluteFill}
       />
     </Animated.View>

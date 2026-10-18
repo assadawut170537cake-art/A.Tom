@@ -164,7 +164,7 @@ npm run test:coverage    # jest --coverage
 | 3 | **Brain + Voice** — AI providers + fallback, 16 voice providers, Intent Router, Settings UI, persona prompt/voice | ✅ เสร็จ |
 | 3+ | **Polish (Q1–Q5)** — tests, refactor, strict types, error handling, documentation | ✅ เสร็จ |
 | 4 | **Shared Memory** — local พร้อมใช้ (`LocalMemoryAdapter`), remote + sync เป็น stub · **Module System** — scaffold (`ModuleRegistry`, hook `pc-bridge` ใน `PCCommandHandler`, hook memory ใน `ChatHandler`) — ดู [ADR-011](docs/DECISIONS.md#adr-011--phase-4-shared-memory--module-system) | 🧱 scaffold |
-| 4.5 | ต่อ UI จัดการความจำ / module · Remote memory + SyncQueue · module `pc-bridge` ตัวจริง (สั่งงานคอม) · รับเสียงพูดจริง (บันทึก → STT) | 🔜 ถัดไป |
+| 4.5 | ต่อ UI จัดการความจำ / module · Remote memory + SyncQueue · module `pc-bridge` ตัวจริง (สั่งงานคอม) · ~~รับเสียงพูดจริง (บันทึก → STT)~~ ✅ คุยด้วยเสียงแบบไลฟ์ (กดค้างที่ Orb / ปุ่มไมค์) | 🔜 ถัดไป |
 | 5 | ยังไม่กำหนด scope (ตัวเลือกที่ค้างอยู่: โหมด "ประชุม" ใน dropdown, แท็บ Today / Memory) | 🗓️ วางแผน |
 
 ประวัติการเปลี่ยนแปลงทั้งหมด → [CHANGELOG.md](CHANGELOG.md)
