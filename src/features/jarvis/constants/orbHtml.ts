@@ -1,3 +1,4 @@
+import type { Persona } from '../../../core/types/persona';
 import { LAYOUT, PERSONAS } from './index';
 
 /**
@@ -21,6 +22,24 @@ const PERSONA_COLORS = JSON.stringify(
   Object.fromEntries(Object.values(PERSONAS).map((p) => [p.id, hexToRgb(p.color)]))
 );
 
+/**
+ * รูปทรง/การเคลื่อนไหวของแต่ละ persona (Parking Lot ข้อ 14) — ค่าถูก interpolate ตอนสลับ จึงเปลี่ยนแบบนุ่ม ๆ
+ * - freq/rough: ความถี่/ความแรงของผิวที่บิดเบี้ยว · spike: หนาม 8 แฉก · facet: ผิวเหลี่ยมแบบคริสตัล
+ * - scan: เส้นสแกนแบบจอทีวีเก่า · halo: วงแหวนโคจร · crack: รอยร้าวมืด · tempo: ความเร็วการเคลื่อนไหว
+ */
+export const ORB_STYLES: Record<Persona, Record<'freq' | 'rough' | 'spike' | 'facet' | 'scan' | 'halo' | 'crack' | 'tempo', number>> = {
+  // อะตอม — นักเลง 2499: ก้อนหนืดโยกช้า ๆ + เส้นสแกนแบบทีวีขาวดำ
+  1: { freq: 0.9, rough: 1.8, spike: 0, facet: 0, scan: 1, halo: 0, crack: 0, tempo: 0.8 },
+  // จาร์วิส — สุขุม: ทรงกลมเรียบนิ่ง + วงแหวนโคจร
+  2: { freq: 1.2, rough: 0.45, spike: 0, facet: 0, scan: 0, halo: 1, crack: 0, tempo: 0.7 },
+  // ไฟรเดย์ — เนี๊ยบ: คริสตัลเหลี่ยมคมชัด
+  3: { freq: 1.4, rough: 0.7, spike: 0, facet: 1, scan: 0, halo: 0, crack: 0, tempo: 1.0 },
+  // อัลตรอน — ดุดัน: หนามแหลม สั่นเร็ว รอยร้าว
+  4: { freq: 2.6, rough: 1.4, spike: 1, facet: 0, scan: 0, halo: 0, crack: 1, tempo: 1.6 },
+};
+
+const PERSONA_STYLES = JSON.stringify(ORB_STYLES);
+
 const SIZE = LAYOUT.orb.nativeSize;
 
 export const ORB_HTML = `<!DOCTYPE html>
@@ -41,6 +60,10 @@ export const ORB_HTML = `<!DOCTYPE html>
 <script>
 (function () {
   var COLORS = ${PERSONA_COLORS};
+  var STYLES = ${PERSONA_STYLES};
+  var SKEYS = ['freq', 'rough', 'spike', 'facet', 'scan', 'halo', 'crack', 'tempo'];
+  var style = {}; var targetStyle = STYLES[1];
+  for (var sk = 0; sk < SKEYS.length; sk++) style[SKEYS[sk]] = STYLES[1][SKEYS[sk]];
   var STATES = {
     IDLE:      { speed: 0.35, amp: 0.025, glow: 0.55, ring: 0.0, swirl: 0.0, pulse: 0.0 },
     LISTENING: { speed: 0.80, amp: 0.045, glow: 0.75, ring: 1.0, swirl: 0.0, pulse: 0.0 },
@@ -65,7 +88,11 @@ export const ORB_HTML = `<!DOCTYPE html>
     var c = COLORS[p];
     if (!c) return;
     targetColor = c.slice();
-    if (!colorInit) { color = c.slice(); colorInit = true; }
+    targetStyle = STYLES[p] || targetStyle;
+    if (!colorInit) {
+      color = c.slice(); colorInit = true;
+      for (var i = 0; i < SKEYS.length; i++) style[SKEYS[i]] = targetStyle[SKEYS[i]];
+    }
     if (!gl) applyFallback();
   };
   window.setOrbState = function (s) {
@@ -89,6 +116,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     'precision highp float;',
     'uniform vec2 uRes; uniform float uTime; uniform vec3 uColor;',
     'uniform float uAmp; uniform float uGlow; uniform float uRing; uniform float uSwirl; uniform float uPulse; uniform float uPhase; uniform float uAudio;',
+    'uniform float uFreq; uniform float uRough; uniform float uSpike; uniform float uFacet; uniform float uScan; uniform float uHalo; uniform float uCrack;',
     'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}',
@@ -119,11 +147,15 @@ export const ORB_HTML = `<!DOCTYPE html>
     '  float t=uPhase;',
     '  float voice=uAudio;',
     '  float R=0.56+uPulse*0.05*voice;',
-    '  float Rd=R+snoise(vec3(dir*1.3,t))*uAmp;',
+    '  float ang0=atan(dir.y,dir.x);',
+    '  float spikes=pow(abs(sin(ang0*4.0+t*0.8)),10.0)*(0.7+0.3*snoise(vec3(dir*3.0,t*2.0)));',
+    '  float Rd=R+snoise(vec3(dir*uFreq,t))*uAmp*uRough+uSpike*0.075*spikes;',
     '  vec3 col=vec3(0.0); float a=0.0;',
     '  if(r<Rd+0.02){',
     '    float z=sqrt(max(Rd*Rd-r*r,0.0));',
     '    vec3 n=normalize(vec3(uv,z));',
+    '    vec3 nf=normalize(floor(n*3.0+0.5)/3.0);',
+    '    n=normalize(mix(n,nf,uFacet*0.85));',
     '    float ang=uSwirl*uTime*1.8;',
     '    mat2 rot=mat2(cos(ang),-sin(ang),sin(ang),cos(ang));',
     '    vec3 q=vec3(rot*n.xy,n.z);',
@@ -135,13 +167,18 @@ export const ORB_HTML = `<!DOCTYPE html>
     '    float fres=pow(1.0-n.z,2.2);',
     '    col=uColor*(0.18+0.55*diff)+uColor*fres*1.3+vec3(spec)*0.55+uColor*inner*0.22+uColor*bands*0.35;',
     '    col=mix(col,vec3(1.0),0.12*fres);',
+    '    col*=mix(1.0,0.25+0.75*smoothstep(0.03,0.16,abs(inner)),uCrack);',
+    '    col*=1.0-uScan*0.22*(0.5+0.5*sin(gl_FragCoord.y*0.9+uTime*5.0));',
     '    a=smoothstep(Rd+0.01,Rd-0.01,r);',
     '  }',
     '  float d=max(r-Rd,0.0);',
     '  float glow=uGlow*exp(-d*7.5)*smoothstep(Rd-0.05,Rd,r);',
     '  float wave=fract(uTime*0.7);',
     '  float ring=uRing*(1.0-wave)*smoothstep(0.025,0.0,abs(r-(Rd+0.04+0.3*wave)));',
-    '  float ga=clamp(glow*0.55+ring*0.8,0.0,1.0);',
+    '  float hr=length(vec2(uv.x,uv.y*3.2));',
+    '  float hp=0.35+0.65*pow(0.5+0.5*cos(atan(uv.y*3.2,uv.x)-uTime*1.3),6.0);',
+    '  float halo=uHalo*smoothstep(0.018,0.0,abs(hr-(Rd+0.16)))*hp*(1.0-a);',
+    '  float ga=clamp(glow*0.55+ring*0.8+halo*0.9,0.0,1.0);',
     '  vec3 rgb=col*a+uColor*ga*(1.0-a);',
     '  float outA=a+ga*(1.0-a);',
     '  gl_FragColor=vec4(min(rgb,vec3(outA)),outA);',
@@ -170,7 +207,8 @@ export const ORB_HTML = `<!DOCTYPE html>
     var loc = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase', 'uAudio'].forEach(function (n) {
+    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase', 'uAudio',
+      'uFreq', 'uRough', 'uSpike', 'uFacet', 'uScan', 'uHalo', 'uCrack'].forEach(function (n) {
       U[n] = gl.getUniformLocation(prog, n);
     });
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -195,8 +233,9 @@ export const ORB_HTML = `<!DOCTYPE html>
     var f = 1 - Math.exp(-dt * 5);
     for (var i = 0; i < KEYS.length; i++) cur[KEYS[i]] += (target[KEYS[i]] - cur[KEYS[i]]) * f;
     for (var c = 0; c < 3; c++) color[c] += (targetColor[c] - color[c]) * f;
+    for (var s2 = 0; s2 < SKEYS.length; s2++) style[SKEYS[s2]] += (targetStyle[SKEYS[s2]] - style[SKEYS[s2]]) * f;
     time += dt;
-    phase += dt * cur.speed;
+    phase += dt * cur.speed * style.tempo;
     if (!window.__externalAudioControl) {
       // Auto voice waveform until RN drives the level via setOrbAudio
       targetAudio = 0.5 + 0.5 * Math.sin(time * 9.0) * Math.sin(time * 3.7 + 1.3);
@@ -215,6 +254,13 @@ export const ORB_HTML = `<!DOCTYPE html>
     gl.uniform1f(U.uSwirl, cur.swirl);
     gl.uniform1f(U.uPulse, cur.pulse);
     gl.uniform1f(U.uAudio, audio);
+    gl.uniform1f(U.uFreq, style.freq);
+    gl.uniform1f(U.uRough, style.rough);
+    gl.uniform1f(U.uSpike, style.spike);
+    gl.uniform1f(U.uFacet, style.facet);
+    gl.uniform1f(U.uScan, style.scan);
+    gl.uniform1f(U.uHalo, style.halo);
+    gl.uniform1f(U.uCrack, style.crack);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 

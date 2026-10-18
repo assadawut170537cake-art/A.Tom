@@ -118,3 +118,30 @@ test('provider failure surfaces as a system message and resets the orb', async (
   expect(history(1).at(-1)?.role).toBe('system');
   expect(useAtomStore.getState().mood).toBe('idle');
 });
+
+describe('Orb แยกรูปทรงต่อ persona + สีอะตอม/อัลตรอนต่างกันชัด', () => {
+  test('ทุก persona มีสไตล์ Orb ไม่ซ้ำกัน และส่งเข้า HTML', () => {
+    const { ORB_HTML, ORB_STYLES } = jest.requireActual<typeof import('../features/jarvis/constants/orbHtml')>(
+      '../features/jarvis/constants/orbHtml'
+    );
+    const keys = Object.values(ORB_STYLES).map((s) => JSON.stringify(s));
+    expect(new Set(keys).size).toBe(4);
+    expect(ORB_HTML).toContain('var STYLES = ');
+    expect(ORB_HTML).toContain('uniform float uSpike');
+  });
+
+  test('อะตอม (เหลืองอำพัน) ห่างจากอัลตรอน (แดง) เรื่องโทนสี', () => {
+    const { PERSONAS } = jest.requireActual<typeof import('../features/jarvis/constants')>('../features/jarvis/constants');
+    const hue = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255) as [number, number, number];
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const d = max - min;
+      const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const diff = Math.abs(hue(PERSONAS[1].color) - hue(PERSONAS[4].color));
+    expect(Math.min(diff, 360 - diff)).toBeGreaterThan(30);
+  });
+});
