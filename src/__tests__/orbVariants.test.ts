@@ -43,6 +43,12 @@ describe('Orb variants ต่อ persona', () => {
     for (const u of ['uFacet', 'uFreq', 'uSharp', 'uGloss', 'uPulseMul']) expect(ORB_HTML).toContain(u);
   });
 
+  test('facet ใช้มุมละ 2π/9 พอดี — มุมสุดท้ายทับมุมแรก ไม่มีรอยต่อที่ ±π', () => {
+    const s = /float S=([\d.]+);/.exec(ORB_HTML)?.[1];
+    expect(Number(s)).toBeCloseTo((2 * Math.PI) / 9, 6);
+    expect(ORB_HTML).not.toContain('floor(ang0/0.6981+0.5)'); // แบบเดิมปัดมุมเป็นขั้น → รอยแฉก
+  });
+
   test('setOrbPersona(p) สลับ variant ตาม persona', () => {
     const page = loadOrbPage();
     for (const p of PERSONAS) {

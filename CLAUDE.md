@@ -289,7 +289,8 @@
 13. ✅ **Voice Persona Map default** (A2) — `DEFAULT_PERSONA_VOICE_MAP` (นิยามใน `core/storage/ProviderSettings.ts`, re-export ที่ `voice.config.ts`) · `resolveVoiceFor()` = shared voice → ค่าที่ตั้ง → default · default ใช้ Expo Speech แยกด้วย pitch/speed เท่านั้น (ไม่ใส่ voiceId เพราะ identifier ต่างกันตามเครื่อง)
     เดิม: — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
     (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
-14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ⚠️ GLSL ใหม่ยังไม่ได้ลองบน GPU จริง
+14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ⚠️ GLSL ใหม่ยังไม่ได้ลองบน GPU จริง (ผ่านบน WebGL SwiftShader แล้ว)
+    facet เดิมปัดมุมเป็นขั้น → รัศมีกระโดด เกิดรอยแฉกในแสงเรือง (อะตอม/อัลตรอน) → แก้เป็นรูป 9 เหลี่ยมที่ต่อเนื่อง
     เดิม: — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
 15. ✅ **สี Atom vs Ultron ต่างชัด** (A4) — Atom `#E67E22` · Ultron `#C0392B` (contrast บนดำ ≥ 3:1 มี test) · Boss อนุมัติเปลี่ยน lock Phase 2 แล้ว
     เดิม: — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
