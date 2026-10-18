@@ -42,3 +42,7 @@ yarn-error.*
 
 # test coverage reports
 coverage/
+
+# local IDE / เครื่อง Boss (path ผูกกับเครื่อง)
+.idea/
+run_mark55.bat
