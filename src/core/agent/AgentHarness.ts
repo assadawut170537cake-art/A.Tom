@@ -209,6 +209,7 @@ export class AgentHarness {
     ].join('\n');
     return [
       { role: 'system', content: input.systemPrompt ? `${input.systemPrompt}\n\n${protocol}` : protocol },
+      ...(input.history ?? []).filter((m) => m.role !== 'system'),
       { role: 'user', content: input.text },
     ];
   }

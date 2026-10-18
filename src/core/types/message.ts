@@ -30,6 +30,16 @@ export function isAttachment(value: unknown): value is Attachment {
   );
 }
 
+/** ความจำที่ AI เสนอในคำตอบนี้ — รอบอสกด "จำ" (ดู core/memory/suggestions.ts) */
+export interface MemorySuggestion {
+  key: string;
+  value: string;
+}
+
+export function isMemorySuggestion(value: unknown): value is MemorySuggestion {
+  return isRecord(value) && isString(value.key) && isString(value.value);
+}
+
 export const MESSAGE_ROLES = ['user', 'assistant', 'system'] as const;
 
 export type MessageRole = (typeof MESSAGE_ROLES)[number];
@@ -43,4 +53,6 @@ export interface Message {
   createdAt: number;
   /** รูป/ไฟล์ที่บอสแนบมากับข้อความ */
   attachments?: Attachment[] | undefined;
+  /** ความจำที่ผู้ช่วยเสนอ (ยังไม่บันทึก) — หายไปเมื่อบอสกดจำ/ไม่จำ */
+  memorySuggestions?: MemorySuggestion[] | undefined;
 }

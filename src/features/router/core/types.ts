@@ -1,4 +1,5 @@
 import type { AIAttachment, ChatMessage } from '../../ai/core/types';
+import type { MemorySuggestion } from '../../../core/types/message';
 import type { Persona } from '../../../core/types/persona';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
@@ -68,6 +69,8 @@ export interface HandlerResult {
   persona: Persona;
   /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
   agentScreen?: { agentId: string } | undefined;
+  /** ความจำที่ AI เสนอ (มีเฉพาะผลจาก ChatHandler ที่มี memory) — รอบอสยืนยันก่อนบันทึก */
+  memorySuggestions?: MemorySuggestion[] | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

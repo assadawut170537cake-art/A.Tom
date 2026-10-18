@@ -16,7 +16,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { isArray, isArrayOf, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
-import { MESSAGE_ROLES, isAttachment, type Message } from '../types/message';
+import { MESSAGE_ROLES, isAttachment, isMemorySuggestion, type Message } from '../types/message';
 import { PERSONA_IDS, isPersona, type Persona } from '../types/persona';
 
 /**
@@ -40,7 +40,8 @@ function isMessage(value: unknown, persona: Persona): value is Message {
     typeof value.createdAt === 'number' &&
     isOneOf(MESSAGE_ROLES, value.role) &&
     value.persona === persona &&
-    (value.attachments === undefined || isArrayOf(value.attachments, isAttachment))
+    (value.attachments === undefined || isArrayOf(value.attachments, isAttachment)) &&
+    (value.memorySuggestions === undefined || isArrayOf(value.memorySuggestions, isMemorySuggestion))
   );
 }
 

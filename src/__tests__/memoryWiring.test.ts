@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { bootApp, startServices } from '../boot';
 import { localMemory } from '../core/memory/LocalMemoryAdapter';
+import { MEMORY_SUGGESTION_INSTRUCTION } from '../core/memory/suggestions';
 import type { MemoryStore } from '../core/memory/types';
 import { ModuleManager } from '../core/modules/ModuleManager';
 import { ModuleRegistry } from '../core/modules/ModuleRegistry';
@@ -71,14 +72,14 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
     expect(second).toContain('- city: เชียงใหม่');
   });
 
-  test('B2: empty memory → system prompt is exactly the persona prompt', async () => {
+  test('B2: empty memory → persona prompt + คำสั่งเสนอความจำ (ไม่มีบล็อก facts)', async () => {
     const prompts = captureSystemPrompts();
     useAtomStore.getState().setActivePersona(3);
     await sendMessage('สวัสดี', { speak: false });
-    expect(prompts()).toEqual([getPersonaPrompt(3)]);
+    expect(prompts()).toEqual([`${getPersonaPrompt(3)}\n\n${MEMORY_SUGGESTION_INSTRUCTION}`]);
   });
 
-  test('B3: memory that throws → logged, chat still answers with the plain persona prompt', async () => {
+  test('B3: memory that throws → logged, chat still answers without facts', async () => {
     jest.spyOn(localMemory, 'list').mockRejectedValue(new Error('storage locked'));
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     const prompts = captureSystemPrompts();
@@ -87,7 +88,7 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
 
     expect(res).toMatchObject({ reply: 'จำได้ครับ' });
     expect(res.error).toBeUndefined();
-    expect(prompts()).toEqual([getPersonaPrompt(1)]);
+    expect(prompts()).toEqual([`${getPersonaPrompt(1)}\n\n${MEMORY_SUGGESTION_INSTRUCTION}`]);
     expect(error).toHaveBeenCalledWith('[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ', expect.any(Error));
     expect(useAtomStore.getState().messagesByPersona[1].map((m) => m.role)).toEqual(['user', 'assistant']);
   });

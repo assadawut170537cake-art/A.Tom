@@ -5,6 +5,7 @@ import { PERSONAS, USER_NAME } from '../../constants';
 import type { Message } from '../../types';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MarkdownText } from './MarkdownText';
+import { MemorySuggestionChips } from './MemorySuggestionChips';
 
 const formatTime = (ts: number) => {
   const d = new Date(ts);
@@ -78,6 +79,7 @@ export const ChatBubble = memo(function ChatBubble({ message, onLongPress }: Cha
           <MarkdownText text={message.content} accent={persona.color} />
         )}
       </Pressable>
+      {!isUser && <MemorySuggestionChips message={message} accent={persona.color} />}
     </View>
   );
 });

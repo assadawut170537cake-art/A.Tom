@@ -7,7 +7,7 @@ import { AgentHarness } from '../../core/agent/AgentHarness';
 import { deviceControl } from '../../core/agent/DeviceControlBridge';
 import { mcpBridge } from '../../core/agent/MCPClientBridge';
 import { skillEngine } from '../../core/agent/SkillEngine';
-import type { AgentHarnessOptions, AgentHooks, AgentLLM } from '../../core/agent/types';
+import type { AgentHarnessOptions, AgentHooks, AgentLLM, AgentRunInput } from '../../core/agent/types';
 import { localMemory } from '../../core/memory/LocalMemoryAdapter';
 import { moduleRegistry } from '../../core/modules/ModuleRegistry';
 import { aiOrchestrator, type Orchestrator } from './core/Orchestrator';
@@ -55,4 +55,42 @@ export async function createAppAgent(
     ...rest,
     hooks: combineHooks(skillEngine.hooks(learn ? llm : undefined), hooks),
   });
+}
+
+/** สร้าง harness ใหม่หลังจากนี้ — บอสเปิด/ปิด MCP หรือทักษะ แล้วแชทจะเห็นภายในไม่กี่นาที */
+const CHAT_AGENT_TTL_MS = 2 * 60 * 1000;
+
+export interface ChatToolAgent {
+  /** มี tool นอก module (MCP / ทักษะ / ควบคุมเครื่อง) เปิดอยู่ไหม — ไม่มี = แชทแบบปกติ */
+  hasTools(): Promise<boolean>;
+  /** คำตอบสุดท้ายของ agent — throw เมื่อ LLM ล้ม */
+  run(input: AgentRunInput): Promise<string>;
+}
+
+/**
+ * agent สำหรับแชท: ChatHandler ใช้เมื่อบอสเปิด tool ไว้ (ไม่งั้นแชทปกติ — ไหลทีละส่วน + ค้นเว็บได้)
+ * module (เช่น pc-bridge) ไม่นับ เพราะมี intent ของตัวเองอยู่แล้ว
+ */
+export function createChatToolAgent(build: () => Promise<AgentHarness> = () => createAppAgent()): ChatToolAgent {
+  let harness: Promise<AgentHarness> | null = null;
+  let builtAt = 0;
+  const get = () => {
+    if (!harness || Date.now() - builtAt > CHAT_AGENT_TTL_MS) {
+      builtAt = Date.now();
+      const pending = build().catch((e: unknown) => {
+        if (harness === pending) harness = null; // ครั้งหน้าลองใหม่
+        throw e;
+      });
+      harness = pending;
+    }
+    return harness;
+  };
+  return {
+    async hasTools() {
+      return (await get()).availableTools().some((t) => t.source !== 'module');
+    },
+    async run(input) {
+      return (await (await get()).run(input)).reply;
+    },
+  };
 }

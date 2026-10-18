@@ -1,4 +1,6 @@
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
+import { localMemory } from '../../../core/memory/LocalMemoryAdapter';
+import { stripMemoryMarkers } from '../../../core/memory/suggestions';
 import { isOffline } from '../../../core/network/connectivity';
 import type { Attachment } from '../../../core/types/message';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
@@ -34,8 +36,11 @@ function createStreamView(persona: Persona, isLatest: () => boolean) {
   };
 
   return {
-    onPartial(text: string) {
+    onPartial(raw: string) {
       if (!isLatest()) return;
+      // มาร์กเกอร์ [[จำ: …]] ไม่แสดงระหว่างไหล (ChatHandler ตัดออกจากคำตอบจริงอยู่แล้ว)
+      const text = raw ? stripMemoryMarkers(raw) : '';
+      if (raw && !text) return;
       if (!text) {
         if (timer) clearTimeout(timer);
         timer = null;
@@ -133,11 +138,17 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     const partialId = stream.finish();
     if (partialId && result.persona === persona) {
       // ข้อความที่ไหลมาแล้วกลายเป็นคำตอบจริง (แทนด้วยฉบับเต็ม เช่นมีแหล่งข้อมูลต่อท้าย) แล้วบันทึก
-      useAtomStore.getState().updateMessage(persona, partialId, result.reply);
+      useAtomStore.getState().updateMessage(persona, partialId, result.reply, { save: !result.memorySuggestions });
+      if (result.memorySuggestions) useAtomStore.getState().setMemorySuggestions(persona, partialId, result.memorySuggestions);
     } else {
       if (partialId) useAtomStore.getState().removeMessage(persona, partialId);
       // A switch moves the reply (the new persona's greeting) into the new persona's history
-      useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+      useAtomStore.getState().pushMessage({
+        role: 'assistant',
+        content: result.reply,
+        persona: result.persona,
+        memorySuggestions: result.memorySuggestions,
+      });
     }
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);
@@ -202,4 +213,27 @@ export function editMessage(message: Message): void {
 /** อ่านข้อความนี้ออกเสียงอีกครั้งด้วยเสียงของ persona เจ้าของข้อความ */
 export function speakMessage(message: Message): void {
   void voiceOrchestrator.speak(stripMarkdown(message.content), message.persona).catch(() => undefined);
+}
+
+/** บอสกด "จำ" — บันทึกลง Shared Memory (global) แล้วเอาข้อเสนอออกจากข้อความ */
+export async function acceptMemorySuggestion(message: Message, key: string): Promise<boolean> {
+  const suggestion = message.memorySuggestions?.find((s) => s.key === key);
+  if (!suggestion) return false;
+  try {
+    await localMemory.save({ scope: 'global' }, suggestion.key, suggestion.value, 'assistant');
+  } catch (e) {
+    console.error('[memory] บันทึกความจำที่ผู้ช่วยเสนอไม่ได้', e);
+    return false;
+  }
+  dismissMemorySuggestion(message, key);
+  return true;
+}
+
+/** บอสกด "ไม่ต้อง" — ทิ้งข้อเสนอ (ไม่บันทึก) */
+export function dismissMemorySuggestion(message: Message, key: string): void {
+  const store = useAtomStore.getState();
+  // อ่านจาก store (ไม่ใช่ prop) — กดสองข้อติดกันเร็ว ๆ ต้องไม่ได้รายการเก่ากลับมา
+  const current = store.messagesByPersona[message.persona].find((m) => m.id === message.id);
+  const rest = (current?.memorySuggestions ?? []).filter((s) => s.key !== key);
+  store.setMemorySuggestions(message.persona, message.id, rest);
 }

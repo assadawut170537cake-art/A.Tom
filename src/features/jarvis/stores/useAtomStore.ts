@@ -8,7 +8,7 @@ import { ProviderSettings, type PersonaVoice } from '../../../core/storage/Provi
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { DEFAULT_PERSONA, PERSONA_IDS } from '../constants';
-import type { Attachment } from '../../../core/types/message';
+import type { Attachment, MemorySuggestion } from '../../../core/types/message';
 import type { Message, MessageRole, OrbMood, Persona, UIMode } from '../types';
 
 interface PushMessageInput {
@@ -17,6 +17,7 @@ interface PushMessageInput {
   /** Defaults to the active persona */
   persona?: Persona;
   attachments?: Attachment[] | undefined;
+  memorySuggestions?: MemorySuggestion[] | undefined;
 }
 
 interface AtomState {
@@ -56,6 +57,8 @@ interface AtomState {
   /** แก้เนื้อหาข้อความ (คำตอบที่กำลังไหลเข้ามา) — `save: false` = ยังไม่บันทึก (บันทึกตอนจบ) */
   updateMessage: (persona: Persona, id: string, content: string, opts?: { save?: boolean }) => void;
   removeMessage: (persona: Persona, id: string) => void;
+  /** ตั้ง/ล้างความจำที่ผู้ช่วยเสนอของข้อความ (รายการว่าง = ลบ field) แล้วบันทึก */
+  setMemorySuggestions: (persona: Persona, id: string, suggestions: MemorySuggestion[]) => void;
   /** ลบข้อความ `id` และทุกข้อความหลังจากนั้น (ตอบใหม่ / แก้ข้อความ) */
   truncateFrom: (persona: Persona, id: string) => void;
   /** เก็บห้องปัจจุบันเข้าห้องเก่า แล้วเริ่มห้องว่าง (ห้องว่างอยู่แล้ว = ไม่ทำอะไร) */
@@ -130,7 +133,7 @@ export const useAtomStore = create<AtomState>()(
         // Ignore stale results if the persona changed while loading
         if (get().activePersona === persona) set({ voice });
       },
-      pushMessage: ({ role, content, persona, attachments }) => {
+      pushMessage: ({ role, content, persona, attachments, memorySuggestions }) => {
         const target = persona ?? get().activePersona;
         const message: Message = {
           id: createId(),
@@ -139,6 +142,7 @@ export const useAtomStore = create<AtomState>()(
           content,
           createdAt: Date.now(),
           ...(attachments?.length && { attachments }),
+          ...(memorySuggestions?.length && { memorySuggestions }),
         };
         set((s) => ({
           messagesByPersona: {
@@ -178,6 +182,19 @@ export const useAtomStore = create<AtomState>()(
           },
         }));
         if (opts?.save !== false && get().historyLoaded) void saveHistory(persona);
+      },
+      setMemorySuggestions: (persona, id, suggestions) => {
+        set((s) => ({
+          messagesByPersona: {
+            ...s.messagesByPersona,
+            [persona]: s.messagesByPersona[persona].map((m) => {
+              if (m.id !== id) return m;
+              const { memorySuggestions: _old, ...rest } = m;
+              return suggestions.length ? { ...rest, memorySuggestions: suggestions } : rest;
+            }),
+          },
+        }));
+        if (get().historyLoaded) void saveHistory(persona);
       },
       removeMessage: (persona, id) => {
         set((s) => ({
