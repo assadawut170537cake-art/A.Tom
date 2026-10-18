@@ -42,5 +42,12 @@ export interface AIProvider {
   config: AIProviderConfig;
   chat(req: ChatRequest): Promise<ChatResponse>;
   testConnection(): Promise<{ ok: boolean; error?: string }>;
+  /** รายชื่อโมเดลสำหรับแสดง — ถ้าดึงสดไม่ได้ provider บางตัวคืนรายการใน config แทน */
   getModels(): Promise<string[]>;
+  /**
+   * ดึงรายชื่อโมเดลสด ๆ จาก API ของผู้ให้บริการ (ต้องมี API key) — ไม่ fallback ไปรายการใน config
+   * ล้ม → throw ProviderError (ข้อความไทย) ให้หน้าตั้งค่าแสดง แล้วให้บอสพิมพ์ชื่อเองได้
+   * ไม่มี = provider นี้ไม่มี endpoint รายชื่อโมเดล
+   */
+  listModels?(): Promise<string[]>;
 }

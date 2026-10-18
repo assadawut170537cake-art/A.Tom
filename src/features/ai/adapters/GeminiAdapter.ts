@@ -1,6 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
 import { requestJson } from '../../../core/http/request';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { normalizeModelIds, parseGeminiModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
 interface GenerateContentResponse {
@@ -10,10 +11,9 @@ interface GenerateContentResponse {
   promptFeedback?: { blockReason?: string };
 }
 
-interface ModelListResponse {
-  models?: { name: string; supportedGenerationMethods?: string[] }[];
-  nextPageToken?: string;
-}
+/** pageSize สูงสุดที่ Gemini ยอม · ตามหน้าไม่เกิน MAX_PAGES กัน loop ไม่จบถ้า API ส่ง token วน */
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 5;
 
 /** Google Gemini via the Generative Language REST API (v1beta). */
 export class GeminiAdapter extends BaseAIProvider {
@@ -70,23 +70,31 @@ export class GeminiAdapter extends BaseAIProvider {
   }
 
   /** Live list of models that support generateContent. */
-  override async getModels(): Promise<string[]> {
-    const data = await this.listModels();
-    return (data.models ?? [])
-      .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
-      .map((m) => m.name.replace(/^models\//, ''))
-      .sort();
+  override getModels(): Promise<string[]> {
+    return this.listModels();
+  }
+
+  /** `GET /v1beta/models` (ทุกหน้า) → เฉพาะโมเดลที่ใช้ generateContent ได้ */
+  async listModels(): Promise<string[]> {
+    const ids: string[] = [];
+    let pageToken: string | undefined;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const query = `pageSize=${PAGE_SIZE}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+      const parsed = parseGeminiModels(this.config.id, await this.fetchModelPage(query));
+      ids.push(...parsed.ids);
+      pageToken = parsed.nextPageToken;
+      if (!pageToken) break;
+    }
+    return normalizeModelIds(ids);
   }
 
   protected probe(): Promise<unknown> {
-    return this.listModels(1);
+    return this.fetchModelPage('pageSize=1');
   }
 
-  private async listModels(pageSize = 1000): Promise<ModelListResponse> {
-    return requestJson<ModelListResponse>(
-      this.config.id,
-      this.url(`/v1beta/models?pageSize=${pageSize}`),
-      { headers: await this.headers() }
-    );
+  private async fetchModelPage(query: string): Promise<unknown> {
+    return requestJson<unknown>(this.config.id, this.url(`/v1beta/models?${query}`), {
+      headers: await this.headers(),
+    });
   }
 }
