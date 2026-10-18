@@ -13,6 +13,19 @@
 ## [Unreleased]
 
 ### Added
+- **ผู้ช่วยครบชุด (16 ข้อจาก gap analysis):**
+  - แชท: ประวัติหลายห้อง + ค้นหา · ปุ่ม ＋ แชทใหม่ · Markdown · เมนูข้อความ (คัดลอก/พูดซ้ำ/ลบ) · error ย่อเป็นแถบเดียว · คำตอบไหลทีละส่วน (streaming) · ค้นเว็บ (Gemini Google Search / OpenRouter web)
+  - แนบรูป / ถ่ายรูป / แนบไฟล์ PDF ให้ AI ดู
+  - เตือนความจำ (expo-notifications) + แท็บ **Today** (เตือน + นัดวันนี้) · ปฏิทิน (expo-calendar) · โทร/SMS/อีเมลหาคนในรายชื่อ (expo-contacts — เปิดแอปโทร/SMS/อีเมลให้ ไม่ส่งเอง) · อ่านเวลาไทย (`today/thaiTime.ts`: "อีก 30 นาที", "พรุ่งนี้ 2 ทุ่ม", "บ่าย 3") ไม่ออก → ถาม AI
+  - ผู้ช่วยใช้ tool (MCP/ทักษะ/อุปกรณ์) ในแชทปกติได้ · เสนอสิ่งที่ควรจำ (ชิป "จำไว้ไหม" ต้องกดยืนยันก่อนบันทึก)
+  - ถอดเสียงในเครื่อง (expo-speech-recognition — ไม่ต้องมี key) · พูดแทรกระหว่างผู้ช่วยพูดได้ (ปิดได้ที่ ตั้งค่า › เสียง)
+  - Android: กดค้างปุ่มโฮม (เมื่อเลือก A.T.O.M. เป็นผู้ช่วยดิจิทัล) / ปุ่มหูฟัง → คุยด้วยเสียง · ลิงก์ `atom://live|today|memory|new|chat?text=` · ทางลัดไอคอน · widget หน้าจอหลัก (`plugins/withAssistantEntry.js`)
+  - เสียงเริ่มต้นต่อ persona (`PERSONA_VOICE_DEFAULTS`) · Orb รูปทรง/จังหวะเฉพาะตัว (`ORB_STYLES`)
+
+### Changed
+- สีอะตอม `#d35400` → `#f5a623` (แยกจากอัลตรอนชัด — บอสอนุมัติ 2026-10-18)
+
+### Added (ก่อนหน้า)
 - **ซิงก์ Memory เข้า Supermemory:** `core/memory/SuperMemorySync.ts` (`SuperMemorySyncService`) ฟัง `LocalMemoryAdapter.subscribe()` → fact ที่เพิ่ม/แก้ส่ง `POST https://api.supermemory.ai/v3/documents` (`containerTag: project_atom_memory_base_4folders_atom_core`, `dreaming: instant`) ทีละรายการตามลำดับ · fail-open (เน็ตหลุด / key ผิด / server ล่ม / timeout 10s แค่ log — save() และแชทไม่รอ) · ไม่ส่งการลบ และไม่ส่งของที่ดึงจาก Mark 55 · API key ใน SecureStore (`atom.secret.supermemory.apiKey`) ใส่ได้ที่ **ตั้งค่า › Sync › Supermemory** · boot เรียก `superMemorySync.start()` · `redactSecrets()` ปิด `sm_…`
 - **Build แอป Android (APK ติดตั้งเองได้):** `eas.json` (profile `preview` = APK, `production` = AAB) · package `com.atom.assistant` · `plugins/withCleartextTraffic.js` ให้ release build ต่อ Sync server แบบ http ใน LAN ได้ (ใช้ expo/config-plugins ที่มากับ expo — ไม่มี dependency ใหม่)
 - **คุยด้วยเสียงแบบไลฟ์ (Live Voice):** กดค้างที่ Orb หรือปุ่มไมค์ในช่องพิมพ์ → ฟัง → ตรวจจบประโยคจากระดับเสียง (VAD: เงียบ 1.2s, ตัดเสียงสั้นกว่า 0.4s, ยาวสุด 30s, ไม่มีใครพูด 30s ออกเอง) → ถอดเสียงด้วย STT chain เดิม → ข้อความขึ้นเป็นของบอสในแชท → ผู้ช่วยตอบ + พูด → ฟังต่ออัตโนมัติ จนกว่าจะแตะ Orb/ปุ่มไมค์ · สถานะไทย (กำลังฟัง… / กำลังถอดเสียง… / กำลังคิด… / กำลังพูด…) · ไม่อัดเสียงระหว่างผู้ช่วยพูด · ไม่มี STT / key → ออกจากโหมดพร้อมบอกให้ตั้งค่าที่ ตั้งค่า › เสียง · `voice/live/LiveVoiceSession.ts` (state machine, DI) + `jarvis/hooks/useLiveVoice.ts` (expo-audio recorder + metering) — ไม่มี dependency ใหม่

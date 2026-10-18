@@ -260,6 +260,26 @@
 - cache = `modelListCache` (หน่วยความจำ, ต่อ provider, ทั้ง session) · บันทึก/ลบ key → ProviderCard ล้าง cache + remount picker (`key={keyVersion}`)
 - "พิมพ์ชื่อเอง" ต้องมีเสมอ (Boss ขอ) — ค่าที่บันทึกยังเป็น string เดียวใน `ProviderSettings.models[id]`
 
+### Today / เตือน / ปฏิทิน / รายชื่อ
+- อ่านเวลา: `parseThaiWhen()` (features/today/thaiTime.ts) ก่อน → ไม่ออกค่อยถาม AI (`extractWhenWithAI`) · "N โมง" เปล่า ๆ 1–5 = บ่าย · เวลาที่ผ่านไปแล้ววันนี้ (ไม่ระบุวัน) = พรุ่งนี้
+- `reminderStore` (AsyncStorage `atom.reminders.v1`) ตั้งแจ้งเตือนไม่ได้ = ไม่บันทึก · เวลาที่ผ่านแล้ว = ปฏิเสธ · แจ้งเตือน channel `reminders`
+- agent: `reminder.list` / `calendar.list` ต้องลงทะเบียน **ก่อน** ตัว add (ตัวแรกที่ match ชนะ) · ติดต่อคน = เปิด `tel:`/`sms:`/`mailto:` ให้บอสกดเอง ไม่ส่งเอง
+- Today ไม่ขอสิทธิ์ปฏิทินเองตอนเปิดแท็บ (ต้องกดปุ่ม)
+
+### แชท: tool + ความจำที่เสนอ
+- ChatHandler: มี tool ที่ไม่ใช่ module (MCP/ทักษะ/อุปกรณ์) + ไม่มีไฟล์แนบ → ตอบผ่าน AgentHarness (`createChatToolAgent`, cache 2 นาที) · agent ล้ม → แชทปกติ
+- ความจำที่เสนอ: AI ใส่ `[[จำ: key=value]]` ท้ายคำตอบ (`core/memory/suggestions.ts`) → ตัดออก แสดงเป็นชิป · บันทึกเฉพาะเมื่อบอสกด "จำ" (source `assistant`) · ไม่มี memory store = ไม่แตะคำตอบ
+- เปลี่ยน prompt ของ ChatHandler → test ที่เทียบ prompt ตรง ๆ ต้องต่อ `MEMORY_SUGGESTION_INSTRUCTION`
+
+### ถอดเสียงในเครื่อง + พูดแทรก
+- `expo-speech-recognition` (~57.1 — อย่าให้ `expo install` ดึง 58) · ถอดจากไฟล์ไม่ได้ (Android ต้อง WAV PCM แต่ expo-audio อัด AAC) → ใช้ได้เฉพาะโหมดไลฟ์ (`nativeListenOnce`) · STT cloud ไม่มี key → ตกมาที่ในเครื่องอัตโนมัติ
+- พูดแทรก: ระหว่างผู้ช่วยพูด เสียง ≥ `BARGE_IN_THRESHOLD_DB` (-14) นาน `BARGE_IN_HOLD_MS` (450ms) → หยุดพูดแล้วฟัง · ถ้าเครื่องจริงตัดตัวเอง (ได้ยินเสียงลำโพง) → เพิ่ม threshold หรือปิดที่ ตั้งค่า › เสียง › พูดแทรกได้
+
+### ทางเข้า Android — `plugins/withAssistantEntry.js`
+- ASSIST/VOICE_COMMAND → MainActivity แปลงเป็น `atom://live` (onCreate + onNewIntent) · ต้องเลือก A.T.O.M. ใน ตั้งค่าเครื่อง › แอปเริ่มต้น › ผู้ช่วยดิจิทัล
+- ลิงก์: `services/deepLinks.ts` (`parseDeepLink`) + `hooks/useDeepLinks.ts` · ไม่มี "Hey Atom" (hotword ต้องเป็นแอปผู้ช่วยของระบบ)
+- แก้ plugin → ต้อง `expo prebuild --clean` ใหม่
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -291,11 +311,11 @@
 11. ✅ `SECRET_PATTERN` เพิ่ม `|AKIA[0-9A-Z]{16}`
 12. ✅ `AGENTS.md` อัปเดตให้ตรง ADR-009
 
-### Findings จาก Boss test (emulator) — ยังไม่ได้แก้
-13. **Voice Persona Map default** — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
+### Findings จาก Boss test (emulator) — แก้แล้ว 2026-10-18 (`PERSONA_VOICE_DEFAULTS` · `ORB_STYLES`)
+13. ✅ **Voice Persona Map default** — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
     (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
-14. **Orb แยก shape/animation** — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
-15. **สี Atom vs Ultron ต่างชัด** — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
+14. ✅ **Orb แยก shape/animation** — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
+15. ✅ **สี Atom vs Ultron ต่างชัด** (อะตอม → `#f5a623` บอสอนุมัติ 2026-10-18) — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
     (ค่า `PERSONAS` ถูก lock ไว้ตั้งแต่ Phase 2 — เปลี่ยนต้องให้ Boss อนุมัติ)
 
 ### Findings ระหว่างทำ 4.5.3
@@ -330,6 +350,7 @@
 - Sync: `src/core/memory/MemorySync.ts` · `SyncQueue.ts` · `RemoteMemoryAdapter.ts` · UI `src/features/settings/screens/SyncScreen.tsx`
 - Agents (intent): `src/core/agents/AgentRegistry.ts` · `src/features/router/classifiers/AgentClassifier.ts` · `handlers/AgentHandler.ts` · `src/features/agents/` · sample `src/modules/agents/sample-agent.ts`
 - Agent: `src/core/agent/` · app wiring `src/features/ai/agent.ts` · Marketplace: `src/features/marketplace/screens/PluginMarketplaceScreen.tsx`
+- Today/เตือน: `src/features/today/` · agents `src/modules/agents/{reminder,calendar,contact}-agent.ts` · ลิงก์ `src/features/jarvis/services/deepLinks.ts` · plugin `plugins/withAssistantEntry.js`
 - Shared types: `src/core/types/`
 - Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`
 
