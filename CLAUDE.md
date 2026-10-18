@@ -238,6 +238,17 @@
 - ⚠️ "เช็กเครื่อง" เฉย ๆ ไม่ผ่าน RuleClassifier (ต้องมี เปิด/ปิด/สั่ง + คอม/เครื่อง) → ขึ้นกับ LLM classifier · พิมพ์ "สั่งคอมเช็กสถานะ" ชัวร์กว่า · "ปิดคอม" = ยังไม่รองรับ (ไม่มี handler)
 - Jest ไม่แปลง `import()` แบบ dynamic → test loader ด้วย factory ของตัวเอง (`MODULE_LOADERS` จริงทดสอบได้แค่ว่ามี key)
 
+### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
+- `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
+- เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)
+- VAD จาก metering (dBFS) poll ทุก 100ms: ดัง ≥ `SPEECH_THRESHOLD_DB` (-40) = พูด · เงียบ `SILENCE_END_MS` (1.2s) = จบ · สั้นกว่า `MIN_SPEECH_MS` (0.4s) = เสียงรบกวน · ยาวสุด `MAX_UTTERANCE_MS` (30s) · ไม่มีใครพูด `IDLE_TIMEOUT_MS` (30s) = ออกเอง · เงียบนำหน้า `PRE_SPEECH_RESET_MS` (8s) = ทิ้งไฟล์อัดใหม่
+- ⚠️ ค่า dBFS ต่างกันตามเครื่อง: Android = peak (`maxAmplitude`), iOS = average power → ถ้าเครื่องจริงตัดประโยคเร็ว/ไม่ยอมจบ ปรับ `SPEECH_THRESHOLD_DB` ที่เดียว
+- ระหว่างผู้ช่วยพูด **ไม่อัดเสียง** (กันได้ยินตัวเอง) — ยังไม่มี barge-in · recorder หยุดแล้วคืน `allowsRecording: false` ทุกครั้ง (iOS playAndRecord ทำเสียง TTS เบา)
+- หยุดระหว่างรอ AI → `sendMessage({ onSpeaking })` คืน false = ไม่พูดคำตอบ · งาน async รอบเก่าทิ้งด้วย `runId` guard
+- ถอดเสียงว่าง → ฟังใหม่เงียบ ๆ · STT ไม่ได้ตั้งค่า (`missing_key`/`unsupported`) → ออกจากโหมด + ข้อความไทยชี้ ตั้งค่า › เสียง · ไมค์ไม่ได้สิทธิ์ → ข้อความจาก `ensureMicPermission()`
+- `VoiceOrchestrator` รวม error ของ chain: ล้มเพราะ "ยังไม่ตั้งค่า" ทั้งหมด → `missing_key` (เดิม `commonKind` ได้ `server` เพราะ Expo STT = unsupported ปนกับ missing_key)
+- test: `liveVoice.test.ts` (fake timers + fake recorder) · mock `useAudioRecorder` อยู่ใน `jest.setup.js` (metering -160 = เงียบ)
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
@@ -297,7 +308,7 @@
 - Entry: `index.ts` → `App.tsx` → `RootNavigator.tsx`
 - Main: `src/features/jarvis/screens/MainScreen.tsx`
 - AI Orchestrator: `src/features/ai/core/Orchestrator.ts`
-- Voice Orchestrator: `src/features/voice/core/VoiceOrchestrator.ts`
+- Voice Orchestrator: `src/features/voice/core/VoiceOrchestrator.ts` · Live voice: `src/features/voice/live/LiveVoiceSession.ts` · `src/features/jarvis/hooks/useLiveVoice.ts`
 - Intent Router: `src/features/router/core/IntentRouter.ts`
 - Memory: `src/core/memory/LocalMemoryAdapter.ts`
 - Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`

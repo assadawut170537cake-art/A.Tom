@@ -43,6 +43,27 @@ jest.mock('expo-audio', () => ({
     pause: jest.fn(),
     remove: jest.fn(),
   })),
+  // โหมดคุยด้วยเสียง (useLiveVoice): recorder ปลอม — เงียบเสมอ (metering -160) จนกว่า test จะ mock เอง
+  RecordingPresets: { HIGH_QUALITY: { extension: '.m4a', sampleRate: 44100, numberOfChannels: 2, bitRate: 128000 } },
+  setAudioModeAsync: jest.fn(async () => {}),
+  useAudioRecorder: jest.fn(() => {
+    const { useState } = require('react');
+    const [recorder] = useState(() => ({
+      id: 'rec',
+      uri: null,
+      isRecording: false,
+      prepareToRecordAsync: jest.fn(async () => {}),
+      record: jest.fn(function () {
+        this.isRecording = true;
+        this.uri = 'file:///cache/live.m4a';
+      }),
+      stop: jest.fn(async function () {
+        this.isRecording = false;
+      }),
+      getStatus: jest.fn(() => ({ canRecord: true, isRecording: false, durationMillis: 0, mediaServicesDidReset: false, metering: -160, url: null })),
+    }));
+    return recorder;
+  }),
   getRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
   requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
 }));

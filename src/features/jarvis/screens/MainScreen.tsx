@@ -18,10 +18,12 @@ import { ActionBar } from '../components/navigation/ActionBar';
 import { BottomTabs } from '../components/navigation/BottomTabs';
 import { IdleGreeting } from '../components/orb/IdleGreeting';
 import { ListeningIndicator } from '../components/orb/ListeningIndicator';
+import { LiveVoiceStatus } from '../components/orb/LiveVoiceStatus';
 import { OrbLayer } from '../components/orb/OrbLayer';
 import { LAYOUT, PERSONAS } from '../constants';
 import { useAIKeyStatus } from '../hooks/useAIKeyStatus';
 import { useKeyboardOverlap } from '../hooks/useKeyboardOverlap';
+import { useLiveVoice } from '../hooks/useLiveVoice';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
@@ -48,6 +50,8 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const persona = PERSONAS[useAtomStore((s) => s.activePersona)];
   const keyStatus = useAIKeyStatus();
 
+  const live = useLiveVoice();
+
   const agentId = useAgentPanelStore((s) => s.agentId);
   const closeAgent = useAgentPanelStore((s) => s.close);
 
@@ -63,6 +67,11 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   }, []);
 
   const onOrbPress = useCallback(() => {
+    // โหมดคุยด้วยเสียงทำงานอยู่ → แตะ = หยุดโหมดเสียงอย่างเดียว (ยังอยู่หน้าคุย)
+    if (live.active) {
+      live.stop();
+      return;
+    }
     if (useAtomStore.getState().uiMode === 'idle') {
       // เข้าโหมดคุยแล้วเปิดช่องพิมพ์ — ไม่มีข้อความทักทาย demo แล้ว (คำทักทายใช้เฉพาะตอนสั่งสลับ persona)
       enterConversation();
@@ -74,7 +83,19 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
       useAgentPanelStore.getState().close();
       useAtomStore.getState().setUIMode('idle');
     }
-  }, [enterConversation, focusInput]);
+  }, [enterConversation, focusInput, live]);
+
+  /** กดค้าง Orb / ปุ่มไมค์ → เข้าโหมดคุยด้วยเสียง (ห้ามเริ่มระหว่างผู้ช่วยตอบข้อความที่พิมพ์ — ไมค์จะได้ยินเสียงพูด) */
+  const startLive = useCallback(() => {
+    if (live.active || busy) return;
+    Keyboard.dismiss();
+    live.start();
+  }, [live, busy]);
+
+  const toggleLive = useCallback(() => {
+    if (live.active) live.stop();
+    else startLive();
+  }, [live, startLive]);
 
   const onSend = useCallback((text: string) => {
     // sendMessage จับ error ทุกกรณีเองแล้วแสดงเป็นข้อความ ⚠️ ในแชท — ไม่ reject
@@ -92,9 +113,10 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   return (
     <>
       <ChatLayer bottom={chatBottom} />
-      <OrbLayer onPress={onOrbPress} />
+      <OrbLayer onPress={onOrbPress} onLongPress={startLive} liveActive={live.active} />
       {isIdle && <IdleGreeting top={GREETING_TOP} />}
-      <ListeningIndicator />
+      {/* โหมดไลฟ์ใช้ mood listening ด้วย แต่แสดงสถานะเองใน LiveVoiceStatus */}
+      {!live.active && <ListeningIndicator />}
       <ActionBar onComputer={onOrbPress} onKeyboard={focusInput} />
       <View
         className="absolute left-4 right-4"
@@ -104,10 +126,15 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
         {keyStatus === 'missing' && (
           <ApiKeyNotice onPress={() => navigation.navigate('AISettings')} />
         )}
+        <LiveVoiceStatus state={live.state} color={persona.color} />
         <ChatInput
           ref={inputRef}
           onSend={onSend}
-          disabled={busy}
+          // โหมดเสียงทำงานอยู่ = ห้ามส่งข้อความพิมพ์ซ้อน (สองรอบจะแย่งกันพูด)
+          disabled={busy || live.active}
+          onVoice={toggleLive}
+          voiceActive={live.active}
+          voiceDisabled={busy}
           onFocus={enterConversation}
           placeholder={`พิมพ์ข้อความถึง${persona.name}…`}
           accentColor={persona.color}

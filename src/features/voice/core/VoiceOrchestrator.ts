@@ -13,7 +13,7 @@
  * @see ../../../../docs/DECISIONS.md — ADR-008 Expo Speech เป็น TTS สำรองสุดท้ายเสมอ
  */
 
-import { ProviderError, commonKind, toProviderError } from '../../../core/http/errors';
+import { ProviderError, commonKind, toProviderError, type ProviderErrorKind } from '../../../core/http/errors';
 import {
   ProviderSettings,
   type PersonaVoice,
@@ -120,10 +120,21 @@ export class VoiceOrchestrator {
     }
     throw new ProviderError(
       'voice',
-      commonKind(failures),
+      chainKind(failures),
       `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
     );
   }
+}
+
+/**
+ * kind รวมของ chain ที่ล้มทุกตัว — ถ้าทุกตัวล้มเพราะ "ยังไม่ได้ตั้งค่า" (ไม่มี key / ใช้บนเครื่องไม่ได้)
+ * ให้เป็น `missing_key` แทน `server` เพื่อให้ UI บอกบอสให้ไปตั้งค่า (ค่าเริ่มต้น: STT ทุกตัวเปิด แต่ไม่มี key
+ * + Expo STT = unsupported → commonKind จะได้ 'server' ซึ่งพาไปผิดทาง)
+ */
+function chainKind(failures: readonly ProviderError[]): ProviderErrorKind {
+  const notConfigured = failures.every((f) => f.kind === 'missing_key' || f.kind === 'unsupported');
+  if (notConfigured && failures.some((f) => f.kind === 'missing_key')) return 'missing_key';
+  return commonKind(failures);
 }
 
 function unique<T>(list: T[]): T[] {
