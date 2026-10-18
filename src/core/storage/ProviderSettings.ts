@@ -26,6 +26,19 @@ export interface PersonaVoice {
   pitch?: number | undefined;
 }
 
+/**
+ * เสียงเริ่มต้นต่อ persona เมื่อบอสยังไม่ได้ตั้ง Persona Voice Map — ใช้ Expo Speech (ไม่ต้องมี key)
+ * แยกกันด้วย pitch/speed เท่านั้น ไม่ใส่ voiceId เพราะ identifier ของเสียงในเครื่องต่างกันตามอุปกรณ์/OS
+ * (ใส่ชื่อที่ไม่มีจริง expo-speech จะเงียบหรือตกไปเสียงเดิม) · อยู่ที่ core เพราะ core import features ไม่ได้
+ * ค่าที่บอสตั้งเองชนะเสมอ · re-export ที่ features/voice/voice.config.ts
+ */
+export const DEFAULT_PERSONA_VOICE_MAP: Readonly<Record<Persona, PersonaVoice>> = {
+  1: { providerId: 'expo', pitch: 0.85, speed: 1.0 }, // อะตอม: ทุ้มนักเลง
+  2: { providerId: 'expo', pitch: 0.95, speed: 0.92 }, // จาร์วิส: นุ่ม สุขุม ช้ากว่าเล็กน้อย
+  3: { providerId: 'expo', pitch: 1.25, speed: 1.08 }, // ไฟรเดย์: แหลมเนี๊ยบ เร็ว
+  4: { providerId: 'expo', pitch: 0.7, speed: 0.88 }, // อัลตรอน: ต่ำ หนัก
+};
+
 export interface AdvancedSettings {
   /** Per-request timeout for AI calls. */
   timeoutMs: number;
@@ -259,10 +272,14 @@ export const ProviderSettings = {
       d.sharedVoice = voice;
     });
   },
-  /** The voice a persona actually speaks with (shared voice wins when enabled). */
+  /**
+   * The voice a persona actually speaks with: shared voice (when enabled) → the user's own setting
+   * → DEFAULT_PERSONA_VOICE_MAP. Returns a copy so callers can't mutate the defaults.
+   */
   async resolveVoiceFor(persona: Persona): Promise<PersonaVoice | undefined> {
     const d = await load();
-    return d.sameVoiceForAll ? d.sharedVoice : d.ttsByPersona[persona];
+    if (d.sameVoiceForAll) return d.sharedVoice;
+    return d.ttsByPersona[persona] ?? { ...DEFAULT_PERSONA_VOICE_MAP[persona] };
   },
 
   async getAdvanced(): Promise<AdvancedSettings> {
