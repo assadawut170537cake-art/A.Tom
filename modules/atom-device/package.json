@@ -1,0 +1,6 @@
+{
+  "name": "atom-device",
+  "version": "0.1.0",
+  "private": true,
+  "description": "native module ของ A.T.O.M. — ปรับเสียง / ไฟฉาย (ADR-015 ระดับ A, Android เท่านั้น)"
+}

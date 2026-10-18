@@ -13,7 +13,9 @@ import {
   checkAppUrl,
   defaultDriver,
   linkingDriver,
+  nativeDriverParts,
   parseLevel,
+  parseOnOff,
   type DeviceDriver,
 } from '../core/agent/DeviceControlBridge';
 import {
@@ -448,6 +450,7 @@ type FakeDriver = Record<keyof DeviceDriver, jest.Mock>;
 function fakeDriver(overrides: Partial<FakeDriver> = {}): FakeDriver {
   return {
     setVolume: jest.fn(async () => {}),
+    setTorch: jest.fn(async () => {}),
     setBrightness: jest.fn(async () => {}),
     setClipboard: jest.fn(async () => {}),
     openWifiSettings: jest.fn(async () => {}),
@@ -476,7 +479,7 @@ describe('DeviceControlBridge', () => {
     await new DeviceControlBridge(driver).setEnabled(true);
     const device = new DeviceControlBridge(driver);
     expect(await device.isEnabled()).toBe(true);
-    expect(device.listTools()).toHaveLength(6);
+    expect(device.listTools()).toHaveLength(7);
     await expect(
       device.call({ tool: 'device.volume', text: '', args: { level: 150 } }),
     ).resolves.toEqual({
@@ -537,7 +540,7 @@ describe('DeviceControlBridge', () => {
     expect(parseLevel({ tool: 'x', text: '0.25' })).toBe(0.25);
   });
 
-  test('default driver: only volume unsupported (needs our native module); wifi opens settings', async () => {
+  test('default driver without AtomDevice native module: volume + flashlight unsupported; wifi opens settings', async () => {
     const device = new DeviceControlBridge();
     await device.setEnabled(true);
     expect(
@@ -545,7 +548,7 @@ describe('DeviceControlBridge', () => {
         .capabilities()
         .filter((c) => !c.supported)
         .map((c) => c.id),
-    ).toEqual(['device.volume']);
+    ).toEqual(['device.volume', 'device.flashlight']);
     await expect(device.call({ tool: 'device.volume', text: '50' })).resolves.toEqual({
       ok: false,
       output: 'เครื่องนี้ยังไม่รองรับ "ปรับเสียง"',
@@ -564,6 +567,43 @@ describe('DeviceControlBridge', () => {
     expect(openURL).toHaveBeenCalledWith('https://example.com');
     await linkingDriver.openSettings?.();
     expect(openSettings).toHaveBeenCalled();
+  });
+
+  test('flashlight: on/off from args or Thai/English text ("เปิด" contains "ปิด")', async () => {
+    const driver = fakeDriver();
+    const device = new DeviceControlBridge(driver);
+    await device.setEnabled(true);
+    await expect(device.call({ tool: 'device.flashlight', text: 'เปิดไฟฉาย' })).resolves.toEqual({
+      ok: true,
+      output: 'เปิดไฟฉายแล้ว',
+    });
+    expect(driver.setTorch).toHaveBeenLastCalledWith(true);
+    await device.call({ tool: 'device.flashlight', text: 'ปิดไฟฉายหน่อย' });
+    expect(driver.setTorch).toHaveBeenLastCalledWith(false);
+    expect(parseOnOff({ tool: 'x', text: '', args: { on: true } })).toBe(true);
+    expect(parseOnOff({ tool: 'x', text: 'turn it off' })).toBe(false);
+    expect(parseOnOff({ tool: 'x', text: 'torch on' })).toBe(true);
+    await expect(device.call({ tool: 'device.flashlight', text: 'ไฟฉาย' })).resolves.toEqual({
+      ok: false,
+      output: 'ไม่เข้าใจว่าจะเปิดหรือปิด (ใส่ args.on เป็น true/false)',
+    });
+  });
+
+  test('nativeDriverParts: AtomDevice present → volume + torch call native; absent → nothing', async () => {
+    expect(nativeDriverParts(null)).toEqual({});
+    const native = { setVolume: jest.fn(), setTorch: jest.fn(() => true) };
+    const parts = nativeDriverParts(native);
+    await parts.setVolume?.(0.5);
+    await parts.setTorch?.(true);
+    expect(native.setVolume).toHaveBeenCalledWith(0.5);
+    expect(native.setTorch).toHaveBeenCalledWith(true);
+    native.setTorch.mockReturnValueOnce(false);
+    const device = new DeviceControlBridge({ ...parts });
+    await device.setEnabled(true);
+    await expect(device.call({ tool: 'device.flashlight', text: 'on' })).resolves.toEqual({
+      ok: false,
+      output: 'เครื่องนี้ไม่มีไฟแฟลช',
+    });
   });
 
   test('default driver: clipboard → expo-clipboard', async () => {

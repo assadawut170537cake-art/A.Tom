@@ -8,12 +8,14 @@
  * - ทุกคำสั่งไม่ throw: ไม่รองรับ / ล้ม → คืน ok:false พร้อมเหตุผลภาษาไทย
  *
  * ความสามารถจริงมาจาก {@link DeviceDriver} — ตัวเริ่มต้น ({@link defaultDriver}) = `Linking` (ตั้งค่า / WiFi / เปิดแอป)
- * + expo-brightness + expo-clipboard (ADR-015 ระดับ A, Boss อนุมัติ) · volume ยังต้องมี native module ของเราเอง → "ยังไม่รองรับ"
+ * + expo-brightness + expo-clipboard + native module `AtomDevice` ของเราเอง (`modules/atom-device`, Android: เสียง / ไฟฉาย)
+ * — ADR-015 ระดับ A · ไม่มี native module (Expo Go / iOS / test) → เสียง + ไฟฉาย = "ยังไม่รองรับ"
  * Android 10+ / iOS ไม่ให้แอปเปิด-ปิด WiFi เอง → เปิดหน้าตั้งค่า WiFi ให้บอสกดเองแทน (ระดับ B AccessibilityService จะกดให้ได้)
  */
 
 import * as Brightness from 'expo-brightness';
 import * as Clipboard from 'expo-clipboard';
+import { requireOptionalNativeModule } from 'expo';
 import { Linking, Platform } from 'react-native';
 
 import { redactSecrets } from '../http/errors';
@@ -37,6 +39,7 @@ export const BLOCKED_SCHEMES = [
 
 export interface DeviceDriver {
   setVolume?(level: number): Promise<void>;
+  setTorch?(on: boolean): Promise<void>;
   setBrightness?(level: number): Promise<void>;
   setClipboard?(text: string): Promise<void>;
   openWifiSettings?(): Promise<void>;
@@ -74,13 +77,32 @@ async function setScreenBrightness(level: number): Promise<void> {
   await Brightness.setBrightnessAsync(level);
 }
 
-/** driver ของแอป: Linking + expo-brightness + expo-clipboard */
+/** ฟังก์ชันของ `modules/atom-device` (Kotlin) — sync ฝั่ง JS · setTorch คืน false = เครื่องไม่มีแฟลช */
+export interface AtomDeviceNative {
+  setVolume(level: number): void;
+  setTorch(on: boolean): boolean;
+}
+
+/** เติมเสียง / ไฟฉายเข้า driver เมื่อมี native module · ไม่มี → ไม่ใส่ (tool ขึ้น "ยังไม่รองรับ") */
+export function nativeDriverParts(native: AtomDeviceNative | null): DeviceDriver {
+  if (!native) return {};
+  return {
+    setVolume: async (level) => native.setVolume(level),
+    setTorch: async (on) => {
+      if (!native.setTorch(on)) throw new GuardError('เครื่องนี้ไม่มีไฟแฟลช');
+    },
+  };
+}
+
+/** driver ของแอป: Linking + expo-brightness + expo-clipboard + AtomDevice (ถ้ามี) */
 export const defaultDriver: DeviceDriver = {
   ...linkingDriver,
   setBrightness: setScreenBrightness,
   setClipboard: async (text) => {
     await Clipboard.setStringAsync(text);
   },
+  // type argument = trust boundary: รูปร่างมาจาก Kotlin (AtomDeviceModule.kt) ซึ่ง TS ตรวจไม่ได้
+  ...nativeDriverParts(requireOptionalNativeModule<AtomDeviceNative>('AtomDevice')),
 };
 
 interface DeviceTool {
@@ -100,6 +122,16 @@ export function parseLevel(call: AgentToolCall): number {
   if (!Number.isFinite(n)) throw new GuardError('ไม่เข้าใจระดับที่ต้องการ (ใส่ 0-100 หรือ 0-1)');
   const level = n > 1 ? n / 100 : n;
   return Math.min(1, Math.max(0, level));
+}
+
+/** เปิด/ปิด จาก args.on หรือข้อความ ("ปิดไฟฉาย", "on") — "เปิด" มี "ปิด" ซ้อนอยู่ จึงนับ "ปิด" เฉพาะที่ไม่ได้ตามหลัง "เ" */
+export function parseOnOff(call: AgentToolCall): boolean {
+  const raw = call.args?.on;
+  if (isBoolean(raw)) return raw;
+  const text = `${call.target ?? ''} ${call.text}`.toLowerCase();
+  if (/(^|[^เ])ปิด|\boff\b|\bfalse\b/.test(text)) return false;
+  if (/เปิด|\bon\b|\btrue\b/.test(text)) return true;
+  throw new GuardError('ไม่เข้าใจว่าจะเปิดหรือปิด (ใส่ args.on เป็น true/false)');
 }
 
 /** ตรวจ URL ที่จะเปิด — scheme ต้องปลอดภัย */
@@ -138,6 +170,17 @@ const DEVICE_TOOLS: DeviceTool[] = [
       const level = parseLevel(call);
       await d.setBrightness?.(level);
       return `ตั้งความสว่างเป็น ${Math.round(level * 100)}% แล้ว`;
+    },
+  },
+  {
+    id: 'device.flashlight',
+    name: 'ไฟฉาย',
+    description: 'เปิด/ปิดไฟฉาย (args.on true/false)',
+    supported: (d) => !!d.setTorch,
+    run: async (d, call) => {
+      const on = parseOnOff(call);
+      await d.setTorch?.(on);
+      return on ? 'เปิดไฟฉายแล้ว' : 'ปิดไฟฉายแล้ว';
     },
   },
   {
