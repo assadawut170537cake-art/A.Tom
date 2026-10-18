@@ -1,17 +1,5 @@
 import type { VoiceIdOf, VoiceKind } from '../../core/storage/ProviderSettings';
-import type { Persona } from '../../core/types/persona';
 import type { STTProviderId, TTSProviderId } from './core/types';
-
-/**
- * เสียงเริ่มต้นของแต่ละ persona เมื่อบอสยังไม่ได้ตั้ง Persona Voice Map — ให้ 4 ตัวฟังต่างกันแม้ใช้เสียงเดียวกันในเครื่อง
- * pitch/speed เป็นตัวคูณ (1 = ปกติ) ทุก provider แปลงเอง (Google = semitone) · Gemini TTS ไม่รับตัวเลข → ไม่มีผล
- */
-export const PERSONA_VOICE_DEFAULTS: Readonly<Record<Persona, { pitch: number; speed: number }>> = {
-  1: { pitch: 0.9, speed: 1.08 }, // อะตอม: นักเลง พูดเร็ว เสียงต่ำนิด
-  2: { pitch: 0.8, speed: 0.92 }, // จาร์วิส: สุขุม ทุ้ม ช้า
-  3: { pitch: 1.25, speed: 1.02 }, // ไฟรเดย์: เสียงสูง ชัด
-  4: { pitch: 0.62, speed: 1.12 }, // อัลตรอน: ทุ้มหนัก ดุดัน
-};
 
 export interface VoiceProviderMeta<Id extends string> {
   id: Id;

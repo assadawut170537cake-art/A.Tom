@@ -20,7 +20,6 @@ import {
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import type { Persona } from '../../../core/types/persona';
-import { PERSONA_VOICE_DEFAULTS } from '../voice.config';
 import { ensureMicPermission } from './permissions';
 import { voiceRegistry, type VoiceRegistry } from './VoiceRegistry';
 import type { SpeakOptions, STTProvider, TTSProvider, TTSProviderId } from './types';
@@ -60,7 +59,7 @@ export class VoiceOrchestrator {
       this.stop();
       this.speaking = tts;
       try {
-        await tts.speak(text, await this.optionsFor(tts.id, voice, personaId));
+        await tts.speak(text, await this.optionsFor(tts.id, voice));
       } finally {
         if (this.speaking === tts) this.speaking = null;
       }
@@ -107,14 +106,12 @@ export class VoiceOrchestrator {
   }
 
   /** The persona's voice settings apply to its own provider; fallbacks use their default voice. */
-  private async optionsFor(id: TTSProviderId, voice: PersonaVoice | undefined, persona: Persona): Promise<SpeakOptions> {
+  private async optionsFor(id: TTSProviderId, voice?: PersonaVoice): Promise<SpeakOptions> {
     const voiceId =
       voice?.providerId === id
         ? voice.voiceId
         : await this.settings.getOption(`tts.${id}`, 'voiceId');
-    // ยังไม่ได้ตั้งเสียงของ persona นี้ → ใช้โทนเริ่มต้นของ persona (Parking Lot ข้อ 13)
-    if (!voice) return { voiceId, ...PERSONA_VOICE_DEFAULTS[persona] };
-    return { voiceId, speed: voice.speed, pitch: voice.pitch };
+    return { voiceId, speed: voice?.speed, pitch: voice?.pitch };
   }
 
   private async runChain<P extends { id: string }, R>(

@@ -11,7 +11,6 @@ import type {
 } from '../features/ai/core/types';
 import { VoiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { VoiceRegistry } from '../features/voice/core/VoiceRegistry';
-import { PERSONA_VOICE_DEFAULTS } from '../features/voice/voice.config';
 import type { STTProvider, STTProviderId, TTSProvider, TTSProviderId } from '../features/voice/core/types';
 import {
   GEMINI,
@@ -451,27 +450,6 @@ describe('Voice Orchestrator — TTS priority + fallback', () => {
     expect(slow.stop).toHaveBeenCalled();
     release();
     await pending;
-  });
-});
-
-describe('Voice Orchestrator — เสียงเริ่มต้นต่อ persona', () => {
-  test('ยังไม่ได้ตั้งเสียง → แต่ละ persona ได้ pitch/speed ของตัวเอง (4 ตัวไม่ซ้ำกัน)', async () => {
-    // test ก่อนหน้าบันทึกเสียงของ persona 1 ไว้ (ไม่มี API ลบ) → จำลองว่ายังไม่ได้ตั้งเลย
-    jest.spyOn(ProviderSettings, 'resolveVoiceFor').mockResolvedValue(undefined);
-    const expo = fakeTTS('expo');
-    const voice = voiceWith([expo]);
-    for (const p of [1, 2, 3, 4] as const) await voice.speak('hi', p);
-    // cast: fakeTTS เก็บ opts เป็น unknown — ที่นี่รู้ว่าเป็น TTSOptions
-    const opts = expo.spoken.map((s) => s.opts as { pitch?: number; speed?: number });
-    expect(opts).toEqual([1, 2, 3, 4].map((p) => ({ voiceId: undefined, ...PERSONA_VOICE_DEFAULTS[p as 1 | 2 | 3 | 4] })));
-    expect(new Set(opts.map((o) => `${o.pitch}/${o.speed}`)).size).toBe(4);
-  });
-
-  test('ตั้งเสียงของ persona แล้ว → ใช้ค่าที่บอสตั้ง (ไม่ปนค่าเริ่มต้น)', async () => {
-    await ProviderSettings.setTTSFor(2, { providerId: 'expo' });
-    const expo = fakeTTS('expo');
-    await voiceWith([expo]).speak('hi', 2);
-    expect(nth(expo.spoken, 0).opts).toEqual({ voiceId: undefined, speed: undefined, pitch: undefined });
   });
 });
 
