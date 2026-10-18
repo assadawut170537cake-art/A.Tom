@@ -119,3 +119,29 @@ jest.mock('expo-image-picker', () => ({
 jest.mock('expo-document-picker', () => ({
   getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
 }));
+
+// แจ้งเตือน / ปฏิทิน / รายชื่อ — native ทั้งหมด · ค่าเริ่มต้น = ได้สิทธิ์ ไม่มีข้อมูล
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { HIGH: 6 },
+  SchedulableTriggerInputTypes: { DATE: 'date' },
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => null),
+  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  scheduleNotificationAsync: jest.fn(async () => 'notif-1'),
+  cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+}));
+jest.mock('expo-calendar/legacy', () => ({
+  EntityTypes: { EVENT: 'event' },
+  getCalendarPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestCalendarPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getCalendarsAsync: jest.fn(async () => []),
+  getEventsAsync: jest.fn(async () => []),
+  createEventAsync: jest.fn(async () => 'event-1'),
+}));
+jest.mock('expo-contacts/legacy', () => ({
+  Fields: { Name: 'name', PhoneNumbers: 'phoneNumbers', Emails: 'emails' },
+  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getContactsAsync: jest.fn(async () => ({ data: [] })),
+}));

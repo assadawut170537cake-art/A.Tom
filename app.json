@@ -40,6 +40,20 @@
           "microphonePermission": false
         }
       ],
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "อนุญาตให้ $(PRODUCT_NAME) ดูและเพิ่มนัดในปฏิทินตามที่บอสสั่ง",
+          "remindersPermission": false
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "อนุญาตให้ $(PRODUCT_NAME) ค้นรายชื่อเพื่อโทรหรือส่งข้อความตามที่บอสสั่ง"
+        }
+      ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
       "./plugins/withAndroidProjectName"

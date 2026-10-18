@@ -1,11 +1,12 @@
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AgentPanel } from '../../agents/components/AgentPanel';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { MemoryScreen } from '../../memory/screens/MemoryScreen';
+import { TodayScreen } from '../../today/TodayScreen';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
 import { AttachmentStrip } from '../components/chat/AttachmentStrip';
@@ -184,19 +185,6 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   );
 }
 
-interface ComingSoonProps {
-  label: string;
-}
-
-function ComingSoon({ label }: ComingSoonProps) {
-  return (
-    <View className="absolute inset-0 items-center justify-center">
-      <Text className="text-lg font-semibold text-white/80">{label}</Text>
-      <Text className="mt-1 text-sm text-white/40">เร็วๆ นี้</Text>
-    </View>
-  );
-}
-
 export function MainScreen() {
   const insets = useSafeAreaInsets();
   const activeTab = useTabsStore((s) => s.activeTab);
@@ -221,7 +209,7 @@ export function MainScreen() {
         <Header onHistory={openHistory} onSettings={() => navigation.navigate('Settings')} />
         <OfflineBanner />
         {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
-        {activeTab === 'today' && <ComingSoon label="Today" />}
+        {activeTab === 'today' && <TodayScreen />}
         {activeTab === 'memory' && <MemoryScreen />}
         <BottomTabs />
       </View>
