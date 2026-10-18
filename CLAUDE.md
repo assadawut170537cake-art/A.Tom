@@ -225,7 +225,9 @@
 - retry อยู่ใน SyncQueue เท่านั้น (backoff 5s→5 นาที, 401 ไม่ retry) · RemoteMemoryAdapter ไม่ retry, timeout 10s
 - Server URL: http ได้เฉพาะ LAN/localhost/.local/Tailscale (100.64/10) · ที่อยู่สาธารณะต้อง https (`normalizeServerUrl`)
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
-- ⚠️ release build Android บล็อก http (cleartext) เป็นค่าเริ่มต้น — Expo Go/dev build ใช้ได้; release ต้องตั้ง `usesCleartextTraffic` (ต้องขอ Boss เพราะต้องเพิ่ม expo-build-properties)
+- release build Android เปิด http ไว้ด้วย config plugin `plugins/withCleartextTraffic.js` (ใช้ expo/config-plugins ที่มากับ expo · ไม่ต้องเพิ่ม expo-build-properties) — การจำกัด http ให้แค่ LAN ทำในโค้ด (`normalizeServerUrl`)
+- Build APK: `npx eas-cli build -p android --profile preview` (eas.json) หรือ local `npx expo prebuild -p android` แล้ว `cd android && ./gradlew assembleRelease` · package `com.atom.assistant` (เปลี่ยนแล้วแอปเดิมอัปเดตทับไม่ได้) · local build เซ็นด้วย debug keystore ของ template
+- `plugins/withAndroidProjectName.js`: Gradle 9 ห้ามชื่อโปรเจกต์ขึ้นต้น/ลงท้ายด้วย "." ("A.T.O.M.") → ตั้ง rootProject.name = slug · ห้ามลบ ไม่งั้น build Android ล้ม
 
 ### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)
 - `superMemorySync` (core/memory/SuperMemorySync.ts) ฟัง `localMemory.subscribe()` → `POST /v3/documents` · containerTag `project_atom_memory_base_4folders_atom_core` (ไม่ใช่ `atom_core` เปล่า ๆ — คนละ space)
