@@ -1,14 +1,16 @@
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
 import { isOffline } from '../../../core/network/connectivity';
+import type { Attachment } from '../../../core/types/message';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { aiOrchestrator } from '../../ai/core/Orchestrator';
-import type { ChatMessage } from '../../ai/core/types';
+import type { AIAttachment, ChatMessage } from '../../ai/core/types';
 import { getAppRouter } from '../../router/appRouter';
 import type { RouterOutput } from '../../router/core/types';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { useAtomStore } from '../stores/useAtomStore';
 import type { Message, Persona } from '../types';
 import { stripMarkdown } from '../utils/markdown';
+import { AttachmentError, describeAttachments, toAIAttachment } from './attachments';
 
 /** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
 let activeTurn = 0;
@@ -82,29 +84,45 @@ interface SendOptions {
    * ใช้ให้โหมดไลฟ์รู้ว่าเข้าช่วง "กำลังพูด" แล้วด้วย
    */
   onSpeaking?: () => boolean;
+  /** รูป/ไฟล์ที่แนบมากับข้อความนี้ */
+  attachments?: Attachment[] | undefined;
 }
+
+/** ข้อความที่ส่งให้ AI เมื่อบอสส่งแต่ไฟล์ไม่พิมพ์อะไร */
+const ATTACHMENT_ONLY_PROMPT = 'ช่วยดูไฟล์ที่แนบมาให้หน่อย';
 
 export async function sendMessage(text: string, opts: SendOptions = {}): Promise<SendResult> {
   const content = text.trim();
-  if (!content) return { route: null, reply: '' };
+  const attachments = opts.attachments ?? [];
+  if (!content && !attachments.length) return { route: null, reply: '' };
 
   const store = useAtomStore.getState();
   const persona = store.activePersona;
+  // ข้อความเก่าที่มีไฟล์แนบ: ส่งแค่ชื่อไฟล์ (ส่งไฟล์ซ้ำทุกรอบเปลือง token)
   const history: ChatMessage[] = store.messagesByPersona[persona]
     .filter((m) => m.role !== 'system')
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m) => ({ role: m.role, content: [m.content, describeAttachments(m.attachments)].filter(Boolean).join('\n') }));
 
   const turn = ++activeTurn;
   const isLatest = () => turn === activeTurn;
   const stream = createStreamView(persona, isLatest);
-  store.pushMessage({ role: 'user', content, persona });
+  store.pushMessage({ role: 'user', content, persona, attachments });
   store.setUIMode('conversation');
   store.setMood('thinking');
 
   try {
+    let aiAttachments: AIAttachment[] = [];
+    try {
+      aiAttachments = await Promise.all(attachments.map(toAIAttachment));
+    } catch (e) {
+      const message = e instanceof AttachmentError ? e.message : 'อ่านไฟล์แนบไม่ได้ — แนบใหม่อีกครั้ง';
+      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${message}`, persona });
+      return { route: null, reply: '', error: message };
+    }
     // router ของแอป: ChatHandler มี Shared Memory (facts ถูกแนบใน system prompt)
     const { route, result } = await getAppRouter().handle({
-      text: content,
+      text: content || ATTACHMENT_ONLY_PROMPT,
+      ...(aiAttachments.length && { attachments: aiAttachments }),
       context: {
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),
@@ -170,7 +188,7 @@ export async function regenerate(message: Message): Promise<SendResult | null> {
   const prompt = promptOf(message);
   if (!prompt) return null;
   useAtomStore.getState().truncateFrom(prompt.persona, prompt.id);
-  return sendMessage(prompt.content);
+  return sendMessage(prompt.content, { attachments: prompt.attachments });
 }
 
 /** แก้ข้อความของบอส: ลบข้อความนั้นและที่ตามมา แล้วใส่ข้อความเดิมกลับในช่องพิมพ์ */
@@ -178,6 +196,7 @@ export function editMessage(message: Message): void {
   const store = useAtomStore.getState();
   store.truncateFrom(message.persona, message.id);
   store.setComposerDraft(message.content);
+  message.attachments?.forEach((a) => store.addPendingAttachment(a));
 }
 
 /** อ่านข้อความนี้ออกเสียงอีกครั้งด้วยเสียงของ persona เจ้าของข้อความ */

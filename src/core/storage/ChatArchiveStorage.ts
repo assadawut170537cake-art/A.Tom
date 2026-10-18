@@ -9,8 +9,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { isArray, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
-import { MESSAGE_ROLES, type Message } from '../types/message';
+import { isArray, isArrayOf, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
+import { MESSAGE_ROLES, isAttachment, type Message } from '../types/message';
 import { PERSONA_IDS, isPersona, type Persona } from '../types/persona';
 import { MAX_STORED_MESSAGES } from './ChatHistoryStorage';
 
@@ -44,7 +44,8 @@ function isMessage(value: unknown, persona: Persona): value is Message {
     isString(value.content) &&
     typeof value.createdAt === 'number' &&
     isOneOf(MESSAGE_ROLES, value.role) &&
-    value.persona === persona
+    value.persona === persona &&
+    (value.attachments === undefined || isArrayOf(value.attachments, isAttachment))
   );
 }
 

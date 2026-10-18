@@ -1,4 +1,4 @@
-import type { ChatMessage } from '../../ai/core/types';
+import type { AIAttachment, ChatMessage } from '../../ai/core/types';
 import type { Persona } from '../../../core/types/persona';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
@@ -20,6 +20,8 @@ export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
+  /** รูป/ไฟล์ที่แนบมากับข้อความนี้ — มี = ส่งเข้าแชทเสมอ (คำสั่งอื่นอ่านไฟล์ไม่ได้) */
+  attachments?: AIAttachment[] | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];

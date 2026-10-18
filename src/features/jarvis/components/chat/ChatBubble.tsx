@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { PERSONAS, USER_NAME } from '../../constants';
 import type { Message } from '../../types';
+import { AttachmentStrip } from './AttachmentStrip';
 import { MarkdownText } from './MarkdownText';
 
 const formatTime = (ts: number) => {
@@ -66,8 +67,13 @@ export const ChatBubble = memo(function ChatBubble({ message, onLongPress }: Cha
             : 'rounded-2xl rounded-bl-sm bg-white/[0.08] px-4 py-3'
         }
       >
+        {message.attachments?.length ? (
+          <View className={message.content ? 'mb-2' : ''}>
+            <AttachmentStrip attachments={message.attachments} size={140} />
+          </View>
+        ) : null}
         {isUser ? (
-          <Text className="text-[15px] leading-6 text-white">{message.content}</Text>
+          message.content ? <Text className="text-[15px] leading-6 text-white">{message.content}</Text> : null
         ) : (
           <MarkdownText text={message.content} accent={persona.color} />
         )}

@@ -32,6 +32,14 @@
           "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "อนุญาตให้ $(PRODUCT_NAME) เลือกรูปเพื่อส่งให้ผู้ช่วยดู",
+          "cameraPermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้กล้องถ่ายรูปเพื่อส่งให้ผู้ช่วยดู",
+          "microphonePermission": false
+        }
+      ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
       "./plugins/withAndroidProjectName"

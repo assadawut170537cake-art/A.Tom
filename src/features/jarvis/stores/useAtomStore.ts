@@ -8,6 +8,7 @@ import { ProviderSettings, type PersonaVoice } from '../../../core/storage/Provi
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { DEFAULT_PERSONA, PERSONA_IDS } from '../constants';
+import type { Attachment } from '../../../core/types/message';
 import type { Message, MessageRole, OrbMood, Persona, UIMode } from '../types';
 
 interface PushMessageInput {
@@ -15,6 +16,7 @@ interface PushMessageInput {
   content: string;
   /** Defaults to the active persona */
   persona?: Persona;
+  attachments?: Attachment[] | undefined;
 }
 
 interface AtomState {
@@ -38,6 +40,8 @@ interface AtomState {
   composerDraft: string | null;
   /** ข้อความของผู้ช่วยที่กำลังไหลเข้ามา (ซ่อนจุดสามจุด "กำลังพิมพ์") */
   streamingId: string | null;
+  /** ไฟล์ที่เลือกไว้รอส่งกับข้อความถัดไป */
+  pendingAttachments: Attachment[];
 
   setUIMode: (mode: UIMode) => void;
   setMood: (mood: OrbMood) => void;
@@ -61,6 +65,10 @@ interface AtomState {
   deleteChat: (persona: Persona, archiveId: string) => void;
   setComposerDraft: (draft: string | null) => void;
   setStreamingId: (id: string | null) => void;
+  addPendingAttachment: (attachment: Attachment) => void;
+  removePendingAttachment: (id: string) => void;
+  /** คืนไฟล์ที่รอส่งแล้วล้างรายการ (ตอนกดส่ง) */
+  takePendingAttachments: () => Attachment[];
 }
 
 const emptyArchives = (): Record<Persona, ChatArchive[]> => ({ 1: [], 2: [], 3: [], 4: [] });
@@ -106,6 +114,7 @@ export const useAtomStore = create<AtomState>()(
       archivesByPersona: emptyArchives(),
       composerDraft: null,
       streamingId: null,
+      pendingAttachments: [],
 
       setUIMode: (uiMode) => set({ uiMode }),
       setMood: (mood) => set({ mood }),
@@ -121,7 +130,7 @@ export const useAtomStore = create<AtomState>()(
         // Ignore stale results if the persona changed while loading
         if (get().activePersona === persona) set({ voice });
       },
-      pushMessage: ({ role, content, persona }) => {
+      pushMessage: ({ role, content, persona, attachments }) => {
         const target = persona ?? get().activePersona;
         const message: Message = {
           id: createId(),
@@ -129,6 +138,7 @@ export const useAtomStore = create<AtomState>()(
           role,
           content,
           createdAt: Date.now(),
+          ...(attachments?.length && { attachments }),
         };
         set((s) => ({
           messagesByPersona: {
@@ -226,6 +236,15 @@ export const useAtomStore = create<AtomState>()(
       },
       setComposerDraft: (composerDraft) => set({ composerDraft }),
       setStreamingId: (streamingId) => set({ streamingId }),
+      addPendingAttachment: (attachment) =>
+        set((s) => ({ pendingAttachments: [...s.pendingAttachments, attachment] })),
+      removePendingAttachment: (id) =>
+        set((s) => ({ pendingAttachments: s.pendingAttachments.filter((a) => a.id !== id) })),
+      takePendingAttachments: () => {
+        const list = get().pendingAttachments;
+        if (list.length) set({ pendingAttachments: [] });
+        return list;
+      },
     }),
     {
       name: 'atom-store',

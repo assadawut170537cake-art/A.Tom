@@ -12,7 +12,7 @@ const PADDING_Y = 8;
 export const CHAT_INPUT_MAX_HEIGHT = LINE_HEIGHT * MAX_LINES + PADDING_Y * 2;
 
 interface ChatInputProps {
-  /** ได้ข้อความที่ trim แล้ว (ไม่ถูกเรียกเมื่อว่าง) */
+  /** ได้ข้อความที่ trim แล้ว (ว่างได้เฉพาะตอนมีไฟล์แนบ) */
   onSend: (text: string) => void;
   /**
    * ห้ามส่งระหว่างผู้ช่วยกำลังคิด/พูด — แต่ยังพิมพ์ร่างข้อความถัดไปได้
@@ -33,6 +33,8 @@ interface ChatInputProps {
   /** ข้อความที่ต้องใส่ลงช่องพิมพ์ (เช่นกด "แก้ไข") — ใส่แล้วเรียก onDraftConsumed */
   draft?: string | null | undefined;
   onDraftConsumed?: (() => void) | undefined;
+  /** มีไฟล์แนบรอส่ง = กดส่งได้แม้ไม่พิมพ์อะไร */
+  hasAttachments?: boolean | undefined;
 }
 
 export function ChatInput({
@@ -47,6 +49,7 @@ export function ChatInput({
   voiceDisabled = false,
   draft,
   onDraftConsumed,
+  hasAttachments = false,
 }: ChatInputProps) {
   const [text, setText] = useState('');
   // ปรับ state ระหว่าง render (แบบที่ React แนะนำ) แทน setState ใน effect — จำ draft ที่ใส่แล้วกันใส่ซ้ำ
@@ -61,7 +64,7 @@ export function ChatInput({
   useEffect(() => {
     if (draft != null) onDraftConsumed?.();
   }, [draft, onDraftConsumed]);
-  const canSend = !disabled && text.trim().length > 0;
+  const canSend = !disabled && (text.trim().length > 0 || hasAttachments);
 
   const send = () => {
     if (!canSend) return;

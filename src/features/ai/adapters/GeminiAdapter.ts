@@ -52,7 +52,13 @@ export class GeminiAdapter extends BaseAIProvider {
     const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content);
     const contents = req.messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [
+          { text: m.content },
+          ...(m.attachments ?? []).map((a) => ({ inline_data: { mime_type: a.mimeType, data: a.data } })),
+        ],
+      }));
     return JSON.stringify({
       contents,
       ...(system.length && { systemInstruction: { parts: [{ text: system.join('\n\n') }] } }),

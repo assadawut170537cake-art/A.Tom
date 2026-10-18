@@ -16,9 +16,19 @@ export interface AIProviderConfig {
   purpose?: 'llm' | 'router';
 }
 
+/** ไฟล์แนบที่อ่านเป็น base64 แล้ว พร้อมส่งให้ provider */
+export interface AIAttachment {
+  mimeType: string;
+  /** base64 (ไม่มี prefix `data:`) */
+  data: string;
+  name: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** รูป/ไฟล์ของข้อความนี้ (เฉพาะข้อความล่าสุดของบอส — ข้อความเก่าส่งแค่ชื่อไฟล์) */
+  attachments?: AIAttachment[] | undefined;
 }
 
 export interface ChatRequest {

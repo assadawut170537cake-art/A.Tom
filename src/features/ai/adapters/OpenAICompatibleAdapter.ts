@@ -3,7 +3,24 @@ import { requestJson, requestSSE } from '../../../core/http/request';
 import { isRecord, parseJSON } from '../../../core/types/guards';
 import { BaseAIProvider } from '../core/ProviderInterface';
 import { parseOpenAIModels } from '../core/modelLists';
-import type { ChatRequest, ChatResponse, PartialTextListener } from '../core/types';
+import type { ChatMessage, ChatRequest, ChatResponse, PartialTextListener } from '../core/types';
+
+/** ข้อความที่มีไฟล์แนบ → content แบบ array (รูป = image_url · ไฟล์อื่น เช่น PDF = file) */
+function toOpenAIMessage(m: ChatMessage): Record<string, unknown> {
+  if (!m.attachments?.length) return { role: m.role, content: m.content };
+  return {
+    role: m.role,
+    content: [
+      { type: 'text', text: m.content },
+      ...m.attachments.map((a) => {
+        const url = `data:${a.mimeType};base64,${a.data}`;
+        return a.mimeType.startsWith('image/')
+          ? { type: 'image_url', image_url: { url } }
+          : { type: 'file', file: { filename: a.name, file_data: url } };
+      }),
+    ],
+  };
+}
 
 interface ChatCompletionResponse {
   model?: string;
@@ -26,7 +43,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
   private body(req: ChatRequest, stream: boolean): string {
     return JSON.stringify({
       model: req.model,
-      messages: req.messages,
+      messages: req.messages.map(toOpenAIMessage),
       temperature: req.temperature,
       max_tokens: req.maxTokens,
       ...(stream && { stream: true }),

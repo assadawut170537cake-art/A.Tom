@@ -92,8 +92,16 @@ jest.mock('expo-file-system', () => {
     async base64() {
       return 'UklGRg==';
     }
+    async copy() {}
   }
-  return { Paths: { cache: { uri: 'file:///cache' } }, File };
+  class Directory {
+    constructor(...parts) {
+      this.uri = parts.map((p) => p.uri ?? p).join('/');
+      this.exists = true;
+    }
+    create() {}
+  }
+  return { Paths: { cache: { uri: 'file:///cache' }, document: { uri: 'file:///docs' } }, File, Directory };
 });
 
 // expo-clipboard เป็น native module — test ตรวจแค่ว่าเรียกด้วยข้อความอะไร
@@ -101,3 +109,13 @@ jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true), 
 
 // expo/fetch (ใช้กับคำตอบแบบไหล) → ส่งต่อให้ global fetch ตอนเรียก เพื่อให้ mockFetch ของ test ดักได้
 jest.mock('expo/fetch', () => ({ fetch: (...args) => global.fetch(...args) }));
+
+// ตัวเลือกรูป/ไฟล์ — test กำหนดผลเองด้วย mockResolvedValueOnce
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+}));
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));

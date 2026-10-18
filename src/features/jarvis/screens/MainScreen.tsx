@@ -8,6 +8,7 @@ import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { MemoryScreen } from '../../memory/screens/MemoryScreen';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
+import { AttachmentStrip } from '../components/chat/AttachmentStrip';
 import { ChatInput } from '../components/chat/ChatInput';
 import { ChatLayer } from '../components/chat/ChatLayer';
 import { BackgroundGradient } from '../components/layout/BackgroundGradient';
@@ -108,9 +109,11 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
     else startLive();
   }, [live, startLive]);
 
+  const pending = useAtomStore((s) => s.pendingAttachments);
+  const removePending = useAtomStore((s) => s.removePendingAttachment);
   const onSend = useCallback((text: string) => {
     // sendMessage จับ error ทุกกรณีเองแล้วแสดงเป็นข้อความ ⚠️ ในแชท — ไม่ reject
-    void sendMessage(text);
+    void sendMessage(text, { attachments: useAtomStore.getState().takePendingAttachments() });
   }, []);
 
   const composerBottom = keyboardOverlap > 0 ? keyboardOverlap + GAP : COMPOSER_BOTTOM;
@@ -138,6 +141,11 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           <ApiKeyNotice onPress={() => navigation.navigate('AISettings')} />
         )}
         <LiveVoiceStatus state={live.state} color={persona.color} />
+        {pending.length > 0 && (
+          <View className="mb-2">
+            <AttachmentStrip attachments={pending} onRemove={removePending} />
+          </View>
+        )}
         <ChatInput
           ref={inputRef}
           onSend={onSend}
@@ -150,6 +158,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           placeholder={`พิมพ์ข้อความถึง${persona.name}…`}
           draft={draft}
           onDraftConsumed={consumeDraft}
+          hasAttachments={pending.length > 0}
           accentColor={persona.color}
         />
       </View>
@@ -169,7 +178,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
         />
       )}
       <TopSlot />
-      <AddSheet visible={addOpen} onClose={() => setAddOpen(false)} />
+      <AddSheet visible={addOpen} onClose={() => setAddOpen(false)} onAttached={focusInput} />
       <MessageActionSheet message={selected} onClose={() => setSelected(null)} busy={busy || live.active} />
     </>
   );
