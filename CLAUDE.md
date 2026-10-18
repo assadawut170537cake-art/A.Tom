@@ -286,7 +286,7 @@
 
 ### หลัง Phase 4.5
 9. ✅ Prettier config (A5) — `.prettierrc` + `.prettierignore` + scripts `format` / `format:check`
-   ✅ `prettier` อยู่ใน devDependencies แล้ว (Boss อนุมัติ 2026-10-18) · ยังไม่ได้ format ไฟล์ใด ๆ (ห้าม reformat ทั้ง repo โดยไม่บอก)
+   ✅ `prettier` อยู่ใน devDependencies แล้ว (Boss อนุมัติ 2026-10-18) · format เฉพาะไฟล์ .ts/.tsx/.js ที่งานนี้แตะ — ไฟล์อื่นยังไม่ได้ format (ห้าม `npm run format` ทั้ง repo โดยไม่บอก Boss)
 10. Module อื่นๆ — คู่มือสร้าง module: `src/modules/README.md` (B1)
 
 ### Nice to Have

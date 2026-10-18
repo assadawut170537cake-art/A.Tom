@@ -17,7 +17,7 @@
 - **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ
 - **Orb (A3):** variant ต่อ persona (อะตอมเหลี่ยมหยาบหมุนช้า · จาร์วิสเนียน · ไฟรเดย์คมหมุนเร็ว · อัลตรอนกระตุกพัลส์แรง) ผ่าน `setOrbPersona()`
 - **Theme (A4):** Atom `#d35400` → `#E67E22` · Ultron `#ff0033` → `#C0392B` (Boss อนุมัติ)
-- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency
+- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency (Boss อนุมัติ) · format เฉพาะไฟล์ที่งานนี้แตะ
 - **Docs (B1):** `src/modules/README.md` — คู่มือสร้าง module + `demo-module` ตัวอย่าง (ไม่ได้อยู่ในโค้ดแอป)
 
 ### Added
