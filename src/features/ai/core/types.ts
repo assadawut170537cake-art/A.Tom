@@ -16,9 +16,19 @@ export interface AIProviderConfig {
   purpose?: 'llm' | 'router';
 }
 
+/** ไฟล์แนบที่อ่านเป็น base64 แล้ว พร้อมส่งให้ provider */
+export interface AIAttachment {
+  mimeType: string;
+  /** base64 (ไม่มี prefix `data:`) */
+  data: string;
+  name: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** รูป/ไฟล์ของข้อความนี้ (เฉพาะข้อความล่าสุดของบอส — ข้อความเก่าส่งแค่ชื่อไฟล์) */
+  attachments?: AIAttachment[] | undefined;
 }
 
 export interface ChatRequest {
@@ -28,7 +38,12 @@ export interface ChatRequest {
   maxTokens?: number;
   /** Per-request timeout; adapters fall back to the HTTP default when omitted. */
   timeoutMs?: number | undefined;
+  /** ให้ provider ค้นเว็บประกอบคำตอบ (Gemini: Google Search · OpenRouter: web plugin) */
+  webSearch?: boolean | undefined;
 }
+
+/** ข้อความสะสมทั้งหมดจนถึงตอนนี้ (ไม่ใช่แค่ส่วนที่เพิ่ม) — '' = เริ่มใหม่ (provider ถัดไปใน fallback) */
+export type PartialTextListener = (text: string) => void;
 
 export interface ChatResponse {
   content: string;
@@ -50,4 +65,6 @@ export interface AIProvider {
    * ไม่มี = provider นี้ไม่มี endpoint รายชื่อโมเดล
    */
   listModels?(): Promise<string[]>;
+  /** ตอบแบบไหลทีละส่วน — ไม่มี = provider นี้ตอบได้แค่ทั้งก้อน (Orchestrator ใช้ chat() แทน) */
+  chatStream?(req: ChatRequest, onText: PartialTextListener): Promise<ChatResponse>;
 }

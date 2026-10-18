@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { LocalMemoryAdapter } from '../core/memory/LocalMemoryAdapter';
+import { MEMORY_SUGGESTION_INSTRUCTION } from '../core/memory/suggestions';
 import type { MemoryStore } from '../core/memory/types';
 import { loadModule } from '../modules/loader';
 import { ModuleRegistry, consoleLogger, moduleRegistry } from '../core/modules/ModuleRegistry';
@@ -416,8 +417,9 @@ describe('ChatHandler + shared memory', () => {
     await expect(chatCall()).resolves.toBe('PROMPT');
   });
 
-  test('empty memory → unchanged prompt', async () => {
-    await expect(chatCall(new LocalMemoryAdapter())).resolves.toBe('PROMPT');
+  test('empty memory → no facts block (only the suggestion instruction)', async () => {
+    // มี memory = สอนให้เสนอความจำเสมอ (ไม่มี fact ก็ตาม)
+    await expect(chatCall(new LocalMemoryAdapter())).resolves.toBe(`PROMPT\n\n${MEMORY_SUGGESTION_INSTRUCTION}`);
   });
 
   test('global + own persona facts are appended; other personas’ facts are not', async () => {
@@ -455,7 +457,7 @@ describe('ChatHandler + shared memory', () => {
       clear: jest.fn(),
       sync: jest.fn(),
     };
-    await expect(chatCall(broken)).resolves.toBe('PROMPT');
+    await expect(chatCall(broken)).resolves.toBe(`PROMPT\n\n${MEMORY_SUGGESTION_INSTRUCTION}`);
     expect(errorSpy).toHaveBeenCalledWith('[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ', expect.any(Error));
   });
 });

@@ -1,12 +1,30 @@
 import { ProviderError } from '../../../core/http/errors';
-import { requestJson } from '../../../core/http/request';
+import { requestJson, requestSSE } from '../../../core/http/request';
+import { isRecord, parseJSON } from '../../../core/types/guards';
 import { BaseAIProvider } from '../core/ProviderInterface';
 import { parseOpenAIModels } from '../core/modelLists';
-import type { ChatRequest, ChatResponse } from '../core/types';
+import type { ChatMessage, ChatRequest, ChatResponse, PartialTextListener } from '../core/types';
+
+/** ข้อความที่มีไฟล์แนบ → content แบบ array (รูป = image_url · ไฟล์อื่น เช่น PDF = file) */
+function toOpenAIMessage(m: ChatMessage): Record<string, unknown> {
+  if (!m.attachments?.length) return { role: m.role, content: m.content };
+  return {
+    role: m.role,
+    content: [
+      { type: 'text', text: m.content },
+      ...m.attachments.map((a) => {
+        const url = `data:${a.mimeType};base64,${a.data}`;
+        return a.mimeType.startsWith('image/')
+          ? { type: 'image_url', image_url: { url } }
+          : { type: 'file', file: { filename: a.name, file_data: url } };
+      }),
+    ],
+  };
+}
 
 interface ChatCompletionResponse {
   model?: string;
-  choices?: { message?: { content?: string | null } }[];
+  choices?: { message?: { content?: string | null }; delta?: { content?: string | null } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
@@ -15,6 +33,22 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
   /** Extra headers on every request (e.g. OpenRouter attribution). */
   protected extraHeaders(): Record<string, string> {
     return {};
+  }
+
+  /** field เพิ่มใน body ของ /chat/completions (เช่น web plugin ของ OpenRouter) */
+  protected extraBody(_req: ChatRequest): Record<string, unknown> {
+    return {};
+  }
+
+  private body(req: ChatRequest, stream: boolean): string {
+    return JSON.stringify({
+      model: req.model,
+      messages: req.messages.map(toOpenAIMessage),
+      temperature: req.temperature,
+      max_tokens: req.maxTokens,
+      ...(stream && { stream: true }),
+      ...this.extraBody(req),
+    });
   }
 
   protected async headers(): Promise<Record<string, string>> {
@@ -33,12 +67,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
         method: 'POST',
         headers: await this.headers(),
         timeoutMs: req.timeoutMs,
-        body: JSON.stringify({
-          model: req.model,
-          messages: req.messages,
-          temperature: req.temperature,
-          max_tokens: req.maxTokens,
-        }),
+        body: this.body(req, false),
       }
     );
 
@@ -53,6 +82,39 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
       tokensUsed: data.usage
         ? { input: data.usage.prompt_tokens ?? 0, output: data.usage.completion_tokens ?? 0 }
         : undefined,
+    };
+  }
+
+  /** `stream: true` → SSE ที่แต่ละ event มี choices[0].delta.content */
+  async chatStream(req: ChatRequest, onText: PartialTextListener): Promise<ChatResponse> {
+    let text = '';
+    let model: string | undefined;
+    let usage: ChatCompletionResponse['usage'];
+    await requestSSE(
+      this.config.id,
+      this.url('/chat/completions'),
+      { method: 'POST', headers: await this.headers(), timeoutMs: req.timeoutMs, body: this.body(req, true) },
+      (data) => {
+        // Cast: รูปแบบตามมาตรฐาน OpenAI — ทุก field อ่านแบบ optional
+        const event = parseJSON(data, isRecord) as ChatCompletionResponse | null;
+        if (!event) return;
+        model ??= event.model;
+        usage = event.usage ?? usage;
+        // server ที่ไม่ยอม stream ตอบเป็น message ทั้งก้อน — รับได้เหมือนกัน
+        const choice = event.choices?.[0];
+        const delta = choice?.delta?.content ?? choice?.message?.content ?? '';
+        if (delta) {
+          text += delta;
+          onText(text);
+        }
+      }
+    );
+    if (!text) throw new ProviderError(this.config.id, 'invalid_response', 'ไม่มีข้อความในคำตอบ');
+    return {
+      content: text,
+      model: model ?? req.model,
+      providerId: this.config.id,
+      tokensUsed: usage ? { input: usage.prompt_tokens ?? 0, output: usage.completion_tokens ?? 0 } : undefined,
     };
   }
 

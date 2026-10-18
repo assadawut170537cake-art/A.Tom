@@ -7,14 +7,16 @@ import Animated, {
 
 import { ANIMATION, LAYOUT } from '../../constants';
 import { useAtomStore } from '../../stores/useAtomStore';
+import type { Message } from '../../types';
 import { ChatList } from './ChatList';
 
 interface ChatLayerProps {
   /** ระยะขอบล่างของรายการแชท — MainScreen ดันขึ้นเมื่อช่องพิมพ์สูงขึ้นหรือคีย์บอร์ดเปิด */
   bottom?: number;
+  onMessageLongPress?: ((message: Message) => void) | undefined;
 }
 
-export function ChatLayer({ bottom = LAYOUT.chat.bottomPadding }: ChatLayerProps) {
+export function ChatLayer({ bottom = LAYOUT.chat.bottomPadding, onMessageLongPress }: ChatLayerProps) {
   const isConversation = useAtomStore((s) => s.uiMode === 'conversation');
   const progress = useSharedValue(isConversation ? 1 : 0);
 
@@ -42,7 +44,7 @@ export function ChatLayer({ bottom = LAYOUT.chat.bottomPadding }: ChatLayerProps
         style,
       ]}
     >
-      <ChatList />
+      <ChatList onMessageLongPress={onMessageLongPress} />
     </Animated.View>
   );
 }

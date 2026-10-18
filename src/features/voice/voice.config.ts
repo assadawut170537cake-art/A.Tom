@@ -31,7 +31,7 @@ export const TTS_PROVIDERS: VoiceProviderMeta<TTSProviderId>[] = [
 ];
 
 export const STT_PROVIDERS: VoiceProviderMeta<STTProviderId>[] = [
-  { id: 'expo', name: 'Expo Speech Recognition', requiresKey: false, isDefault: true },
+  { id: 'expo', name: 'ถอดเสียงในเครื่อง', requiresKey: false, isDefault: true },
   { id: 'whisper', name: 'OpenAI Whisper', requiresKey: true },
   { id: 'deepgram', name: 'Deepgram', requiresKey: true },
   { id: 'google', name: 'Google Cloud STT', requiresKey: true },

@@ -73,7 +73,8 @@ describe('Voice settings screen — layout', () => {
     // 9 + 8 toggles (Azure appears in both sections)
     for (const p of TTS_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
     for (const p of STT_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('switch')).toHaveLength(17);
+    // + สวิตช์ "พูดแทรกได้" ของโหมดคุยด้วยเสียง
+    expect(screen.getAllByRole('switch')).toHaveLength(18);
     // keyless on-device providers don't ask for a key: 8 TTS + 7 STT key fields
     expect(screen.getAllByLabelText('API key')).toHaveLength(15);
     // Gemini TTS can share the Gemini LLM key — its field says so
@@ -105,7 +106,7 @@ describe('Voice settings screen — layout', () => {
       'Amazon Polly', 'Custom (OpenAI-compatible)',
     ]);
     expect(order.slice(9)).toEqual([
-      'Deepgram', 'Expo Speech Recognition', 'OpenAI Whisper', 'Google Cloud STT', 'Azure Speech', 'AssemblyAI',
+      'Deepgram', 'ถอดเสียงในเครื่อง', 'OpenAI Whisper', 'Google Cloud STT', 'Azure Speech', 'AssemblyAI',
       'Rev AI', 'Custom',
     ]);
   });
@@ -206,7 +207,7 @@ describe('Voice settings screen — interactions', () => {
       expect((await ProviderSettings.getVoicePriority('tts')).slice(0, 2)).toEqual(['gemini', 'expo'])
     );
 
-    await fireEvent.press(screen.getByLabelText('เลื่อน Expo Speech Recognition ลง'));
+    await fireEvent.press(screen.getByLabelText('เลื่อน ถอดเสียงในเครื่อง ลง'));
     await waitFor(async () =>
       expect((await ProviderSettings.getVoicePriority('stt')).slice(0, 2)).toEqual(['whisper', 'expo'])
     );

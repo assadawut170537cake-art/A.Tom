@@ -81,6 +81,8 @@ export interface AgentRunInput {
   systemPrompt?: string | undefined;
   /** persona ที่คุยอยู่ — ใช้เลือก memory facts (global + persona นี้) */
   persona?: Persona | undefined;
+  /** บทสนทนาก่อนหน้า (ไม่รวมข้อความนี้) — ให้ agent ตอบต่อเนื่องได้เหมือนแชทปกติ */
+  history?: readonly AgentMessage[] | undefined;
 }
 
 export interface AgentRunResult {

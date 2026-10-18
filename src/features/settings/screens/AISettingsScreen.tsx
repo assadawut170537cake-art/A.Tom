@@ -101,6 +101,24 @@ function AdvancedSection() {
         value={adv.fallback}
         onChange={(fallback) => patch({ fallback })}
       />
+      <ProviderToggle
+        label="คำตอบแบบไหล"
+        subtitle="แสดงคำตอบทีละส่วนระหว่างที่ AI ยังพิมพ์ไม่จบ"
+        value={adv.streaming}
+        onChange={(streaming) => patch({ streaming })}
+      />
+      <ProviderToggle
+        label="ค้นเว็บด้วย Gemini"
+        subtitle="ให้ Gemini ค้น Google เพื่อตอบข่าว ราคา อากาศ ฯลฯ (ใช้โควตาฟรีของ Gemini)"
+        value={adv.webSearch}
+        onChange={(webSearch) => patch({ webSearch })}
+      />
+      <ProviderToggle
+        label="ค้นเว็บด้วย OpenRouter"
+        subtitle="ใช้ web plugin ของ OpenRouter — คิดเงินเพิ่มทุกครั้งที่ตอบ"
+        value={adv.webSearchPaid}
+        onChange={(webSearchPaid) => patch({ webSearchPaid })}
+      />
     </Card>
   );
 }

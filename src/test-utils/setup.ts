@@ -43,6 +43,8 @@ export async function setAIKeys(ids: ('gemini' | 'openrouter' | 'jev')[]) {
 export function resetStore() {
   useAtomStore.setState({
     messagesByPersona: { 1: [], 2: [], 3: [], 4: [] },
+    archivesByPersona: { 1: [], 2: [], 3: [], 4: [] },
+    composerDraft: null,
     uiMode: 'idle',
     mood: 'idle',
   });

@@ -92,6 +92,68 @@ jest.mock('expo-file-system', () => {
     async base64() {
       return 'UklGRg==';
     }
+    async copy() {}
   }
-  return { Paths: { cache: { uri: 'file:///cache' } }, File };
+  class Directory {
+    constructor(...parts) {
+      this.uri = parts.map((p) => p.uri ?? p).join('/');
+      this.exists = true;
+    }
+    create() {}
+  }
+  return { Paths: { cache: { uri: 'file:///cache' }, document: { uri: 'file:///docs' } }, File, Directory };
 });
+
+// expo-clipboard เป็น native module — test ตรวจแค่ว่าเรียกด้วยข้อความอะไร
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true), getStringAsync: jest.fn(async () => '') }));
+
+// expo/fetch (ใช้กับคำตอบแบบไหล) → ส่งต่อให้ global fetch ตอนเรียก เพื่อให้ mockFetch ของ test ดักได้
+jest.mock('expo/fetch', () => ({ fetch: (...args) => global.fetch(...args) }));
+
+// ตัวเลือกรูป/ไฟล์ — test กำหนดผลเองด้วย mockResolvedValueOnce
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true })),
+}));
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+}));
+
+// แจ้งเตือน / ปฏิทิน / รายชื่อ — native ทั้งหมด · ค่าเริ่มต้น = ได้สิทธิ์ ไม่มีข้อมูล
+jest.mock('expo-notifications', () => ({
+  AndroidImportance: { HIGH: 6 },
+  SchedulableTriggerInputTypes: { DATE: 'date' },
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => null),
+  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  scheduleNotificationAsync: jest.fn(async () => 'notif-1'),
+  cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+}));
+jest.mock('expo-calendar/legacy', () => ({
+  EntityTypes: { EVENT: 'event' },
+  getCalendarPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestCalendarPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getCalendarsAsync: jest.fn(async () => []),
+  getEventsAsync: jest.fn(async () => []),
+  createEventAsync: jest.fn(async () => 'event-1'),
+}));
+jest.mock('expo-contacts/legacy', () => ({
+  Fields: { Name: 'name', PhoneNumbers: 'phoneNumbers', Emails: 'emails' },
+  getPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+  getContactsAsync: jest.fn(async () => ({ data: [] })),
+}));
+
+// ถอดเสียงในเครื่อง — ค่าเริ่มต้น "ไม่มีบริการ" ให้ test เดิม (อัดไฟล์ + STT คลาวด์) ทำงานเหมือนเดิม
+jest.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: {
+    isRecognitionAvailable: jest.fn(() => false),
+    requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    start: jest.fn(),
+    stop: jest.fn(),
+    abort: jest.fn(),
+  },
+}));

@@ -1,4 +1,5 @@
-import type { ChatMessage } from '../../ai/core/types';
+import type { AIAttachment, ChatMessage } from '../../ai/core/types';
+import type { MemorySuggestion } from '../../../core/types/message';
 import type { Persona } from '../../../core/types/persona';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
@@ -20,11 +21,15 @@ export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
+  /** รูป/ไฟล์ที่แนบมากับข้อความนี้ — มี = ส่งเข้าแชทเสมอ (คำสั่งอื่นอ่านไฟล์ไม่ได้) */
+  attachments?: AIAttachment[] | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];
     /** Full role-tagged history for the active persona, used by ChatHandler. */
     history?: ChatMessage[];
+    /** คำตอบครึ่งทางระหว่างที่ AI ยังตอบไม่จบ (ChatHandler ส่งต่อให้ Orchestrator) */
+    onPartial?: ((text: string) => void) | undefined;
   };
 }
 
@@ -64,6 +69,8 @@ export interface HandlerResult {
   persona: Persona;
   /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
   agentScreen?: { agentId: string } | undefined;
+  /** ความจำที่ AI เสนอ (มีเฉพาะผลจาก ChatHandler ที่มี memory) — รอบอสยืนยันก่อนบันทึก */
+  memorySuggestions?: MemorySuggestion[] | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

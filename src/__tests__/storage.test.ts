@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ChatHistoryStorage, historyKey } from '../core/storage/ChatHistoryStorage';
 import { readJSON, writeJSON } from '../core/storage/jsonStorage';
-import type { ProviderSettingsStore } from '../core/storage/ProviderSettings';
+import { DEFAULT_ADVANCED, type ProviderSettingsStore } from '../core/storage/ProviderSettings';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import type { Persona } from '../features/jarvis/types';
 import { isArrayOf, isRecord, isString, parseJSON } from '../core/types/guards';
@@ -108,7 +108,7 @@ describe('ProviderSettings: corrupt / unreadable storage', () => {
     expect(await settings.getTTSFor(1)).toBeUndefined();
     expect(await settings.getSameVoiceForAll()).toBe(false);
     expect(await settings.getSTT()).toBeUndefined();
-    expect(await settings.getAdvanced()).toEqual({ timeoutMs: 30_000, retries: 0, fallback: true });
+    expect(await settings.getAdvanced()).toEqual(DEFAULT_ADVANCED);
     expect(await settings.getVoiceEnabled('tts', 'openai')).toBe(true);
     expect(await settings.getVoicePriority('stt')).toEqual([]);
     expect(await settings.getOption('tts.azure', 'region')).toBeUndefined();
@@ -129,7 +129,7 @@ describe('ProviderSettings: corrupt / unreadable storage', () => {
       SETTINGS_KEY,
       JSON.stringify({ advanced: { retries: 2 }, voicePriority: { tts: ['google'] } })
     );
-    expect(await settings.getAdvanced()).toEqual({ timeoutMs: 30_000, retries: 2, fallback: true });
+    expect(await settings.getAdvanced()).toEqual({ ...DEFAULT_ADVANCED, retries: 2 });
     expect(await settings.getVoicePriority('tts')).toEqual(['google']);
     expect(await settings.getVoicePriority('stt')).toEqual([]);
     expect(errorSpy).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('ProviderSettings: corrupt / unreadable storage', () => {
   test('read failure → in-memory defaults, flagged not persistent, app keeps working', async () => {
     const { settings, storage } = freshSettings();
     jest.mocked(storage.getItem).mockRejectedValueOnce(new Error('SQLITE_IOERR'));
-    expect(await settings.getAdvanced()).toEqual({ timeoutMs: 30_000, retries: 0, fallback: true });
+    expect(await settings.getAdvanced()).toEqual(DEFAULT_ADVANCED);
     expect(settings.isPersistent()).toBe(false);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[settings] อ่านการตั้งค่าไม่ได้'), expect.any(Error));
 

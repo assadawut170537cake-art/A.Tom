@@ -24,6 +24,7 @@ import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
+import { registerAssistantAgents } from './modules/agents/assistant-agents';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { loadBootModules } from './modules/loader';
@@ -68,6 +69,7 @@ export function bootApp(): Promise<BootReport> {
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();
+  registerAssistantAgents();
   return (started ??= startServices());
 }
 

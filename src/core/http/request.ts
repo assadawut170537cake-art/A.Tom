@@ -17,6 +17,8 @@
  * @see ../../../docs/DECISIONS.md — ADR-001 (fetch ตรง ไม่ใช้ SDK)
  */
 
+import { fetch as expoFetch } from 'expo/fetch';
+
 import { isRecord, parseJSON } from '../types/guards';
 import { ProviderError, describeKind, kindForStatus, redactSecrets } from './errors';
 
@@ -53,19 +55,118 @@ export async function request(
   }
 
   if (!res.ok) {
-    // Reading the body consumes it; accepted error statuses are only used by key probes
-    const { detail, raw } = await readErrorDetail(res);
-    // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
-    const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
-    if (kind !== 'auth' && acceptStatus?.includes(res.status)) return res;
-    throw new ProviderError(
-      providerId,
-      kind,
-      `HTTP ${res.status}: ${describeKind(kind)}${detail ? ` — ${detail}` : ''}`,
-      res.status
-    );
+    const err = await errorForResponse(providerId, res, acceptStatus);
+    if (err) throw err;
   }
   return res;
+}
+
+/** HTTP error → ProviderError (null = status อยู่ใน acceptStatus ให้ถือว่าสำเร็จ) */
+async function errorForResponse(
+  providerId: string,
+  res: Response,
+  acceptStatus?: number[]
+): Promise<ProviderError | null> {
+  // Reading the body consumes it; accepted error statuses are only used by key probes
+  const { detail, raw } = await readErrorDetail(res);
+  // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
+  const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
+  if (kind !== 'auth' && acceptStatus?.includes(res.status)) return null;
+  return new ProviderError(
+    providerId,
+    kind,
+    `HTTP ${res.status}: ${describeKind(kind)}${detail ? ` — ${detail}` : ''}`,
+    res.status
+  );
+}
+
+/**
+ * fetch ที่อ่าน body เป็น stream ได้: fetch ของ React Native (XHR) รอจนได้ body ครบก่อน
+ * ส่วน `expo/fetch` ส่ง chunk ระหว่างทาง — ใช้กับคำตอบแบบไหล (SSE) เท่านั้น
+ */
+// Cast: expo/fetch ใช้ type ของตัวเอง (FetchRequestInit/FetchResponse) แต่รูปแบบตรงกับ WHATWG fetch ที่ใช้ที่นี่
+const streamingFetch = expoFetch as unknown as typeof fetch;
+
+/**
+ * POST แล้วอ่านคำตอบแบบ Server-Sent Events — เรียก `onData` ทีละ `data:` (ไม่รวม `[DONE]`)
+ * timeout นับแบบ "เงียบนานเกิน" (รีเซ็ตทุก chunk) เพราะคำตอบยาว ๆ ไหลนานกว่า timeout ปกติได้
+ * error mapping เหมือน `request()` ทุกอย่าง
+ */
+export async function requestSSE(
+  providerId: string,
+  url: string,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, acceptStatus: _ignored, ...init }: RequestOptions,
+  onData: (data: string) => void
+): Promise<void> {
+  const controller = new AbortController();
+  let timer = setTimeout(() => controller.abort(), timeoutMs);
+  const touch = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  };
+  const timeoutError = () => new ProviderError(providerId, 'timeout', `หมดเวลา (${timeoutMs / 1000}s)`);
+
+  try {
+    let res: Response;
+    try {
+      res = await streamingFetch(url, { ...init, signal: controller.signal });
+    } catch (e) {
+      if (controller.signal.aborted) throw timeoutError();
+      const reason = e instanceof Error ? e.message : String(e);
+      throw new ProviderError(providerId, 'network', `เชื่อมต่อเครือข่ายไม่ได้ (${redactSecrets(reason)})`);
+    }
+    if (!res.ok) throw (await errorForResponse(providerId, res)) ?? new ProviderError(providerId, 'server', `HTTP ${res.status}`);
+
+    let buffer = '';
+    let sawEvent = false;
+    const flush = (final: boolean) => {
+      // ตอบกลับเป็น JSON ธรรมดา (server/proxy ไม่ส่ง SSE) → ส่งทั้งก้อนเป็น event เดียว
+      if (final && !sawEvent && /^\s*[[{]/.test(buffer)) {
+        const whole = buffer.trim();
+        buffer = '';
+        if (whole) onData(whole);
+        return;
+      }
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = final ? '' : (events.pop() ?? '');
+      for (const event of events) {
+        const data = event
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trimStart())
+          .join('\n');
+        if (data) sawEvent = true;
+        if (data && data !== '[DONE]') onData(data);
+      }
+    };
+
+    const reader = res.body?.getReader();
+    if (!reader) {
+      // runtime ที่ไม่มี stream (เช่น test) — อ่านทั้งก้อนแล้วแยก event เหมือนกัน
+      buffer = await res.text();
+      flush(true);
+      return;
+    }
+    const decoder = new TextDecoder();
+    for (;;) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (e) {
+        if (controller.signal.aborted) throw timeoutError();
+        const reason = e instanceof Error ? e.message : String(e);
+        throw new ProviderError(providerId, 'network', `การเชื่อมต่อหลุดระหว่างรับคำตอบ (${redactSecrets(reason)})`);
+      }
+      if (chunk.done) break;
+      touch();
+      buffer += decoder.decode(chunk.value, { stream: true });
+      flush(false);
+    }
+    buffer += decoder.decode();
+    flush(true);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function requestJson<T>(

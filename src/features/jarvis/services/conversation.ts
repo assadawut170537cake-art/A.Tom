@@ -1,15 +1,73 @@
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
+import { localMemory } from '../../../core/memory/LocalMemoryAdapter';
+import { stripMemoryMarkers } from '../../../core/memory/suggestions';
 import { isOffline } from '../../../core/network/connectivity';
+import type { Attachment } from '../../../core/types/message';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { aiOrchestrator } from '../../ai/core/Orchestrator';
-import type { ChatMessage } from '../../ai/core/types';
+import type { AIAttachment, ChatMessage } from '../../ai/core/types';
 import { getAppRouter } from '../../router/appRouter';
 import type { RouterOutput } from '../../router/core/types';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { useAtomStore } from '../stores/useAtomStore';
+import type { Message, Persona } from '../types';
+import { stripMarkdown } from '../utils/markdown';
+import { AttachmentError, describeAttachments, toAIAttachment } from './attachments';
 
 /** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
 let activeTurn = 0;
+
+/** อัปเดตข้อความที่กำลังไหลไม่ถี่กว่านี้ (ms) — ทุก token = re-render รายการแชททุกครั้ง */
+const STREAM_UPDATE_MS = 60;
+
+/**
+ * แสดงคำตอบครึ่งทางเป็นข้อความของผู้ช่วยที่ค่อย ๆ ยาวขึ้น (ยังไม่บันทึกจนตอบจบ)
+ * `''` = provider ถัดไปเริ่มใหม่ → ลบข้อความครึ่งทางของตัวที่ล้ม
+ */
+function createStreamView(persona: Persona, isLatest: () => boolean) {
+  let id: string | null = null;
+  let pending = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const store = () => useAtomStore.getState();
+
+  const flush = () => {
+    timer = null;
+    if (id) store().updateMessage(persona, id, pending, { save: false });
+  };
+
+  return {
+    onPartial(raw: string) {
+      if (!isLatest()) return;
+      // มาร์กเกอร์ [[จำ: …]] ไม่แสดงระหว่างไหล (ChatHandler ตัดออกจากคำตอบจริงอยู่แล้ว)
+      const text = raw ? stripMemoryMarkers(raw) : '';
+      if (raw && !text) return;
+      if (!text) {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        if (id) store().removeMessage(persona, id);
+        id = null;
+        store().setStreamingId(null);
+        return;
+      }
+      pending = text;
+      if (!id) {
+        id = store().pushMessage({ role: 'assistant', content: text, persona }).id;
+        store().setStreamingId(id);
+      } else if (!timer) {
+        timer = setTimeout(flush, STREAM_UPDATE_MS);
+      }
+    },
+    /** จบรอบ: คืน id ข้อความครึ่งทาง (null = ไม่ได้ไหล) แล้วหยุดอัปเดต */
+    finish(): string | null {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      if (store().streamingId === id) store().setStreamingId(null);
+      const done = id;
+      id = null;
+      return done;
+    },
+  };
+}
 
 interface SendResult {
   route: RouterOutput | null;
@@ -31,36 +89,67 @@ interface SendOptions {
    * ใช้ให้โหมดไลฟ์รู้ว่าเข้าช่วง "กำลังพูด" แล้วด้วย
    */
   onSpeaking?: () => boolean;
+  /** รูป/ไฟล์ที่แนบมากับข้อความนี้ */
+  attachments?: Attachment[] | undefined;
 }
+
+/** ข้อความที่ส่งให้ AI เมื่อบอสส่งแต่ไฟล์ไม่พิมพ์อะไร */
+const ATTACHMENT_ONLY_PROMPT = 'ช่วยดูไฟล์ที่แนบมาให้หน่อย';
 
 export async function sendMessage(text: string, opts: SendOptions = {}): Promise<SendResult> {
   const content = text.trim();
-  if (!content) return { route: null, reply: '' };
+  const attachments = opts.attachments ?? [];
+  if (!content && !attachments.length) return { route: null, reply: '' };
 
   const store = useAtomStore.getState();
   const persona = store.activePersona;
+  // ข้อความเก่าที่มีไฟล์แนบ: ส่งแค่ชื่อไฟล์ (ส่งไฟล์ซ้ำทุกรอบเปลือง token)
   const history: ChatMessage[] = store.messagesByPersona[persona]
     .filter((m) => m.role !== 'system')
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m) => ({ role: m.role, content: [m.content, describeAttachments(m.attachments)].filter(Boolean).join('\n') }));
 
   const turn = ++activeTurn;
   const isLatest = () => turn === activeTurn;
-  store.pushMessage({ role: 'user', content, persona });
+  const stream = createStreamView(persona, isLatest);
+  store.pushMessage({ role: 'user', content, persona, attachments });
   store.setUIMode('conversation');
   store.setMood('thinking');
 
   try {
+    let aiAttachments: AIAttachment[] = [];
+    try {
+      aiAttachments = await Promise.all(attachments.map(toAIAttachment));
+    } catch (e) {
+      const message = e instanceof AttachmentError ? e.message : 'อ่านไฟล์แนบไม่ได้ — แนบใหม่อีกครั้ง';
+      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${message}`, persona });
+      return { route: null, reply: '', error: message };
+    }
     // router ของแอป: ChatHandler มี Shared Memory (facts ถูกแนบใน system prompt)
     const { route, result } = await getAppRouter().handle({
-      text: content,
+      text: content || ATTACHMENT_ONLY_PROMPT,
+      ...(aiAttachments.length && { attachments: aiAttachments }),
       context: {
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),
         history,
+        onPartial: stream.onPartial,
       },
     });
-    // A switch moves the reply (the new persona's greeting) into the new persona's history
-    useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    const partialId = stream.finish();
+    if (partialId && result.persona === persona) {
+      // ข้อความที่ไหลมาแล้วกลายเป็นคำตอบจริง (แทนด้วยฉบับเต็ม เช่นมีแหล่งข้อมูลต่อท้าย) แล้วบันทึก
+      useAtomStore.getState().updateMessage(persona, partialId, result.reply, { save: !result.memorySuggestions });
+      if (result.memorySuggestions) useAtomStore.getState().setMemorySuggestions(persona, partialId, result.memorySuggestions);
+    } else {
+      if (partialId) useAtomStore.getState().removeMessage(persona, partialId);
+      // A switch moves the reply (the new persona's greeting) into the new persona's history
+      useAtomStore.getState().pushMessage({
+        role: 'assistant',
+        content: result.reply,
+        persona: result.persona,
+        memorySuggestions: result.memorySuggestions,
+      });
+    }
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);
     // Keys rejected along the way (e.g. Gemini 401 while OpenRouter answered) still need fixing
@@ -70,7 +159,7 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
 
     if (opts.speak !== false && result.reply && (opts.onSpeaking?.() ?? true)) {
       if (isLatest()) useAtomStore.getState().setMood('speaking');
-      await voiceOrchestrator.speak(result.reply, result.persona).catch(() => {
+      await voiceOrchestrator.speak(stripMarkdown(result.reply), result.persona).catch(() => {
         // Speech is best-effort; the text reply is already on screen
       });
     }
@@ -78,6 +167,8 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       ? { route, reply: result.reply, agentScreen: result.agentScreen }
       : { route, reply: result.reply };
   } catch (e) {
+    const partialId = stream.finish();
+    if (partialId) useAtomStore.getState().removeMessage(persona, partialId);
     aiOrchestrator.takeNotices(); // already listed in the aggregated error below
     const err = toProviderError('conversation', e);
     const error = redactSecrets(err.message);
@@ -90,4 +181,59 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     // An older turn finishing must not reset the mood of a newer one still in flight
     if (isLatest()) useAtomStore.getState().setMood('idle');
   }
+}
+
+/** ข้อความของบอสที่ทำให้เกิดคำตอบนี้ (ข้อความ user ล่าสุดก่อนหน้า) */
+function promptOf(message: Message): Message | undefined {
+  const list = useAtomStore.getState().messagesByPersona[message.persona];
+  const index = list.findIndex((m) => m.id === message.id);
+  for (let i = index; i >= 0; i--) {
+    const m = list[i];
+    if (m?.role === 'user') return m;
+  }
+  return undefined;
+}
+
+/** ตอบใหม่: ลบตั้งแต่คำถามของคำตอบนี้ แล้วส่งคำถามเดิมอีกรอบ (ประวัติที่ส่งให้ AI จึงไม่มีคำตอบเก่า) */
+export async function regenerate(message: Message): Promise<SendResult | null> {
+  const prompt = promptOf(message);
+  if (!prompt) return null;
+  useAtomStore.getState().truncateFrom(prompt.persona, prompt.id);
+  return sendMessage(prompt.content, { attachments: prompt.attachments });
+}
+
+/** แก้ข้อความของบอส: ลบข้อความนั้นและที่ตามมา แล้วใส่ข้อความเดิมกลับในช่องพิมพ์ */
+export function editMessage(message: Message): void {
+  const store = useAtomStore.getState();
+  store.truncateFrom(message.persona, message.id);
+  store.setComposerDraft(message.content);
+  message.attachments?.forEach((a) => store.addPendingAttachment(a));
+}
+
+/** อ่านข้อความนี้ออกเสียงอีกครั้งด้วยเสียงของ persona เจ้าของข้อความ */
+export function speakMessage(message: Message): void {
+  void voiceOrchestrator.speak(stripMarkdown(message.content), message.persona).catch(() => undefined);
+}
+
+/** บอสกด "จำ" — บันทึกลง Shared Memory (global) แล้วเอาข้อเสนอออกจากข้อความ */
+export async function acceptMemorySuggestion(message: Message, key: string): Promise<boolean> {
+  const suggestion = message.memorySuggestions?.find((s) => s.key === key);
+  if (!suggestion) return false;
+  try {
+    await localMemory.save({ scope: 'global' }, suggestion.key, suggestion.value, 'assistant');
+  } catch (e) {
+    console.error('[memory] บันทึกความจำที่ผู้ช่วยเสนอไม่ได้', e);
+    return false;
+  }
+  dismissMemorySuggestion(message, key);
+  return true;
+}
+
+/** บอสกด "ไม่ต้อง" — ทิ้งข้อเสนอ (ไม่บันทึก) */
+export function dismissMemorySuggestion(message: Message, key: string): void {
+  const store = useAtomStore.getState();
+  // อ่านจาก store (ไม่ใช่ prop) — กดสองข้อติดกันเร็ว ๆ ต้องไม่ได้รายการเก่ากลับมา
+  const current = store.messagesByPersona[message.persona].find((m) => m.id === message.id);
+  const rest = (current?.memorySuggestions ?? []).filter((s) => s.key !== key);
+  store.setMemorySuggestions(message.persona, message.id, rest);
 }

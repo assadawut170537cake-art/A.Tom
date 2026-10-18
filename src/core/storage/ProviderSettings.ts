@@ -46,9 +46,22 @@ export interface AdvancedSettings {
   retries: number;
   /** Try the next provider in priority order when one fails. */
   fallback: boolean;
+  /** แสดงคำตอบทีละส่วนระหว่างที่ AI ยังตอบไม่จบ */
+  streaming: boolean;
+  /** ให้ Gemini ค้น Google ประกอบคำตอบ (โควตาฟรีของ Gemini) */
+  webSearch: boolean;
+  /** ให้ OpenRouter ค้นเว็บด้วย (web plugin — คิดเงินเพิ่มต่อครั้ง) */
+  webSearchPaid: boolean;
 }
 
-export const DEFAULT_ADVANCED: AdvancedSettings = { timeoutMs: 30_000, retries: 0, fallback: true };
+export const DEFAULT_ADVANCED: AdvancedSettings = {
+  timeoutMs: 30_000,
+  retries: 0,
+  fallback: true,
+  streaming: true,
+  webSearch: true,
+  webSearchPaid: false,
+};
 
 export type VoiceKind = 'tts' | 'stt';
 
@@ -139,7 +152,10 @@ const FIELD_GUARDS: { [K in keyof StoredSettings]: Guard<StoredSettings[K]> } = 
     isRecord(v) &&
     optional(isNumber)(v.timeoutMs) &&
     optional(isNumber)(v.retries) &&
-    optional(isBoolean)(v.fallback),
+    optional(isBoolean)(v.fallback) &&
+    optional(isBoolean)(v.streaming) &&
+    optional(isBoolean)(v.webSearch) &&
+    optional(isBoolean)(v.webSearchPaid),
   voiceEnabled: (v): v is StoredSettings['voiceEnabled'] =>
     isRecord(v) && optional(recordOf(isBoolean))(v.tts) && optional(recordOf(isBoolean))(v.stt),
   voicePriority: (v): v is StoredSettings['voicePriority'] =>

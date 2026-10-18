@@ -2,6 +2,7 @@
   "expo": {
     "name": "A.T.O.M.",
     "slug": "atom",
+    "scheme": "atom",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,9 +33,39 @@
           "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "อนุญาตให้ $(PRODUCT_NAME) เลือกรูปเพื่อส่งให้ผู้ช่วยดู",
+          "cameraPermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้กล้องถ่ายรูปเพื่อส่งให้ผู้ช่วยดู",
+          "microphonePermission": false
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "อนุญาตให้ $(PRODUCT_NAME) ดูและเพิ่มนัดในปฏิทินตามที่บอสสั่ง",
+          "remindersPermission": false
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "อนุญาตให้ $(PRODUCT_NAME) ค้นรายชื่อเพื่อโทรหรือส่งข้อความตามที่บอสสั่ง"
+        }
+      ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
-      "./plugins/withAndroidProjectName"
+      "./plugins/withAndroidProjectName",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
+          "speechRecognitionPermission": "อนุญาตให้ $(PRODUCT_NAME) แปลงเสียงพูดเป็นข้อความ"
+        }
+      ],
+      "./plugins/withAssistantEntry"
     ]
   }
 }

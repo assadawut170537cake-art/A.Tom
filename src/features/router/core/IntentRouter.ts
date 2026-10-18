@@ -83,7 +83,7 @@ export class IntentRouter {
 
   async route(input: RouterInput): Promise<RouterOutput> {
     const text = input.text.trim();
-    if (!text) return DEFAULT_ROUTE;
+    if (!text || input.attachments?.length) return DEFAULT_ROUTE;
 
     const byRule = this.rule.check(text);
     if (byRule) return byRule;

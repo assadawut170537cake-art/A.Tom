@@ -1,9 +1,14 @@
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
+
 import { ProviderError } from '../core/http/errors';
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
 import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
+import { nativeListenOnce } from '../features/voice/stt/nativeRecognizer';
 import { STT_PROVIDERS } from '../features/voice/voice.config';
 import {
+  BARGE_IN_HOLD_MS,
+  NATIVE_FALLBACK_MESSAGE,
   IDLE_TIMEOUT_MESSAGE,
   IDLE_TIMEOUT_MS,
   LiveVoiceSession,
@@ -386,5 +391,185 @@ describe('VoiceOrchestrator.listen — fresh install (no STT key)', () => {
     const err: unknown = await voiceOrchestrator.listen('file:///cache/rec.m4a').catch((e: unknown) => e);
     expect(err).toMatchObject({ kind: 'unsupported' });
     expect(describeLiveError(err)).toBe(`⚠️ ${STT_NOT_CONFIGURED}`);
+  });
+});
+
+/** recognizer ปลอม: แต่ละรอบ listen() รอให้ test ส่งผลเอง */
+function fakeNative(preferred: boolean, available = true) {
+  const rounds: Deferred<string>[] = [];
+  const native = {
+    preferred: jest.fn(async () => preferred),
+    available: jest.fn(() => available),
+    listen: jest.fn(() => {
+      const d = deferred<string>();
+      rounds.push(d);
+      return { result: d.promise, cancel: jest.fn(() => d.resolve('')) };
+    }),
+  };
+  return { native, rounds };
+}
+
+describe('LiveVoiceSession — ถอดเสียงในเครื่อง', () => {
+  test('STT ตัวแรกเป็นในเครื่อง → ไม่อัดไฟล์ ใช้ recognizer ฟังแล้วตอบ วนต่อ', async () => {
+    const { native, rounds } = fakeNative(true);
+    const { session, fx } = setup({ native });
+    await session.start();
+    expect(session.getState()).toBe('listening');
+    expect(fx.recorder.start).not.toHaveBeenCalled();
+    nth(rounds, 0).resolve('  เปิดเพลงหน่อย ');
+    await advance(10);
+    expect(fx.transcribe).not.toHaveBeenCalled();
+    expect(fx.spoken).toEqual(['เปิดเพลงหน่อย']);
+    expect(native.listen).toHaveBeenCalledTimes(2);
+    expect(session.getState()).toBe('listening');
+    session.stop();
+    expect(nth(rounds, 1).promise).resolves.toBe('');
+  });
+
+  test('ไม่ได้ยินอะไร → ฟังใหม่เงียบ ๆ จนครบเวลา idle แล้วออก', async () => {
+    const { native, rounds } = fakeNative(true);
+    const { session, fx } = setup({ native });
+    await session.start();
+    nth(rounds, 0).resolve('');
+    await advance(10);
+    expect(native.listen).toHaveBeenCalledTimes(2);
+    expect(fx.messages).toEqual([]);
+    await advance(IDLE_TIMEOUT_MS);
+    nth(rounds, 1).resolve('');
+    await advance(10);
+    expect(session.getState()).toBe('idle');
+    expect(fx.messages).toEqual([IDLE_TIMEOUT_MESSAGE]);
+  });
+
+  test('STT คลาวด์ยังไม่ได้ตั้งค่า แต่เครื่องถอดเองได้ → สลับไปใช้ของเครื่อง', async () => {
+    const { native, rounds } = fakeNative(false);
+    const { session, fx } = setup({
+      native,
+      transcribe: jest.fn(async () => {
+        throw new ProviderError('voice', 'missing_key', 'no key');
+      }),
+    });
+    await session.start();
+    await say(fx, 800);
+    expect(fx.messages).toEqual([NATIVE_FALLBACK_MESSAGE]);
+    expect(session.getState()).toBe('listening');
+    nth(rounds, 0).resolve('ทดสอบ');
+    await advance(10);
+    expect(fx.spoken).toEqual(['ทดสอบ']);
+    session.stop();
+  });
+});
+
+describe('LiveVoiceSession — พูดแทรก (barge-in)', () => {
+  const BARGE = -6;
+
+  function speakingSetup() {
+    const reply = deferred<void>();
+    const stopSpeech = jest.fn(() => reply.resolve());
+    const ctx = setup({
+      bargeIn: async () => true,
+      respond: jest.fn((_t: string, hooks: LiveRespondHooks) => {
+        hooks.onSpeaking();
+        return reply.promise;
+      }),
+      stopSpeech,
+    });
+    return { ...ctx, reply, stopSpeech };
+  }
+
+  test('บอสพูดดังต่อเนื่องระหว่างผู้ช่วยพูด → หยุดพูด แล้วฟังต่อในไฟล์เดิม', async () => {
+    const { session, fx, stopSpeech } = speakingSetup();
+    await session.start();
+    await say(fx, 600);
+    expect(session.getState()).toBe('speaking');
+    // เปิดไมค์ไว้ดูระดับเสียง (ไฟล์ที่ 2)
+    expect(fx.recorder.start).toHaveBeenCalledTimes(2);
+
+    fx.level = BARGE;
+    await advance(BARGE_IN_HOLD_MS + 200);
+    expect(stopSpeech).toHaveBeenCalled();
+    expect(session.getState()).toBe('listening');
+    // ฟังต่อจากไฟล์เดิม ไม่เปิดไฟล์ใหม่
+    expect(fx.recorder.start).toHaveBeenCalledTimes(2);
+
+    fx.transcribe.mockResolvedValueOnce('พอแล้ว');
+    fx.level = QUIET;
+    await advance(SILENCE_END_MS + 100);
+    expect(fx.transcribe).toHaveBeenLastCalledWith('file:///cache/rec-2.m4a');
+    session.stop();
+  });
+
+  test('เสียงลำโพงระดับปกติ (ต่ำกว่าเกณฑ์) ไม่นับเป็นพูดแทรก · พูดจบ → ทิ้งไฟล์ที่อัดไว้ฟัง', async () => {
+    const { session, fx, reply, stopSpeech } = speakingSetup();
+    await session.start();
+    await say(fx, 600);
+    fx.level = LOUD;
+    await advance(3_000);
+    expect(stopSpeech).not.toHaveBeenCalled();
+    reply.resolve();
+    await advance(10);
+    expect(fx.recorder.discard).toHaveBeenCalledWith('file:///cache/rec-2.m4a');
+    expect(fx.recorder.start).toHaveBeenCalledTimes(3);
+    expect(session.getState()).toBe('listening');
+    session.stop();
+  });
+
+  test('ปิดพูดแทรก → ไม่เปิดไมค์ระหว่างพูด', async () => {
+    const reply = deferred<void>();
+    const { session, fx } = setup({
+      bargeIn: async () => false,
+      respond: jest.fn((_t: string, hooks: LiveRespondHooks) => {
+        hooks.onSpeaking();
+        return reply.promise;
+      }),
+    });
+    await session.start();
+    await say(fx, 600);
+    expect(fx.recorder.start).toHaveBeenCalledTimes(1);
+    reply.resolve();
+    await advance(10);
+    session.stop();
+  });
+});
+
+describe('nativeListenOnce (expo-speech-recognition)', () => {
+  type Listener = (e: unknown) => void;
+  function capture() {
+    const listeners = new Map<string, Listener>();
+    jest.mocked(ExpoSpeechRecognitionModule.addListener).mockImplementation(((name: string, fn: Listener) => {
+      listeners.set(name, fn);
+      return { remove: jest.fn() };
+    }) as never);
+    return (name: string, event: unknown = null) => listeners.get(name)?.(event);
+  }
+
+  test('ได้ผลล่าสุดเมื่อ recognizer จบ · ภาษาไทย + ตั้งเวลาเงียบจบประโยค', async () => {
+    const emit = capture();
+    const handle = nativeListenOnce();
+    expect(ExpoSpeechRecognitionModule.start).toHaveBeenCalledWith(expect.objectContaining({ lang: 'th-TH', continuous: false }));
+    emit('result', { isFinal: false, results: [{ transcript: 'สวัส' }] });
+    emit('result', { isFinal: true, results: [{ transcript: 'สวัสดีครับ ' }] });
+    emit('end');
+    await expect(handle.result).resolves.toBe('สวัสดีครับ');
+  });
+
+  test('ไม่ได้ยิน = "" · error อื่น = ProviderError', async () => {
+    let emit = capture();
+    const silent = nativeListenOnce();
+    emit('error', { error: 'no-speech', message: '' });
+    await expect(silent.result).resolves.toBe('');
+
+    emit = capture();
+    const broken = nativeListenOnce();
+    emit('error', { error: 'network', message: 'offline' });
+    await expect(broken.result).rejects.toMatchObject({ kind: 'network' });
+  });
+
+  test('cancel → abort + ได้ ""', async () => {
+    capture();
+    const handle = nativeListenOnce();
+    handle.cancel();
+    expect(ExpoSpeechRecognitionModule.abort).toHaveBeenCalled();
+    await expect(handle.result).resolves.toBe('');
   });
 });

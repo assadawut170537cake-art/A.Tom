@@ -78,6 +78,19 @@ export class VoiceOrchestrator {
 
   /** Transcribes a recorded audio file (record with expo-audio, then pass recorder.uri). */
   async listen(audioUri: string): Promise<string> {
+    const chain = await this.sttChain();
+    return this.runChain(chain, (stt) => stt.transcribe(audioUri));
+  }
+
+  /**
+   * ตัวแรกของ STT chain คือ "ในเครื่อง" (expo) ไหม — ใช่ = โหมดไลฟ์ให้ recognizer ของเครื่องฟังเอง
+   * (ค่าเริ่มต้นเป็นแบบนี้ · บอสเลือก Whisper ฯลฯ เป็นตัวแรก = อัดไฟล์ส่งคลาวด์)
+   */
+  async prefersNativeSTT(): Promise<boolean> {
+    return (await this.sttChain())[0]?.id === 'expo';
+  }
+
+  private async sttChain(): Promise<STTProvider[]> {
     const preferred = await this.settings.getSTT();
     const ids = unique([
       ...(preferred ? [preferred] : []),
@@ -89,7 +102,7 @@ export class VoiceOrchestrator {
       const stt = this.registry.getSTT(id);
       if (stt && (await this.settings.getVoiceEnabled('stt', id))) chain.push(stt);
     }
-    return this.runChain(chain, (stt) => stt.transcribe(audioUri));
+    return chain;
   }
 
   /** The persona's voice settings apply to its own provider; fallbacks use their default voice. */

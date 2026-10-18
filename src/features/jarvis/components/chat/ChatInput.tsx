@@ -1,5 +1,5 @@
 import { Mic, MicOff, SendHorizontal } from 'lucide-react-native';
-import { useState, type Ref } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { PERSONAS } from '../../constants';
@@ -12,7 +12,7 @@ const PADDING_Y = 8;
 export const CHAT_INPUT_MAX_HEIGHT = LINE_HEIGHT * MAX_LINES + PADDING_Y * 2;
 
 interface ChatInputProps {
-  /** ได้ข้อความที่ trim แล้ว (ไม่ถูกเรียกเมื่อว่าง) */
+  /** ได้ข้อความที่ trim แล้ว (ว่างได้เฉพาะตอนมีไฟล์แนบ) */
   onSend: (text: string) => void;
   /**
    * ห้ามส่งระหว่างผู้ช่วยกำลังคิด/พูด — แต่ยังพิมพ์ร่างข้อความถัดไปได้
@@ -30,6 +30,11 @@ interface ChatInputProps {
   voiceActive?: boolean | undefined;
   /** ห้ามเริ่มโหมดเสียง (เช่นผู้ช่วยกำลังตอบข้อความที่พิมพ์) — กดหยุดได้เสมอ */
   voiceDisabled?: boolean | undefined;
+  /** ข้อความที่ต้องใส่ลงช่องพิมพ์ (เช่นกด "แก้ไข") — ใส่แล้วเรียก onDraftConsumed */
+  draft?: string | null | undefined;
+  onDraftConsumed?: (() => void) | undefined;
+  /** มีไฟล์แนบรอส่ง = กดส่งได้แม้ไม่พิมพ์อะไร */
+  hasAttachments?: boolean | undefined;
 }
 
 export function ChatInput({
@@ -42,9 +47,24 @@ export function ChatInput({
   onVoice,
   voiceActive = false,
   voiceDisabled = false,
+  draft,
+  onDraftConsumed,
+  hasAttachments = false,
 }: ChatInputProps) {
   const [text, setText] = useState('');
-  const canSend = !disabled && text.trim().length > 0;
+  // ปรับ state ระหว่าง render (แบบที่ React แนะนำ) แทน setState ใน effect — จำ draft ที่ใส่แล้วกันใส่ซ้ำ
+  const [appliedDraft, setAppliedDraft] = useState<string | null>(null);
+  if (draft != null && draft !== appliedDraft) {
+    setAppliedDraft(draft);
+    setText(draft);
+  } else if (draft == null && appliedDraft !== null) {
+    setAppliedDraft(null);
+  }
+
+  useEffect(() => {
+    if (draft != null) onDraftConsumed?.();
+  }, [draft, onDraftConsumed]);
+  const canSend = !disabled && (text.trim().length > 0 || hasAttachments);
 
   const send = () => {
     if (!canSend) return;
