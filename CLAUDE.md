@@ -20,7 +20,7 @@
 
 ## 2. TECH STACK (LOCK — ห้ามเปลี่ยนโดยไม่ขอ)
 
-- **Runtime:** Expo + React Native + TypeScript (strict)
+- **Runtime:** Expo + React Native + TypeScript (strict) · **dev build** (ไม่ใช่ Expo Go — มี native code Kotlin ได้, Boss อนุมัติ 2026-10-18 · ADR-015)
 - **State:** Zustand
 - **Style:** NativeWind + Reanimated
 - **Orb 3D:** WebView
@@ -203,6 +203,13 @@
 - **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · driver เริ่มต้นใช้แค่ `Linking` → volume / brightness / clipboard = "ยังไม่รองรับ" จนกว่าจะเพิ่ม expo-brightness / expo-clipboard ฯลฯ (ต้องขอ Boss) · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
 - ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
+
+### Personas ข้ามอุปกรณ์ + ควบคุมเครื่องเต็มรูปแบบ — ADR-015
+- อะตอม = agent ประจำแอปนี้ ↔ Mark 55 บน PC (ตัวเดียวกัน คุยกันตลอด) · ไฟรเดย์ = แอป Gemini / **Gemini Spark** (โหมด agent ในแอป Gemini) ↔ Gemini Enterprise / Antigravity · จาร์วิส = เข้าประชุม + สายเข้า = สั่งงาน ↔ **Hermes** (ดูแล PC) · อัลตรอน = เบื้องหลัง (Foreground Service) ↔ โปรแกรมไหนก็ได้ที่ต่อ API · ตารางเต็มใน `docs/DECISIONS.md` ADR-015
+- Boss ต้องการ **ควบคุมมือถือด้วยเสียงได้ 100%** ไม่ใช่แค่เพิ่ม/ลดเสียง → ระดับ A native module → ระดับ B AccessibilityService (ทุกแอป) → ระดับ C Shizuku/root (ทางเลือก)
+- แอป Gemini ไม่มี API ให้แอปอื่นสั่งแล้วรับผลกลับ → สั่งได้ผ่าน AccessibilityService เท่านั้น · อย่าสัญญาว่าสั่ง Gemini Spark ตรง ๆ ได้
+- งานเบื้องหลังบน Android = Foreground Service (ต้องมีแจ้งเตือนค้าง) · โค้ดของอัลตรอนรันใน Docker sandbox บน PC เท่านั้น แล้วรอบอส "ปลด" / "ทำลาย"
+- คำสั่งอันตรายผ่าน AccessibilityService (ซื้อ/โอน/ลบ/ส่งข้อความ) ต้องถามยืนยันก่อนเสมอ
 
 ### Agents (intent `agent`) — ADR-013
 - ลำดับ router: Rule → **AgentClassifier** → Jev → LLM → chat · ไม่มี agent ลงทะเบียน = ทำงานเหมือนเดิม
