@@ -56,7 +56,14 @@
       ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
-      "./plugins/withAndroidProjectName"
+      "./plugins/withAndroidProjectName",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
+          "speechRecognitionPermission": "อนุญาตให้ $(PRODUCT_NAME) แปลงเสียงพูดเป็นข้อความ"
+        }
+      ]
     ]
   }
 }

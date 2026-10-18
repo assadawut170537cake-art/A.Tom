@@ -10,7 +10,12 @@
  * - เสียงสั้นกว่า `MIN_SPEECH_MS` = เสียงรบกวน (ไม่ส่งถอดเสียง ฟังต่อ)
  * - พูดยาวเกิน `MAX_UTTERANCE_MS` = ตัดส่งเลย · ไม่มีใครพูดเลย `IDLE_TIMEOUT_MS` = ออกจากโหมดไลฟ์เอง
  *
- * ระหว่างผู้ช่วยพูด **ไม่บันทึกเสียง** (กันไมค์ได้ยินเสียงตัวเองแล้ววนตอบตัวเอง) — ยังไม่รองรับพูดแทรก (barge-in)
+ * ระหว่างผู้ช่วยพูด ไม่ส่งเสียงไปถอด (กันไมค์ได้ยินเสียงตัวเองแล้ววนตอบตัวเอง) แต่ถ้าเปิด **พูดแทรก** (barge-in)
+ * จะอัดไว้ดูระดับเสียง: ดังกว่า `BARGE_IN_THRESHOLD_DB` ต่อเนื่อง `BARGE_IN_HOLD_MS` = บอสพูดแทรก → หยุดพูด
+ * แล้วฟังต่อจากไฟล์เดิม (คำแรกของบอสไม่หาย)
+ *
+ * **ถอดเสียงในเครื่อง** (`native`): ใช้ recognizer ของระบบฟังและตัดจบประโยคเอง แทนการอัดไฟล์ + VAD + STT
+ * — ใช้เมื่อบอสเลือก STT ในเครื่อง หรือเป็นทางสำรองเมื่อ STT บนคลาวด์ยังไม่ได้ตั้งค่า
  */
 
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
@@ -29,6 +34,13 @@ export const IDLE_TIMEOUT_MS = 30_000;
 export const PRE_SPEECH_RESET_MS = 8_000;
 /** ถี่แค่ไหนในการอ่านระดับเสียง */
 export const METER_INTERVAL_MS = 100;
+/**
+ * ระหว่างผู้ช่วยพูด ดังกว่านี้ = บอสพูดแทรก — สูงกว่า SPEECH_THRESHOLD_DB มาก เพราะไมค์ได้ยินเสียงลำโพงตัวเองด้วย
+ * ⚠️ ถ้าเครื่องจริงตัดตัวเองบ่อย (เสียงลำโพงดังถึง) ปรับขึ้นที่นี่ หรือปิด "พูดแทรก" ใน ตั้งค่า › เสียง
+ */
+export const BARGE_IN_THRESHOLD_DB = -14;
+/** ต้องดังต่อเนื่องนานเท่านี้ถึงนับว่าพูดแทรก (เสียงกระแทกสั้น ๆ ไม่นับ) */
+export const BARGE_IN_HOLD_MS = 450;
 
 export type LiveVoiceState = 'idle' | 'starting' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
@@ -45,6 +57,8 @@ export const STT_NOT_CONFIGURED =
   'ยังไม่ได้ตั้งค่าบริการแปลงเสียงเป็นข้อความ (STT) — เลือกผู้ให้บริการและใส่ API key ได้ที่ ตั้งค่า › เสียง แล้วลองคุยด้วยเสียงใหม่อีกครั้ง';
 export const STT_AUTH_FAILED =
   'API key ของบริการแปลงเสียงเป็นข้อความ (STT) ไม่ถูกต้องหรือหมดสิทธิ์ — ตรวจสอบได้ที่ ตั้งค่า › เสียง';
+export const NATIVE_FALLBACK_MESSAGE =
+  'ยังไม่ได้ตั้งค่า STT บนคลาวด์ — เปลี่ยนมาใช้ระบบถอดเสียงของเครื่องแทนแล้ว พูดอีกครั้งได้เลยครับ';
 export const IDLE_TIMEOUT_MESSAGE = `ปิดโหมดคุยด้วยเสียงแล้ว เพราะไม่ได้ยินเสียงพูด ${IDLE_TIMEOUT_MS / 1000} วินาที — กดค้างที่ Orb หรือกดปุ่มไมค์เพื่อเริ่มใหม่`;
 const RECORDER_FAILED = 'เปิดไมโครโฟนไม่สำเร็จ — ปิดแอปอื่นที่ใช้ไมค์อยู่แล้วลองใหม่';
 
@@ -76,6 +90,16 @@ export interface LiveTimers {
   clearInterval(handle: unknown): void;
 }
 
+/** ถอดเสียงด้วย recognizer ของเครื่อง (แอปจริงห่อ expo-speech-recognition) */
+export interface LiveNativeListener {
+  /** บอสเลือก STT ในเครื่องเป็นตัวแรกไหม */
+  preferred(): Promise<boolean>;
+  /** เครื่องรองรับไหม — ใช้เป็นทางสำรองเมื่อ STT บนคลาวด์ยังไม่ได้ตั้งค่า */
+  available(): boolean;
+  /** ฟังหนึ่งประโยค ('' = ไม่ได้ยินอะไร) */
+  listen(): { result: Promise<string>; cancel(): void };
+}
+
 export interface LiveVoiceDeps {
   recorder: LiveRecorder;
   /** ขอสิทธิ์ไมค์ — reject ด้วย ProviderError `permission` (ข้อความไทย) */
@@ -86,6 +110,10 @@ export interface LiveVoiceDeps {
   respond(text: string, hooks: LiveRespondHooks): Promise<void>;
   /** หยุดเสียงที่พูดค้าง (VoiceOrchestrator.stop) */
   stopSpeech(): void;
+  /** ถอดเสียงในเครื่อง (ไม่ส่ง = อัดไฟล์ + transcribe เสมอ) */
+  native?: LiveNativeListener;
+  /** เปิดพูดแทรกไหม (อ่านทุกครั้งที่เข้าโหมดไลฟ์) */
+  bargeIn?: () => Promise<boolean>;
   onStateChange?(state: LiveVoiceState): void;
   /** ข้อความไทยที่ควรแสดงในแชท (error / เหตุผลที่ออกจากโหมดไลฟ์) */
   onMessage?(message: string): void;
@@ -129,6 +157,16 @@ export class LiveVoiceSession {
   /** กำลัง stop/restart recorder อยู่ — tick ที่มาระหว่างนั้นไม่ทำอะไร */
   private busy = false;
 
+  /** รอบนี้ใช้ recognizer ของเครื่อง */
+  private nativeMode = false;
+  private nativeHandle: { cancel(): void } | null = null;
+  private bargeEnabled = false;
+  /** promise ของการเปิดไมค์ฟังพูดแทรก — ต้องรอก่อนเก็บกวาด ไม่งั้นไมค์ที่เปิดช้าค้าง */
+  private monitor: Promise<void> | null = null;
+  private bargeCandidateAt: number | null = null;
+  /** เวลาที่บอสเริ่มพูดแทรก (null = ไม่ได้แทรก) */
+  private bargeAt: number | null = null;
+
   private readonly timers: LiveTimers;
 
   constructor(private readonly deps: LiveVoiceDeps) {
@@ -155,6 +193,13 @@ export class LiveVoiceSession {
       return;
     }
     if (!this.isCurrent(run)) return;
+    const [native, barge] = await Promise.all([
+      this.deps.native?.preferred().catch(() => false) ?? false,
+      this.deps.bargeIn?.().catch(() => false) ?? false,
+    ]);
+    if (!this.isCurrent(run)) return;
+    this.nativeMode = native;
+    this.bargeEnabled = barge;
     await this.listen(run);
   }
 
@@ -176,6 +221,11 @@ export class LiveVoiceSession {
   }
 
   private async listen(run: number): Promise<void> {
+    if (this.nativeMode) {
+      // recognizer รอจนบอสพูดจบ — ไม่ให้ start() ค้างรอทั้งวง (เหมือนโหมดอัดไฟล์ที่คืนหลังเริ่มฟัง)
+      void this.listenNative(run, true);
+      return;
+    }
     try {
       await this.deps.recorder.start();
       this.recording = true;
@@ -272,7 +322,16 @@ export class LiveVoiceSession {
     try {
       text = (await this.deps.transcribe(uri)).trim();
     } catch (e) {
-      if (this.isCurrent(run)) await this.fail(describeLiveError(e));
+      if (!this.isCurrent(run)) return;
+      const kind = toProviderError('voice', e).kind;
+      // ยังไม่มี STT บนคลาวด์ แต่เครื่องถอดเองได้ → สลับไปใช้ของเครื่อง (ประโยคนี้หาย บอสพูดใหม่)
+      if ((kind === 'missing_key' || kind === 'unsupported') && this.deps.native?.available()) {
+        this.nativeMode = true;
+        this.deps.onMessage?.(NATIVE_FALLBACK_MESSAGE);
+        await this.listenNative(run, true);
+        return;
+      }
+      await this.fail(describeLiveError(e));
       return;
     } finally {
       this.deps.recorder.discard?.(uri);
@@ -283,13 +342,52 @@ export class LiveVoiceSession {
       await this.listen(run);
       return;
     }
+    await this.respondTo(run, text);
+  }
 
+  /** ฟังด้วย recognizer ของเครื่อง · `fresh` = เริ่มนับเวลา idle ใหม่ (ไม่ใช่รอบที่ฟังซ้ำเพราะไม่ได้ยิน) */
+  private async listenNative(run: number, fresh: boolean): Promise<void> {
+    const native = this.deps.native;
+    if (!native) {
+      this.nativeMode = false;
+      await this.listen(run);
+      return;
+    }
+    if (fresh) this.listenStartedAt = this.timers.now();
+    this.setState('listening');
+    const handle = native.listen();
+    this.nativeHandle = handle;
+    let text: string;
+    try {
+      text = (await handle.result).trim();
+    } catch (e) {
+      if (this.isCurrent(run)) await this.fail(describeLiveError(e));
+      return;
+    } finally {
+      if (this.nativeHandle === handle) this.nativeHandle = null;
+    }
+    if (!this.isCurrent(run)) return;
+    if (!text) {
+      if (this.timers.now() - this.listenStartedAt >= IDLE_TIMEOUT_MS) {
+        await this.fail(IDLE_TIMEOUT_MESSAGE);
+        return;
+      }
+      await this.listenNative(run, false);
+      return;
+    }
+    await this.respondTo(run, text);
+  }
+
+  /** ส่งข้อความให้ผู้ช่วยตอบ แล้วกลับไปฟัง (หรือฟังต่อจากที่บอสพูดแทรก) */
+  private async respondTo(run: number, text: string): Promise<void> {
     this.setState('thinking');
+    this.bargeAt = null;
     try {
       await this.deps.respond(text, {
         onSpeaking: () => {
           if (!this.isCurrent(run)) return false;
           this.setState('speaking');
+          if (this.bargeEnabled) this.monitor = this.startBargeMonitor(run);
           return true;
         },
       });
@@ -299,7 +397,73 @@ export class LiveVoiceSession {
       if (this.isCurrent(run)) await this.fail(`⚠️ ${userAdvice(toProviderError('voice', e).kind)}`);
       return;
     }
+    await this.monitor;
+    this.monitor = null;
+    this.clearMeter();
+    if (!this.isCurrent(run)) return;
+
+    if (this.bargeAt !== null && this.recording && !this.nativeMode) {
+      this.resumeAfterBargeIn(run, this.bargeAt);
+      return;
+    }
+    // ไฟล์ที่อัดไว้ฟังพูดแทรก (มีแต่เสียงผู้ช่วย) ไม่ใช้ต่อ
+    try {
+      const uri = await this.stopRecorder();
+      if (uri) this.deps.recorder.discard?.(uri);
+    } catch (e) {
+      console.error('[voice] หยุดบันทึกเสียงไม่สำเร็จ', e);
+    }
     if (this.isCurrent(run)) await this.listen(run);
+  }
+
+  /** ระหว่างผู้ช่วยพูด: เปิดไมค์ดูระดับเสียง (ยังไม่ส่งถอด) */
+  private async startBargeMonitor(run: number): Promise<void> {
+    if (this.recording) return;
+    try {
+      await this.deps.recorder.start();
+      this.recording = true;
+    } catch (e) {
+      console.error('[voice] เปิดไมค์ฟังพูดแทรกไม่สำเร็จ — พูดต่อโดยไม่ฟัง', e);
+      return;
+    }
+    if (!this.isCurrent(run)) {
+      // ออกจากโหมดไลฟ์ระหว่างเปิดไมค์ — end() เก็บกวาดไปก่อนแล้ว ต้องปิดเอง
+      void this.stopRecorder()
+        .then((uri) => uri && this.deps.recorder.discard?.(uri))
+        .catch((e: unknown) => console.error('[voice] หยุดบันทึกเสียงไม่สำเร็จ', e));
+      return;
+    }
+    if (this.state !== 'speaking') return;
+    this.bargeCandidateAt = null;
+    this.meter = this.timers.setInterval(() => this.bargeTick(run), METER_INTERVAL_MS);
+  }
+
+  private bargeTick(run: number) {
+    if (!this.isCurrent(run) || this.state !== 'speaking') return;
+    const now = this.timers.now();
+    const level = this.deps.recorder.level() ?? -160;
+    if (level < BARGE_IN_THRESHOLD_DB) {
+      this.bargeCandidateAt = null;
+      return;
+    }
+    this.bargeCandidateAt ??= now;
+    if (now - this.bargeCandidateAt < BARGE_IN_HOLD_MS) return;
+    this.bargeAt = this.bargeCandidateAt;
+    this.clearMeter();
+    // หยุดเสียง → speak() ของ sendMessage จบ → respondTo ไปต่อที่ resumeAfterBargeIn
+    this.deps.stopSpeech();
+  }
+
+  /** ฟังต่อในไฟล์เดิม โดยถือว่าบอสเริ่มพูดตั้งแต่ตอนแทรก */
+  private resumeAfterBargeIn(run: number, startedAt: number) {
+    const now = this.timers.now();
+    this.listenStartedAt = now;
+    this.segmentStartedAt = startedAt;
+    this.speechStartedAt = startedAt;
+    this.lastVoiceAt = now;
+    this.busy = false;
+    this.setState('listening');
+    this.meter = this.timers.setInterval(() => this.tick(run), METER_INTERVAL_MS);
   }
 
   private async stopRecorder(): Promise<string | null> {
@@ -319,6 +483,9 @@ export class LiveVoiceSession {
     this.clearMeter();
     this.busy = false;
     this.speechStartedAt = null;
+    this.bargeAt = null;
+    this.nativeHandle?.cancel();
+    this.nativeHandle = null;
     this.deps.stopSpeech();
     const { recorder } = this.deps;
     void this.stopRecorder()

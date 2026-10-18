@@ -145,3 +145,15 @@ jest.mock('expo-contacts/legacy', () => ({
   requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
   getContactsAsync: jest.fn(async () => ({ data: [] })),
 }));
+
+// ถอดเสียงในเครื่อง — ค่าเริ่มต้น "ไม่มีบริการ" ให้ test เดิม (อัดไฟล์ + STT คลาวด์) ทำงานเหมือนเดิม
+jest.mock('expo-speech-recognition', () => ({
+  ExpoSpeechRecognitionModule: {
+    isRecognitionAvailable: jest.fn(() => false),
+    requestPermissionsAsync: jest.fn(async () => ({ granted: true })),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    start: jest.fn(),
+    stop: jest.fn(),
+    abort: jest.fn(),
+  },
+}));

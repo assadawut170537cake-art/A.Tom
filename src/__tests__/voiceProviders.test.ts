@@ -1,5 +1,6 @@
 import { createAudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
@@ -615,11 +616,13 @@ describe.each(STT_CASES)('STT $id', ({ id, route, uri, probe, transcribe }) => {
 });
 
 describe('STT specifics', () => {
-  test('Expo (on-device) STT reports unsupported', async () => {
+  test('STT ในเครื่อง: ถอดจากไฟล์ไม่ได้ (ให้ chain ข้ามไปคลาวด์) · ทดสอบ = มีบริการในเครื่องไหม', async () => {
     await expect(stt('expo').transcribe('file:///cache/rec.m4a')).rejects.toMatchObject({ kind: 'unsupported' });
     const res = await stt('expo').testConnection();
     expect(res.ok).toBe(false);
-    expect(res.error).toMatch(/^\[expo\] ยังไม่รองรับการถอดเสียงบนเครื่อง/);
+    expect(res.error).toMatch(/^\[expo\] เครื่องนี้ไม่มีบริการถอดเสียง/);
+    jest.mocked(ExpoSpeechRecognitionModule.isRecognitionAvailable).mockReturnValueOnce(true);
+    await expect(stt('expo').testConnection()).resolves.toEqual({ ok: true });
   });
 
   test.each([

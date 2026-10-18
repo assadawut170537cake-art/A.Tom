@@ -96,7 +96,7 @@ test('Voice settings: 9 TTS + 8 STT providers and both priority lists', async ()
   // On-device STT test reports it's unavailable
   const stt = nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 9); // after the 9 TTS cards
   await fireEvent.press(stt);
-  expect(await screen.findByText(/\[expo\] ยังไม่รองรับการถอดเสียงบนเครื่อง/)).toBeTruthy();
+  expect(await screen.findByText(/\[expo\] เครื่องนี้ไม่มีบริการถอดเสียง/)).toBeTruthy();
 });
 
 test('Persona voice map: per-persona rows and the shared-voice toggle', async () => {

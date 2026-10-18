@@ -9,7 +9,14 @@ import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
-import { LiveVoiceSession, type LiveRecorder, type LiveVoiceState } from '../../voice/live/LiveVoiceSession';
+import { getBargeIn } from '../../voice/live/liveSettings';
+import {
+  LiveVoiceSession,
+  type LiveNativeListener,
+  type LiveRecorder,
+  type LiveVoiceState,
+} from '../../voice/live/LiveVoiceSession';
+import { ensureNativeSTTPermission, isNativeSTTAvailable, nativeListenOnce } from '../../voice/stt/nativeRecognizer';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 
@@ -55,6 +62,17 @@ function createRecorderAdapter(recorder: AudioRecorder): LiveRecorder {
   };
 }
 
+/** recognizer ของเครื่อง — ใช้เมื่อ STT ตัวแรกคือ "ในเครื่อง" (ค่าเริ่มต้น) หรือเป็นทางสำรองตอนไม่มี key */
+const nativeListener: LiveNativeListener = {
+  async preferred() {
+    if (!isNativeSTTAvailable() || !(await voiceOrchestrator.prefersNativeSTT())) return false;
+    await ensureNativeSTTPermission();
+    return true;
+  },
+  available: isNativeSTTAvailable,
+  listen: () => nativeListenOnce(),
+};
+
 export interface LiveVoiceControls {
   state: LiveVoiceState;
   active: boolean;
@@ -82,6 +100,8 @@ export function useLiveVoice(): LiveVoiceControls {
         await sendMessage(text, { onSpeaking: hooks.onSpeaking });
       },
       stopSpeech: () => voiceOrchestrator.stop(),
+      native: nativeListener,
+      bargeIn: getBargeIn,
       onStateChange: (next) => {
         setState(next);
         const store = useAtomStore.getState();

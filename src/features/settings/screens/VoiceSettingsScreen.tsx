@@ -7,8 +7,10 @@ import {
   type VoiceKind,
 } from '../../../core/storage/ProviderSettings';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
+import { getBargeIn, setBargeIn } from '../../voice/live/liveSettings';
 import { STT_PROVIDERS, TTS_PROVIDERS, type VoiceProviderMeta } from '../../voice/voice.config';
 import { PriorityList } from '../components/PriorityList';
+import { ProviderToggle } from '../components/ProviderToggle';
 import { STTProviderCard } from '../components/STTProviderCard';
 import { TTSProviderCard } from '../components/TTSProviderCard';
 import { Section } from '../components/ui';
@@ -45,6 +47,14 @@ export function VoiceSettingsScreen() {
   const [dragging, setDragging] = useState(false);
   const ttsPriority = useVoicePriority('tts');
   const sttPriority = useVoicePriority('stt');
+  const [bargeIn, setBargeInState] = useState(true);
+
+  useEffect(() => whileMounted(getBargeIn, setBargeInState), []);
+
+  const changeBargeIn = (on: boolean) => {
+    setBargeInState(on);
+    void setBargeIn(on);
+  };
 
   return (
     <ScrollView
@@ -64,6 +74,14 @@ export function VoiceSettingsScreen() {
           const provider = voiceRegistry.getSTT(meta.id);
           return provider ? <STTProviderCard key={meta.id} provider={provider} meta={meta} /> : null;
         })}
+      </Section>
+      <Section title="คุยด้วยเสียง">
+        <ProviderToggle
+          label="พูดแทรกได้"
+          subtitle="พูดขัดตอนผู้ช่วยกำลังพูด ผู้ช่วยจะหยุดแล้วฟังบอส — ถ้าผู้ช่วยหยุดพูดเองบ่อย ให้ปิด"
+          value={bargeIn}
+          onChange={changeBargeIn}
+        />
       </Section>
       <Section title="TTS Priority" hint="ใช้เมื่อเสียงของ persona ล้มเหลว — ตัวบนสุดถูกลองก่อน">
         <PriorityList items={ttsPriority.items} onChange={ttsPriority.change} onDragStateChange={setDragging} />
