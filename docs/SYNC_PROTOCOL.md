@@ -218,6 +218,40 @@ server บอกว่าฉบับของมันชนะ → เขี�
 **Clock skew:** server ปฏิเสธ `updatedAt` ที่ล้ำเวลา server เกิน 1 วัน (400) → การเปลี่ยนแปลงค้างในคิวจนกว่าจะแก้นาฬิกาเครื่อง
 (ไม่ retry วน) · ข้อจำกัดที่รู้: แอปยังไม่ปรับ `updatedAt` ตามเวลา server ให้อัตโนมัติ
 
+## 14. การ Deploy จริง (Phase 4.5.4.4 — Mark 55 Server บน PC)
+
+### 14.1 เตรียม server (`../mark55-server`)
+
+1. ติดตั้ง dependency และสร้าง `.env` จาก `.env.example`:
+   ```bash
+   cd mark55-server
+   npm install
+   cp .env.example .env
+   ```
+2. แก้ `.env` ตามคำอธิบายในไฟล์ (อย่างน้อย `PAIRING_CODE` เป็นรหัส 6 หลักจริง, `JWT_SECRET` สุ่มยาว ≥ 32 ตัว)
+3. รัน build แล้วเริ่ม server จริง:
+   ```bash
+   npm run build
+   npm run start   # หรือใช้ `npm run dev` ตอนพัฒนา
+   ```
+   Server จะเปิด port `8787` (กำหนดใน `PORT` ของ `.env`)
+4. ตรวจว่า `GET http://<PC-IP>:8787/health` ตอบกลับมาได้จากมือถือบน Wi-Fi เดียวกัน
+
+### 14.2 เชื่อมแอปมือถือกับ Mark 55 จริง (ตาม §13)
+
+1. เปิดแอป → ตั้งค่า › Sync → Server URL `http://<PC-IP>:8787` → กด "ทดสอบการเชื่อมต่อ" → ข้อความบอกว่าเชื่อมต่อได้ (สถานะ 🟡 จนกว่าจะจับคู่)
+2. ใส่ pairing code (ค่า `PAIRING_CODE` จาก `.env` ของ server) → กด Pair → สถานะเป็น 🟢 และมี JWT เก็บใน SecureStore (`mark55.auth.token`)
+3. แท็บ Memory → เพิ่ม fact ใหม่ → หน้า Sync แสดง "รอส่ง" เพิ่ม → กด "ซิงก์ตอนนี้" → ค้าง 0 รายการ
+4. **ลบ** fact ที่เพิ่งสร้าง → ซิงก์อีกครั้ง → server ต้องเก็บ fact นั้นเป็น `deleted: true` (tombstone) — ถ้า server ยังไม่แยกด้วย `lastSyncAt` การลบจะไม่แพร่ไปเครื่องอื่น (ดูข้อตกลงข้อ 12)
+5. **ทดสอบ conflict:** ใช้เครื่องที่ 2 (หรือยิง `POST /api/v1/memory/sync` ตรงที่ server เอง) แก้ key เดียวกันให้มี `updatedAt` ใหม่กว่า → ซิงก์ที่เครื่องแรก → เห็นใน "ประวัติ Conflict" → กด "ล้างประวัติ" → ปิดเปิดแอป → ประวัติยังคงว่าง
+
+### 14.3 ข้อควรระวัง
+
+- Android **release build** บล็อก cleartext `http://` — ใช้ได้เฉพาะ Expo Go / dev build ตามที่ระบุในข้อ 11 (ถ้าต้องออก release ต้องเพิ่ม `expo-build-properties` และตั้ง `usesCleartextTraffic` — ยังรออนุมัติ)
+- Token (`mark55.auth.token`) เก็บใน SecureStore เท่านั้น ไม่ควร commit `.env` ที่มีคีย์จริงลง repo (กันไว้ใน `.gitignore` แล้ว)
+- ถ้า server จริงเปลี่ยนกติกาข้อ 12 → แก้ `FakeMark55Server` (`src/test-utils/fakeMark55.ts`) ให้ตรงแล้วรัน test ชุด sync อีกรอบ
+
+
 ## 10. ที่เก็บข้อมูล
 
 | ที่ | key | ค่า |

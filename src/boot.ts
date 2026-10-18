@@ -22,6 +22,7 @@ import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
 import { registerSampleAgents } from './modules/agents/sample-agent';
+import { registerRouteEscortAgent } from './modules/agents/route-escort';
 
 export interface BootReport {
   /** null = start() เองล้ม (log แล้ว) */
@@ -56,6 +57,7 @@ export function bootApp(): Promise<BootReport> {
   registerAIProviders();
   registerVoiceProviders();
   registerSampleAgents();
+  registerRouteEscortAgent();
   return (started ??= startServices());
 }
 
