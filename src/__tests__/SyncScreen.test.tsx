@@ -7,7 +7,9 @@ import { ProviderError } from '../core/http/errors';
 import { LocalMemoryAdapter } from '../core/memory/LocalMemoryAdapter';
 import { MemorySync } from '../core/memory/MemorySync';
 import { SYNC_STORAGE_KEYS, SyncQueue } from '../core/memory/SyncQueue';
+import { SUPERMEMORY_KEY_NAME } from '../core/memory/SuperMemorySync';
 import { ALL_MEMORY_TARGETS, type MemoryTarget } from '../core/memory/types';
+import { SecureKeyStore } from '../core/storage/SecureKeyStore';
 import { SyncScreen, connectionStatus, formatTime } from '../features/settings/screens/SyncScreen';
 import { RootNavigator } from '../navigation/RootNavigator';
 import { fakeRemote, fakeSecureStore, remoteStub } from '../test-utils/fakeMark55';
@@ -69,6 +71,17 @@ async function pairWith(code = '123456') {
 }
 
 describe('render states', () => {
+  test('Supermemory: API key บันทึกลง SecureKeyStore (supermemory.apiKey)', async () => {
+    await renderScreen();
+    expect(screen.getByText('Supermemory')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('Supermemory API key'), '  sm_test_key_0123456789abcdef  ');
+    await fireEvent.press(screen.getByRole('button', { name: 'บันทึก' }));
+    await settle();
+    expect(await SecureKeyStore.get(SUPERMEMORY_KEY_NAME)).toBe('sm_test_key_0123456789abcdef');
+    expect(screen.getByLabelText('Supermemory API key บันทึกแล้ว')).toBeTruthy();
+    await SecureKeyStore.delete(SUPERMEMORY_KEY_NAME);
+  });
+
   test('unpaired: 🟡, default URL from env/config, pairing code field, no sync section', async () => {
     await renderScreen();
     expect(screen.getByLabelText('สถานะ: ยังไม่จับคู่')).toBeTruthy();

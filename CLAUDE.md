@@ -227,6 +227,11 @@
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
 - ⚠️ release build Android บล็อก http (cleartext) เป็นค่าเริ่มต้น — Expo Go/dev build ใช้ได้; release ต้องตั้ง `usesCleartextTraffic` (ต้องขอ Boss เพราะต้องเพิ่ม expo-build-properties)
 
+### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)
+- `superMemorySync` (core/memory/SuperMemorySync.ts) ฟัง `localMemory.subscribe()` → `POST /v3/documents` · containerTag `project_atom_memory_base_4folders_atom_core` (ไม่ใช่ `atom_core` เปล่า ๆ — คนละ space)
+- key: SecureKeyStore `supermemory.apiKey` เท่านั้น (ใส่ที่ ตั้งค่า › Sync) · ไม่มี key = ไม่ส่ง · ห้ามใช้ `EXPO_PUBLIC_*` (ถูกฝังใน APK)
+- fail-open: ไม่ throw ไม่ retry ส่งไม่ผ่านก็ทิ้ง · ไม่ส่งการลบ (ต้องใช้ document id ที่เครื่องไม่ได้จด) · `applyRemote` ไม่แจ้ง listener → ของจาก Mark 55 ไม่ถูกส่งซ้ำ
+
 ### Mark 55 Bus — `pc-bridge` (4.5.5.3) · SQL `mark55/sql/002_mobile_rpc.sql`
 - คนละช่องทางกับ Sync (Fastify, memory facts): Bus = สั่งงานให้ Mark 55 รัน ผ่านตาราง `memory_tasks` บน Supabase
 - แอปเรียกได้แค่ RPC `mobile_submit_task` / `mobile_get_task` ด้วย anon/publishable key + **token เครื่อง** (`atm_…`, Supabase เก็บแค่ sha256) · ตารางทั้งหมดปิดสำหรับ anon — **ห้ามเปิด policy ให้ anon** (anon key ดึงจาก APK ได้)
@@ -312,6 +317,7 @@
 - Module: `src/core/modules/ModuleRegistry.ts` · `ModuleManager.ts` · loader: `src/modules/loader.ts`
 - Modules UI: `src/features/settings/screens/ModulesScreen.tsx`
 - Mark 55 Bus: `src/features/pc-bridge/` · UI `src/features/settings/screens/PcBridgeScreen.tsx` · SQL `mark55/sql/002_mobile_rpc.sql`
+- Supermemory: `src/core/memory/SuperMemorySync.ts`
 - Sync: `src/core/memory/MemorySync.ts` · `SyncQueue.ts` · `RemoteMemoryAdapter.ts` · UI `src/features/settings/screens/SyncScreen.tsx`
 - Agents (intent): `src/core/agents/AgentRegistry.ts` · `src/features/router/classifiers/AgentClassifier.ts` · `handlers/AgentHandler.ts` · `src/features/agents/` · sample `src/modules/agents/sample-agent.ts`
 - Agent: `src/core/agent/` · app wiring `src/features/ai/agent.ts` · Marketplace: `src/features/marketplace/screens/PluginMarketplaceScreen.tsx`

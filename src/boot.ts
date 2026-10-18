@@ -8,6 +8,7 @@
  *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
  *    - `memorySync.start()` — จับคู่ Mark 55 ไว้แล้ว → เริ่มคิว sync + ซิงก์ 1 รอบ · ยังไม่จับคู่ = ไม่ทำอะไร
+ *    - `superMemorySync.start()` — ส่ง fact ที่แก้ขึ้น Supermemory เบื้องหลัง (ไม่มี API key = ไม่ส่ง · ล้มแค่ log)
  *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory/module (src/dev/)
  *
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
@@ -15,6 +16,7 @@
 
 import { localMemory } from './core/memory/LocalMemoryAdapter';
 import { memorySync, type MemorySync } from './core/memory/MemorySync';
+import { superMemorySync, type SuperMemorySyncService } from './core/memory/SuperMemorySync';
 import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
 import { moduleManager, type ModuleManager } from './core/modules/ModuleManager';
 import type { InitReport } from './core/modules/types';
@@ -40,6 +42,8 @@ interface BootDeps {
   installDevTools: (memory: MemoryStore) => unknown;
   /** ไม่ส่ง = ไม่เริ่ม sync (test เดิม) */
   sync?: Pick<MemorySync, 'start'>;
+  /** ไม่ส่ง = ไม่ส่งขึ้น Supermemory (test เดิม) */
+  supermemory?: Pick<SuperMemorySyncService, 'start'>;
   /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
   loadModules?: () => Promise<void>;
 }
@@ -48,6 +52,7 @@ const DEFAULT_DEPS: BootDeps = {
   modules: moduleManager,
   memory: localMemory,
   sync: memorySync,
+  supermemory: superMemorySync,
   loadModules: () => loadBootModules(),
   dev: __DEV__,
   installDevTools: (memory) => {
@@ -92,6 +97,11 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     await deps.sync?.start(); // start() ไม่ reject อยู่แล้ว — กันไว้อีกชั้น
   } catch (e) {
     console.error('[boot] เริ่ม Sync ไม่สำเร็จ — ใช้ Shared Memory แบบเครื่องเดียว', e);
+  }
+  try {
+    deps.supermemory?.start();
+  } catch (e) {
+    console.error('[boot] เริ่มส่งขึ้น Supermemory ไม่สำเร็จ — แอปทำงานต่อได้', e);
   }
 
   if (deps.dev) {
