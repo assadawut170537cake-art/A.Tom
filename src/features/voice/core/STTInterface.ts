@@ -60,6 +60,20 @@ export abstract class BaseCloudSTT implements STTProvider {
     return file;
   }
 
+  /**
+   * ไฟล์เสียงสำหรับ `FormData` แบบที่ React Native ส่งได้จริง: `{ uri, name, type }`
+   *
+   * ทำไมไม่ append `File` ของ expo-file-system ตรง ๆ: fetch ของ RN (XHR) อ่านเฉพาะ part ที่มี `uri`
+   * เป็น own property — `File` เก็บ `uri` ไว้ใน prototype จึงไม่ถูกส่งเป็นไฟล์ แล้วคำขอค้างจนหมดเวลา
+   * (เจอบนเครื่องจริง: Whisper "หมดเวลา (120s)") · Blob ใน Node/Jest ไม่มีปัญหานี้ test เลยไม่จับ
+   */
+  protected audioFormPart(audioUri: string): Blob {
+    const file = this.audioFile(audioUri);
+    const part = { uri: file.uri, name: file.name, type: audioMimeType(file.uri) };
+    // Cast: type ของ FormData.append รับแค่ string | Blob แต่ RN รองรับ object { uri, name, type } (trust boundary ของ native networking)
+    return part as unknown as Blob;
+  }
+
   /** Polls an async job until `check` returns a value (or throws), up to `timeoutMs`. */
   protected async poll<T>(
     check: () => Promise<T | undefined>,
