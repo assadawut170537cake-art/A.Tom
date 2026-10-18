@@ -3,6 +3,7 @@
  *
  * 1. ลงทะเบียน AI + voice providers + sample agent "โน้ต" (sync — หน้าแรกต้องใช้ทันที)
  * 2. เริ่ม services แบบ async ไม่บล็อก UI:
+ *    - โหลด module ใน `BOOT_MODULES` (src/modules/loader.ts — ตอนนี้คือ `pc-bridge`)
  *    - `moduleManager.start()` — ใช้ค่าเปิด/ปิด module ที่บอสบันทึกไว้ แล้ว `initAll()`
  *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
@@ -22,6 +23,7 @@ import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
 import { registerSampleAgents } from './modules/agents/sample-agent';
+import { loadBootModules } from './modules/loader';
 
 export interface BootReport {
   /** null = start() เองล้ม (log แล้ว) */
@@ -37,12 +39,15 @@ interface BootDeps {
   installDevTools: (memory: MemoryStore) => unknown;
   /** ไม่ส่ง = ไม่เริ่ม sync (test เดิม) */
   sync?: Pick<MemorySync, 'start'>;
+  /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
+  loadModules?: () => Promise<void>;
 }
 
 const DEFAULT_DEPS: BootDeps = {
   modules: moduleManager,
   memory: localMemory,
   sync: memorySync,
+  loadModules: () => loadBootModules(),
   dev: __DEV__,
   installDevTools: (memory) => {
     installMemoryDevTools(memory);
@@ -62,6 +67,11 @@ export function bootApp(): Promise<BootReport> {
 /** ไม่ reject เด็ดขาด — ทุกขั้นที่ล้มถูก log แล้วข้ามไป */
 export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<BootReport> {
   let modules: InitReport | null = null;
+  try {
+    await deps.loadModules?.(); // loadBootModules() ไม่ reject อยู่แล้ว — กันไว้อีกชั้น
+  } catch (e) {
+    console.error('[boot] โหลด module ไม่สำเร็จ', e);
+  }
   try {
     modules = await deps.modules.start();
   } catch (e) {

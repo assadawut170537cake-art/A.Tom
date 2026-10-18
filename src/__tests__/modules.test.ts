@@ -275,11 +275,11 @@ describe('ModuleRegistry', () => {
   });
 });
 
-describe('loader (stub)', () => {
+describe('loader', () => {
   test('no loader for an id → "Not implemented (Phase 4.5+)"', async () => {
     const { registry } = registryWith();
-    await expect(loadModule('pc-bridge', registry)).rejects.toThrow(
-      '[modules] ยังไม่มี loader สำหรับ "pc-bridge" — Not implemented (Phase 4.5+)'
+    await expect(loadModule('not-a-module', registry)).rejects.toThrow(
+      '[modules] ยังไม่มี loader สำหรับ "not-a-module" — Not implemented (Phase 4.5+)'
     );
   });
 

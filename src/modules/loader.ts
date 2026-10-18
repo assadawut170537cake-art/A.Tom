@@ -1,5 +1,5 @@
 /**
- * @file โหลด module ตาม id แบบ lazy — **STUB** (ยังไม่มี module ให้โหลด)
+ * @file โหลด module ตาม id แบบ lazy
  *
  * อยู่ระดับแอป (`src/modules/`) ไม่ใช่ `core/modules/` เพราะตาราง loader ต้อง import module จริง
  * จาก `features/` — ถ้าอยู่ใน core จะผิดทิศทาง dependency (core → features)
@@ -10,9 +10,7 @@
  *
  * ลงทะเบียนผ่าน `moduleManager` (ค่าเริ่มต้น) → ค่าเปิด/ปิดที่บอสบันทึกไว้มีผลทันที และ init ให้ถ้าเปิดอยู่
  *
- * TODO(phase-4.5):
- *   - เพิ่ม `'pc-bridge': () => import('../features/pc-bridge').then((m) => m.default)` เมื่อ module แรกพร้อม
- *   - โหลด module ที่บอสเปิดไว้ตอนเปิดแอป ก่อน `moduleManager.start()` (src/boot.ts)
+ * boot โหลดทุกตัวใน {@link BOOT_MODULES} ก่อน `moduleManager.start()` (src/boot.ts)
  */
 
 import { moduleManager } from '../core/modules/ModuleManager';
@@ -27,8 +25,29 @@ export interface ModuleHost {
   register(module: AtomModule): void | Promise<void>;
 }
 
-/** id → lazy factory. Empty until the first real module lands (see TODO above). */
-export const MODULE_LOADERS: Readonly<Record<string, ModuleFactory>> = {};
+/** id → lazy factory */
+export const MODULE_LOADERS: Readonly<Record<string, ModuleFactory>> = {
+  // 4.5.5.3 — สั่งงาน Mark 55 ผ่าน Memory Bus (Supabase)
+  'pc-bridge': () => import('../features/pc-bridge').then((m) => m.default),
+};
+
+/** module ที่โหลดตอนเปิดแอป — ค่าเปิด/ปิดที่บอสบันทึกไว้ยังมีผล (ModuleManager.register) */
+export const BOOT_MODULES: readonly string[] = ['pc-bridge'];
+
+/** โหลด {@link BOOT_MODULES} · ตัวที่ล้มแค่ log (ไม่ reject) */
+export async function loadBootModules(
+  registry: ModuleHost = moduleManager,
+  loaders: Readonly<Record<string, ModuleFactory>> = MODULE_LOADERS,
+  ids: readonly string[] = BOOT_MODULES
+): Promise<void> {
+  for (const id of ids) {
+    try {
+      await loadModule(id, registry, loaders);
+    } catch (e) {
+      console.error(`[modules] โหลด "${id}" ตอนเปิดแอปไม่สำเร็จ`, e);
+    }
+  }
+}
 
 /**
  * Registered module for `id`, loading and registering it first if needed.

@@ -25,6 +25,7 @@ PENDING ──claim──▶ IN_PROGRESS ──handler สำเร็จ──�
 | `supabase_gateway.py` | อ่าน/เขียนตาราง · ทุก transition เป็น UPDATE แบบมีเงื่อนไข · error → log ไม่ crash |
 | `handlers.py` | `HANDLER_REGISTRY` — instruction → handler ที่ main.py ลงทะเบียน |
 | `sql/001_init.sql` | schema: ตาราง `memory_tasks` + `memory_tasks_test` · trigger ประทับเวลา · RLS |
+| `sql/002_mobile_rpc.sql` | ช่องทางมือถือ: `mobile_devices` (hash ของ token) · `mobile_instructions` · RPC `mobile_submit_task` / `mobile_get_task` / `mobile_register_device` |
 | `test_memory_bus.py` | unittest — mock (CI) + live (Supabase จริง, เลือกรัน) |
 | `.env.example` | แม่แบบ `.env` |
 
@@ -43,7 +44,21 @@ PENDING ──claim──▶ IN_PROGRESS ──handler สำเร็จ──�
 
 **ความปลอดภัยของตาราง:** เปิด RLS โดย*ไม่มี policy* + `REVOKE` สิทธิ์จาก `anon` / `authenticated`
 → anon key อ่าน/เขียนตารางไม่ได้เลย (ทดสอบแล้ว: ได้ `42501 permission denied`)
-แอปมือถือ (4.5.5.3) ต้องมี policy หรือ RPC เฉพาะของตัวเอง — **ห้ามเปิด allow-all** เพราะ task = คำสั่งที่ Mark 55 รัน
+แอปมือถือ (4.5.5.3) ใช้ RPC จำกัดสิทธิ์ใน `sql/002_mobile_rpc.sql` แทน — **ห้ามเปิด allow-all** เพราะ task = คำสั่งที่ Mark 55 รัน
+
+### มือถือ (แอป A.T.O.M. › ตั้งค่า › Mark 55 Bus)
+
+1. รัน `sql/002_mobile_rpc.sql` (ทำให้แล้ว 2026-10-17)
+2. ออก token เครื่อง ใน SQL Editor — ได้ `atm_…` ครั้งเดียว (Supabase เก็บแค่ hash):
+   ```sql
+   select public.mobile_register_device('boss-phone', 'มือถือ Boss');
+   ```
+3. ในแอปใส่ Project URL · **publishable/anon key** (ไม่ใช่ service_role) · token → บันทึก → ทดสอบการเชื่อมต่อ
+4. พิมพ์ในแชท เช่น "สั่งคอมเช็กสถานะเครื่อง" → งาน `RUN_DIAGNOSTICS` (`sender = MOBILE:boss-phone`) → Mark 55 รัน → ผลขึ้นในแชท
+
+- สั่งได้เฉพาะ instruction ในตาราง `mobile_instructions` · 20 งาน/นาที/เครื่อง · อ่านได้เฉพาะงานของเครื่องตัวเอง
+- เพิ่มคำสั่ง: `insert into mobile_instructions values ('MY_JOB', 'คำอธิบาย');` + handler (ข้อ 6) + `PC_COMMANDS` ในแอป
+- ยกเลิกเครื่อง: `update mobile_devices set revoked = true where device_id = 'boss-phone';` · ออกใหม่ = เรียก register ซ้ำ
 
 ## 4. วิธีรัน
 
@@ -158,5 +173,5 @@ python -m unittest mark55.test_memory_bus -v
 ## 9. Roadmap (ยังไม่ทำ)
 
 - **4.5.5.2** — Supabase Realtime แทนการ poll · ทำความสะอาดงานเก่า
-- **4.5.5.3 Mobile integration** — แอป A.T.O.M. (TypeScript) สร้าง task ผ่าน RPC / policy ที่จำกัดสิทธิ์
+- ~~4.5.5.3 Mobile integration~~ ✅ — ดูข้อ 3 "มือถือ" · ต่อไป: ผลที่มาช้ากว่า 8 วินาทียังไม่เด้งเข้าแชทเอง (ต้องใช้ Realtime 4.5.5.2)
 - **4.5.5.4 U.L.T.R.O.N. governance** — retry limit · watchdog คืนงานที่ค้าง `IN_PROGRESS`
