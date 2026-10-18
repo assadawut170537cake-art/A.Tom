@@ -95,3 +95,6 @@ jest.mock('expo-file-system', () => {
   }
   return { Paths: { cache: { uri: 'file:///cache' } }, File };
 });
+
+// expo-clipboard เป็น native module — test ตรวจแค่ว่าเรียกด้วยข้อความอะไร
+jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true), getStringAsync: jest.fn(async () => '') }));

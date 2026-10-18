@@ -7,13 +7,20 @@ import { ChatBubble } from './ChatBubble';
 import { TypingIndicator } from './TypingIndicator';
 
 const keyExtractor = (m: Message) => m.id;
-const renderItem: ListRenderItem<Message> = ({ item }) => <ChatBubble message={item} />;
 
-export function ChatList() {
+interface ChatListProps {
+  onMessageLongPress?: ((message: Message) => void) | undefined;
+}
+
+export function ChatList({ onMessageLongPress }: ChatListProps) {
   const activePersona = useAtomStore((s) => s.activePersona);
   const messages = useAtomStore((s) => s.messagesByPersona[s.activePersona]);
   const isThinking = useAtomStore((s) => s.mood === 'thinking');
   const listRef = useRef<FlatList<Message>>(null);
+  const renderItem: ListRenderItem<Message> = useCallback(
+    ({ item }) => <ChatBubble message={item} onLongPress={onMessageLongPress} />,
+    [onMessageLongPress]
+  );
 
   const scrollToEnd = useCallback(() => {
     listRef.current?.scrollToEnd({ animated: true });

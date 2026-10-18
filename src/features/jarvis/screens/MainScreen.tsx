@@ -16,6 +16,9 @@ import { OfflineBanner } from '../components/layout/OfflineBanner';
 import { TopSlot } from '../components/layout/TopSlot';
 import { ActionBar } from '../components/navigation/ActionBar';
 import { BottomTabs } from '../components/navigation/BottomTabs';
+import { AddSheet } from '../components/sheets/AddSheet';
+import { ChatHistorySheet } from '../components/sheets/ChatHistorySheet';
+import { MessageActionSheet } from '../components/sheets/MessageActionSheet';
 import { IdleGreeting } from '../components/orb/IdleGreeting';
 import { ListeningIndicator } from '../components/orb/ListeningIndicator';
 import { LiveVoiceStatus } from '../components/orb/LiveVoiceStatus';
@@ -27,6 +30,7 @@ import { useLiveVoice } from '../hooks/useLiveVoice';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
+import type { Message } from '../types';
 
 const GREETING_TOP = LAYOUT.dropdown.top + 58;
 /** แถว ActionBar สูงเท่าปุ่มกลาง (คอมพิวเตอร์ 60px) */
@@ -59,6 +63,13 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const [composerHeight, setComposerHeight] = useState(0);
   const [panelHeight, setPanelHeight] = useState(0);
   const focusInput = useCallback(() => inputRef.current?.focus(), []);
+  const [addOpen, setAddOpen] = useState(false);
+  const [selected, setSelected] = useState<Message | null>(null);
+  const draft = useAtomStore((s) => s.composerDraft);
+  const consumeDraft = useCallback(() => {
+    useAtomStore.getState().setComposerDraft(null);
+    inputRef.current?.focus();
+  }, []);
 
   const enterConversation = useCallback(() => {
     const { uiMode, setUIMode, closeDropdown: close } = useAtomStore.getState();
@@ -112,12 +123,12 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
 
   return (
     <>
-      <ChatLayer bottom={chatBottom} />
+      <ChatLayer bottom={chatBottom} onMessageLongPress={setSelected} />
       <OrbLayer onPress={onOrbPress} onLongPress={startLive} liveActive={live.active} />
       {isIdle && <IdleGreeting top={GREETING_TOP} />}
       {/* โหมดไลฟ์ใช้ mood listening ด้วย แต่แสดงสถานะเองใน LiveVoiceStatus */}
       {!live.active && <ListeningIndicator />}
-      <ActionBar onComputer={onOrbPress} onKeyboard={focusInput} />
+      <ActionBar onAdd={() => setAddOpen(true)} onComputer={onOrbPress} onKeyboard={focusInput} />
       <View
         className="absolute left-4 right-4"
         style={{ bottom: composerBottom, zIndex: 13 }}
@@ -137,6 +148,8 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           voiceDisabled={busy}
           onFocus={enterConversation}
           placeholder={`พิมพ์ข้อความถึง${persona.name}…`}
+          draft={draft}
+          onDraftConsumed={consumeDraft}
           accentColor={persona.color}
         />
       </View>
@@ -156,6 +169,8 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
         />
       )}
       <TopSlot />
+      <AddSheet visible={addOpen} onClose={() => setAddOpen(false)} />
+      <MessageActionSheet message={selected} onClose={() => setSelected(null)} busy={busy || live.active} />
     </>
   );
 }
@@ -179,6 +194,12 @@ export function MainScreen() {
   const navigation = useNavigation();
   const containerRef = useRef<View>(null);
   const { overlap, onContainerLayout } = useKeyboardOverlap(containerRef);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const openHistory = useCallback(() => {
+    // ประวัติแชทเป็นของแท็บ Atom — เปิดจากแท็บอื่นก็พากลับมาที่แชท
+    useTabsStore.getState().setActiveTab('atom');
+    setHistoryOpen(true);
+  }, []);
 
   return (
     <View className="flex-1 bg-black">
@@ -188,13 +209,14 @@ export function MainScreen() {
         onLayout={onContainerLayout}
         style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}
       >
-        <Header onSettings={() => navigation.navigate('Settings')} />
+        <Header onHistory={openHistory} onSettings={() => navigation.navigate('Settings')} />
         <OfflineBanner />
         {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
         {activeTab === 'memory' && <MemoryScreen />}
         <BottomTabs />
       </View>
+      <ChatHistorySheet visible={historyOpen} onClose={() => setHistoryOpen(false)} />
     </View>
   );
 }

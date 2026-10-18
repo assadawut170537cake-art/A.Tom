@@ -1,5 +1,5 @@
 import { Mic, MicOff, SendHorizontal } from 'lucide-react-native';
-import { useState, type Ref } from 'react';
+import { useEffect, useState, type Ref } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
 import { PERSONAS } from '../../constants';
@@ -30,6 +30,9 @@ interface ChatInputProps {
   voiceActive?: boolean | undefined;
   /** ห้ามเริ่มโหมดเสียง (เช่นผู้ช่วยกำลังตอบข้อความที่พิมพ์) — กดหยุดได้เสมอ */
   voiceDisabled?: boolean | undefined;
+  /** ข้อความที่ต้องใส่ลงช่องพิมพ์ (เช่นกด "แก้ไข") — ใส่แล้วเรียก onDraftConsumed */
+  draft?: string | null | undefined;
+  onDraftConsumed?: (() => void) | undefined;
 }
 
 export function ChatInput({
@@ -42,8 +45,22 @@ export function ChatInput({
   onVoice,
   voiceActive = false,
   voiceDisabled = false,
+  draft,
+  onDraftConsumed,
 }: ChatInputProps) {
   const [text, setText] = useState('');
+  // ปรับ state ระหว่าง render (แบบที่ React แนะนำ) แทน setState ใน effect — จำ draft ที่ใส่แล้วกันใส่ซ้ำ
+  const [appliedDraft, setAppliedDraft] = useState<string | null>(null);
+  if (draft != null && draft !== appliedDraft) {
+    setAppliedDraft(draft);
+    setText(draft);
+  } else if (draft == null && appliedDraft !== null) {
+    setAppliedDraft(null);
+  }
+
+  useEffect(() => {
+    if (draft != null) onDraftConsumed?.();
+  }, [draft, onDraftConsumed]);
   const canSend = !disabled && text.trim().length > 0;
 
   const send = () => {
