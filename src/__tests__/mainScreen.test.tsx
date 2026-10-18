@@ -1,7 +1,9 @@
+import { useAudioRecorder } from 'expo-audio';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { Keyboard, TextInput, type KeyboardEvent, type View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ProviderError } from '../core/http/errors';
 import { ProviderSettings } from '../core/storage/ProviderSettings';
 import { SecureKeyStore, secretKey } from '../core/storage/SecureKeyStore';
 import { hasConfiguredLLM } from '../features/ai/core/keyStatus';
@@ -144,6 +146,89 @@ describe('MainScreen — Orb (demo greeting removed)', () => {
     expect(useAtomStore.getState().uiMode).toBe('idle');
     expect(stop).toHaveBeenCalled();
     expect(history()).toEqual([]);
+  });
+});
+
+describe('MainScreen — live voice (คุยด้วยเสียง)', () => {
+  /** recorder ปลอมจาก jest.setup — ตั้งระดับเสียง (dBFS) ที่ VAD จะอ่าน */
+  const setLevel = (metering: number) => {
+    const rec = jest.mocked(useAudioRecorder).mock.results.at(-1)?.value as ReturnType<typeof useAudioRecorder>;
+    jest.mocked(rec.getStatus).mockReturnValue({
+      canRecord: true, isRecording: true, durationMillis: 0, mediaServicesDidReset: false, metering, url: null,
+    });
+  };
+  const micButton = () => screen.getByLabelText('คุยด้วยเสียง');
+
+  afterEach(() => jest.useRealTimers());
+
+  test('long-press the Orb → live mode (Thai status, mood listening, typing blocked); tap the Orb → off', async () => {
+    await renderMain();
+    await fireEvent(screen.getByLabelText('แตะเพื่อเริ่มคุย'), 'longPress');
+    expect(await screen.findByText('กำลังฟัง…')).toBeTruthy();
+    expect(useAtomStore.getState()).toMatchObject({ uiMode: 'conversation', mood: 'listening' });
+    expect(screen.getByLabelText('หยุดคุยด้วยเสียง')).toBeTruthy();
+    await fireEvent.changeText(input(), 'พิมพ์ซ้อน');
+    expect(sendButton().props.accessibilityState?.disabled).toBe(true);
+
+    await fireEvent.press(screen.getByLabelText('แตะเพื่อหยุดคุยด้วยเสียง'));
+    expect(screen.queryByText('กำลังฟัง…')).toBeNull();
+    // หยุดโหมดเสียงอย่างเดียว ยังอยู่หน้าคุย
+    expect(useAtomStore.getState()).toMatchObject({ uiMode: 'conversation', mood: 'idle' });
+    expect(micButton()).toBeTruthy();
+  });
+
+  test('mic button → speak → transcript shows as Boss\'s message → reply → listening again', async () => {
+    mockFetch([[GEMINI, (c) => (isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":0.9}') : geminiText('สวัสดีครับบอส'))]]);
+    const listen = jest.spyOn(voiceOrchestrator, 'listen').mockResolvedValue('สวัสดีอะตอม');
+    await renderMain();
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    await fireEvent.press(micButton());
+    await act(() => jest.advanceTimersByTimeAsync(0));
+    expect(screen.getByText('กำลังฟัง…')).toBeTruthy();
+
+    setLevel(-15);
+    await act(() => jest.advanceTimersByTimeAsync(1_000));
+    setLevel(-160);
+    await act(() => jest.advanceTimersByTimeAsync(1_500));
+    expect(listen).toHaveBeenCalledWith('file:///cache/live.m4a');
+    await waitFor(() => expect(history().map((m) => [m.role, m.content])).toEqual([
+      ['user', 'สวัสดีอะตอม'],
+      ['assistant', 'สวัสดีครับบอส'],
+    ]));
+    await act(() => jest.advanceTimersByTimeAsync(0));
+    expect(screen.getByText('กำลังฟัง…')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('หยุดคุยด้วยเสียง'));
+    expect(screen.queryByText('กำลังฟัง…')).toBeNull();
+  });
+
+  test('no STT provider configured → live mode exits with a Thai hint to ตั้งค่า › เสียง', async () => {
+    jest.spyOn(voiceOrchestrator, 'listen').mockRejectedValue(
+      new ProviderError('voice', 'missing_key', 'ผู้ให้บริการเสียงทุกรายล้มเหลว')
+    );
+    await renderMain();
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    await fireEvent.press(micButton());
+    await act(() => jest.advanceTimersByTimeAsync(0));
+    setLevel(-15);
+    await act(() => jest.advanceTimersByTimeAsync(800));
+    setLevel(-160);
+    await act(() => jest.advanceTimersByTimeAsync(1_500));
+    const last = history().at(-1);
+    expect(last).toMatchObject({ role: 'system' });
+    expect(last?.content).toContain('ตั้งค่า › เสียง');
+    expect(screen.queryByText('กำลังฟัง…')).toBeNull();
+    expect(useAtomStore.getState().mood).toBe('idle');
+  });
+
+  test('mic denied → Thai message in chat, no live mode', async () => {
+    jest.spyOn(voiceOrchestrator, 'requestMicrophone').mockRejectedValue(
+      new ProviderError('voice', 'permission', 'ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน')
+    );
+    await renderMain();
+    await fireEvent.press(micButton());
+    await settle();
+    expect(history().at(-1)).toMatchObject({ role: 'system', content: '⚠️ ไม่ได้รับอนุญาตให้ใช้ไมโครโฟน' });
+    expect(screen.queryByText('กำลังฟัง…')).toBeNull();
   });
 });
 

@@ -1,4 +1,4 @@
-import { SendHorizontal } from 'lucide-react-native';
+import { Mic, MicOff, SendHorizontal } from 'lucide-react-native';
 import { useState, type Ref } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
@@ -24,6 +24,12 @@ interface ChatInputProps {
   accentColor?: string | undefined;
   onFocus?: (() => void) | undefined;
   ref?: Ref<TextInput> | undefined;
+  /** มี = แสดงปุ่มไมค์ (เข้า/ออกโหมดคุยด้วยเสียง) */
+  onVoice?: (() => void) | undefined;
+  /** โหมดคุยด้วยเสียงทำงานอยู่ — ปุ่มไมค์กลายเป็นปุ่มหยุด */
+  voiceActive?: boolean | undefined;
+  /** ห้ามเริ่มโหมดเสียง (เช่นผู้ช่วยกำลังตอบข้อความที่พิมพ์) — กดหยุดได้เสมอ */
+  voiceDisabled?: boolean | undefined;
 }
 
 export function ChatInput({
@@ -33,6 +39,9 @@ export function ChatInput({
   accentColor = PERSONAS[1].color,
   onFocus,
   ref,
+  onVoice,
+  voiceActive = false,
+  voiceDisabled = false,
 }: ChatInputProps) {
   const [text, setText] = useState('');
   const canSend = !disabled && text.trim().length > 0;
@@ -65,6 +74,27 @@ export function ChatInput({
           textAlignVertical: 'center',
         }}
       />
+      {onVoice && (
+        <Pressable
+          onPress={onVoice}
+          disabled={voiceDisabled && !voiceActive}
+          accessibilityRole="button"
+          accessibilityLabel={voiceActive ? 'หยุดคุยด้วยเสียง' : 'คุยด้วยเสียง'}
+          accessibilityState={{ disabled: voiceDisabled && !voiceActive, selected: voiceActive }}
+          hitSlop={6}
+          className="mb-0.5 h-9 w-9 items-center justify-center rounded-full"
+          style={{
+            backgroundColor: voiceActive ? accentColor : 'rgba(255,255,255,0.1)',
+            opacity: voiceDisabled && !voiceActive ? 0.4 : 1,
+          }}
+        >
+          {voiceActive ? (
+            <MicOff size={18} color="#ffffff" strokeWidth={2} />
+          ) : (
+            <Mic size={18} color="rgba(255,255,255,0.85)" strokeWidth={2} />
+          )}
+        </Pressable>
+      )}
       <Pressable
         onPress={send}
         disabled={!canSend}
