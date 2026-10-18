@@ -265,7 +265,8 @@
 ### ต้องทำก่อน
 1. ✅ ย้าย shared types (`Persona`, `AIProviderId`) → `core/types/` — รวม `Message` + TTS/STT ids, core ไม่ import features แล้ว
 2. ✅ Prompt injection guard (ADR-011) — ขั้นแรก: `toPromptLine()` บีบ fact เป็นบรรทัดเดียว (กันปลอมบรรทัด "System:")
-   ⚠️ ยังไม่กรอง/ครอบ *เนื้อหา* ในบรรทัด — ทบทวนอีกครั้งก่อนเปิดให้ module เขียน memory ได้
+   **A1 (ADR-014):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` ถ้าเจอ "ignore previous/all instructions" · `system:` (มี word boundary — `filesystem:` ผ่าน) · `<|...|>`
+   ⚠️ เป็น blacklist แคบ ๆ (อังกฤษเป็นหลัก) ไม่ใช่การกันครบ — ทบทวนอีกครั้งก่อนเปิดให้ module เขียน memory ได้
 3. ✅ ย้าย `loader.ts` → app-level (`src/modules/loader.ts`)
 
 ### ระหว่าง Phase 4.5
@@ -276,18 +277,22 @@
 8. ✅ UI Module Manager (4.5.3) — ตั้งค่า › Modules: สวิตช์เปิด/ปิด (จำค่า) + รายละเอียด + เริ่มใหม่ + กฎ dependency
 
 ### หลัง Phase 4.5
-9. Prettier config + format
-10. Module อื่นๆ
+9. ✅ Prettier config (A5) — `.prettierrc` + `.prettierignore` + scripts `format` / `format:check`
+   ✅ `prettier` อยู่ใน devDependencies แล้ว (Boss อนุมัติ 2026-10-18) · ยังไม่ได้ format ไฟล์ใด ๆ (ห้าม reformat ทั้ง repo โดยไม่บอก)
+10. Module อื่นๆ — คู่มือสร้าง module: `src/modules/README.md` (B1)
 
 ### Nice to Have
 11. ✅ `SECRET_PATTERN` เพิ่ม `|AKIA[0-9A-Z]{16}`
 12. ✅ `AGENTS.md` อัปเดตให้ตรง ADR-009
 
-### Findings จาก Boss test (emulator) — ยังไม่ได้แก้
-13. **Voice Persona Map default** — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
+### Findings จาก Boss test (emulator) — แก้แล้วในงาน Parking Lot Cleanup (ต้องทดสอบบนเครื่องจริง)
+13. ✅ **Voice Persona Map default** (A2) — `DEFAULT_PERSONA_VOICE_MAP` (นิยามใน `core/storage/ProviderSettings.ts`, re-export ที่ `voice.config.ts`) · `resolveVoiceFor()` = shared voice → ค่าที่ตั้ง → default · default ใช้ Expo Speech แยกด้วย pitch/speed เท่านั้น (ไม่ใส่ voiceId เพราะ identifier ต่างกันตามเครื่อง)
+    เดิม: — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
     (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
-14. **Orb แยก shape/animation** — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
-15. **สี Atom vs Ultron ต่างชัด** — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
+14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ⚠️ GLSL ใหม่ยังไม่ได้ลองบน GPU จริง
+    เดิม: — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
+15. ✅ **สี Atom vs Ultron ต่างชัด** (A4) — Atom `#E67E22` · Ultron `#C0392B` (contrast บนดำ ≥ 3:1 มี test) · Boss อนุมัติเปลี่ยน lock Phase 2 แล้ว
+    เดิม: — อะตอม `#d35400` (ส้มเข้ม) กับอัลตรอน `#ff0033` (แดง) ดูใกล้กันบนจอจริง → ต้องปรับให้แยกออกชัด
     (ค่า `PERSONAS` ถูก lock ไว้ตั้งแต่ Phase 2 — เปลี่ยนต้องให้ Boss อนุมัติ)
 
 ### Findings ระหว่างทำ 4.5.3
@@ -357,5 +362,5 @@
 
 ---
 
-**Last updated:** 2026-10-16 (4.5.4.3: ตรวจ conflict/LWW/tombstone + SYNC_PROTOCOL.md · 4.5.4.2: Mark 55 sync — RemoteMemoryAdapter · SyncQueue · Sync screen · MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
+**Last updated:** 2026-10-18 (Parking Lot Cleanup: A1 guard v2 · A2 default voice · A3 orb variants · A4 สี · A5 prettier config · B1 module guide · 4.5.4.3: ตรวจ conflict/LWW/tombstone + SYNC_PROTOCOL.md · 4.5.4.2: Mark 55 sync — RemoteMemoryAdapter · SyncQueue · Sync screen · MCP · Skills · Device · Marketplace · Agent Harness · fix ModuleRegistry stale pending · 4.5.3: Module Manager UI · 4.5.2: Memory UI · 4.5.1: localMemory → ChatHandler + boot)
 **Version:** 1.0

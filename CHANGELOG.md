@@ -12,6 +12,14 @@
 
 ## [Unreleased]
 
+### Parking Lot Cleanup (Phase 4.5 pre-5)
+- **Security (A1, [ADR-014](docs/DECISIONS.md#adr-014--prompt-injection-guard-v2)):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` เมื่อเจอ "ignore previous/all instructions", `system:` (word boundary), `<|...|>` — มีผลกับ memory fact · skill ที่ AI สร้าง · ผลจาก MCP · tool result ที่ผ่านฟังก์ชันนี้
+- **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ
+- **Orb (A3):** variant ต่อ persona (อะตอมเหลี่ยมหยาบหมุนช้า · จาร์วิสเนียน · ไฟรเดย์คมหมุนเร็ว · อัลตรอนกระตุกพัลส์แรง) ผ่าน `setOrbPersona()`
+- **Theme (A4):** Atom `#d35400` → `#E67E22` · Ultron `#ff0033` → `#C0392B` (Boss อนุมัติ)
+- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency
+- **Docs (B1):** `src/modules/README.md` — คู่มือสร้าง module + `demo-module` ตัวอย่าง (ไม่ได้อยู่ในโค้ดแอป)
+
 ### Added
 - **ซิงก์ Memory เข้า Supermemory:** `core/memory/SuperMemorySync.ts` (`SuperMemorySyncService`) ฟัง `LocalMemoryAdapter.subscribe()` → fact ที่เพิ่ม/แก้ส่ง `POST https://api.supermemory.ai/v3/documents` (`containerTag: project_atom_memory_base_4folders_atom_core`, `dreaming: instant`) ทีละรายการตามลำดับ · fail-open (เน็ตหลุด / key ผิด / server ล่ม / timeout 10s แค่ log — save() และแชทไม่รอ) · ไม่ส่งการลบ และไม่ส่งของที่ดึงจาก Mark 55 · API key ใน SecureStore (`atom.secret.supermemory.apiKey`) ใส่ได้ที่ **ตั้งค่า › Sync › Supermemory** · boot เรียก `superMemorySync.start()` · `redactSecrets()` ปิด `sm_…`
 - **คุยด้วยเสียงแบบไลฟ์ (Live Voice):** กดค้างที่ Orb หรือปุ่มไมค์ในช่องพิมพ์ → ฟัง → ตรวจจบประโยคจากระดับเสียง (VAD: เงียบ 1.2s, ตัดเสียงสั้นกว่า 0.4s, ยาวสุด 30s, ไม่มีใครพูด 30s ออกเอง) → ถอดเสียงด้วย STT chain เดิม → ข้อความขึ้นเป็นของบอสในแชท → ผู้ช่วยตอบ + พูด → ฟังต่ออัตโนมัติ จนกว่าจะแตะ Orb/ปุ่มไมค์ · สถานะไทย (กำลังฟัง… / กำลังถอดเสียง… / กำลังคิด… / กำลังพูด…) · ไม่อัดเสียงระหว่างผู้ช่วยพูด · ไม่มี STT / key → ออกจากโหมดพร้อมบอกให้ตั้งค่าที่ ตั้งค่า › เสียง · `voice/live/LiveVoiceSession.ts` (state machine, DI) + `jarvis/hooks/useLiveVoice.ts` (expo-audio recorder + metering) — ไม่มี dependency ใหม่

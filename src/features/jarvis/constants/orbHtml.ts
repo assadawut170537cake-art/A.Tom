@@ -1,10 +1,12 @@
+import type { Persona } from '../../../core/types/persona';
+
 import { LAYOUT, PERSONAS } from './index';
 
 /**
  * Self-contained HTML for the 3D Orb (raw WebGL, no CDN, works offline).
  *
  * Bridge API (called from React Native via injectJavaScript):
- *   window.setOrbPersona(1 | 2 | 3 | 4)
+ *   window.setOrbPersona(1 | 2 | 3 | 4)   // สี + variant รูปทรง/การเคลื่อนไหว (ORB_VARIANTS)
  *   window.setOrbState('IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING')
  *   window.setOrbAudio(0..1)   // first call switches SPEAKING pulse from auto waveform to external level
  *
@@ -20,6 +22,35 @@ const hexToRgb = (hex: string): [number, number, number] => {
 const PERSONA_COLORS = JSON.stringify(
   Object.fromEntries(Object.values(PERSONAS).map((p) => [p.id, hexToRgb(p.color)]))
 );
+
+/**
+ * ลักษณะเฉพาะของ Orb ต่อ persona — ส่งเข้า shader เป็น uniform (setOrbPersona สลับให้)
+ * - spin: ตัวคูณความเร็วการเคลื่อนไหว  - facet: 0 = ผิวเรียบ, 1 = เหลี่ยมหยาบ (ปัดมุมเป็นขั้น)
+ * - freq: ความถี่ของ noise ที่ขอบ      - sharp: ความคมของแสงสะท้อน  - gloss: ความแรงของแสงสะท้อน
+ * - stutter: 0..1 ความกระตุกของเวลา     - pulse: ตัวคูณแรงพัลส์ตอนพูด
+ */
+export interface OrbVariant {
+  spin: number;
+  facet: number;
+  freq: number;
+  sharp: number;
+  gloss: number;
+  stutter: number;
+  pulse: number;
+}
+
+export const ORB_VARIANTS: Record<Persona, OrbVariant> = {
+  // อะตอม: เหลี่ยมหยาบดิบ หมุนช้า
+  1: { spin: 0.7, facet: 1.0, freq: 1.0, sharp: 10, gloss: 0.3, stutter: 0, pulse: 1.0 },
+  // จาร์วิส: เนียน หมุนนุ่ม
+  2: { spin: 0.9, facet: 0, freq: 0.7, sharp: 18, gloss: 0.5, stutter: 0, pulse: 0.9 },
+  // ไฟรเดย์: คม แสงสะท้อนจัด หมุนเร็ว
+  3: { spin: 1.6, facet: 0, freq: 1.6, sharp: 90, gloss: 1.1, stutter: 0, pulse: 1.0 },
+  // อัลตรอน: กระตุก พัลส์แรง
+  4: { spin: 1.2, facet: 0.35, freq: 2.2, sharp: 40, gloss: 0.8, stutter: 0.85, pulse: 2.4 },
+};
+
+const PERSONA_VARIANTS = JSON.stringify(ORB_VARIANTS);
 
 const SIZE = LAYOUT.orb.nativeSize;
 
@@ -41,6 +72,7 @@ export const ORB_HTML = `<!DOCTYPE html>
 <script>
 (function () {
   var COLORS = ${PERSONA_COLORS};
+  var VARIANTS = ${PERSONA_VARIANTS};
   var STATES = {
     IDLE:      { speed: 0.35, amp: 0.025, glow: 0.55, ring: 0.0, swirl: 0.0, pulse: 0.0 },
     LISTENING: { speed: 0.80, amp: 0.045, glow: 0.75, ring: 1.0, swirl: 0.0, pulse: 0.0 },
@@ -53,6 +85,9 @@ export const ORB_HTML = `<!DOCTYPE html>
   for (var k = 0; k < KEYS.length; k++) cur[KEYS[k]] = STATES.IDLE[KEYS[k]];
   var color = COLORS[1].slice(); var targetColor = COLORS[1].slice(); var colorInit = false;
   var audio = 0; var targetAudio = 0;
+  var variant = VARIANTS[1]; var curV = {}; var vInit = false;
+  var VKEYS = ['spin', 'facet', 'freq', 'sharp', 'gloss', 'stutter', 'pulse'];
+  for (var vk = 0; vk < VKEYS.length; vk++) curV[VKEYS[vk]] = variant[VKEYS[vk]];
 
   function applyFallback() {
     var fb = document.getElementById('fallback');
@@ -64,6 +99,10 @@ export const ORB_HTML = `<!DOCTYPE html>
   window.setOrbPersona = function (p) {
     var c = COLORS[p];
     if (!c) return;
+    variant = VARIANTS[p] || variant;
+    window.__orbVariant = variant;
+    // ครั้งแรกกระโดดไปค่าของ persona เลย (ไม่ไล่จากอะตอม) · หลังจากนั้นค่อย ๆ ไล่ใน frame()
+    if (!vInit) { for (var i = 0; i < VKEYS.length; i++) curV[VKEYS[i]] = variant[VKEYS[i]]; vInit = true; }
     targetColor = c.slice();
     if (!colorInit) { color = c.slice(); colorInit = true; }
     if (!gl) applyFallback();
@@ -89,6 +128,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     'precision highp float;',
     'uniform vec2 uRes; uniform float uTime; uniform vec3 uColor;',
     'uniform float uAmp; uniform float uGlow; uniform float uRing; uniform float uSwirl; uniform float uPulse; uniform float uPhase; uniform float uAudio;',
+    'uniform float uFacet; uniform float uFreq; uniform float uSharp; uniform float uGloss; uniform float uPulseMul;',
     'vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 mod289(vec4 x){return x-floor(x*(1.0/289.0))*289.0;}',
     'vec4 permute(vec4 x){return mod289(((x*34.0)+1.0)*x);}',
@@ -118,8 +158,11 @@ export const ORB_HTML = `<!DOCTYPE html>
     '  vec2 dir=r>0.0001?uv/r:vec2(1.0,0.0);',
     '  float t=uPhase;',
     '  float voice=uAudio;',
-    '  float R=0.56+uPulse*0.05*voice;',
-    '  float Rd=R+snoise(vec3(dir*1.3,t))*uAmp;',
+    '  float R=0.56+uPulse*0.05*voice*uPulseMul;',
+    '  float ang0=atan(dir.y,dir.x);',
+    '  float qa=floor(ang0/0.6981+0.5)*0.6981;',
+    '  vec2 fdir=mix(dir,vec2(cos(qa),sin(qa)),uFacet);',
+    '  float Rd=R+snoise(vec3(fdir*1.3*uFreq,t))*uAmp*mix(1.0,2.2,uFacet);',
     '  vec3 col=vec3(0.0); float a=0.0;',
     '  if(r<Rd+0.02){',
     '    float z=sqrt(max(Rd*Rd-r*r,0.0));',
@@ -131,9 +174,9 @@ export const ORB_HTML = `<!DOCTYPE html>
     '    float bands=uSwirl*smoothstep(0.35,0.9,sin(atan(q.y,q.x)*3.0+uTime*4.0+inner*2.0));',
     '    vec3 L=normalize(vec3(-0.45,0.55,0.8));',
     '    float diff=max(dot(n,L),0.0);',
-    '    float spec=pow(max(dot(reflect(-L,n),vec3(0.0,0.0,1.0)),0.0),28.0);',
+    '    float spec=pow(max(dot(reflect(-L,n),vec3(0.0,0.0,1.0)),0.0),uSharp);',
     '    float fres=pow(1.0-n.z,2.2);',
-    '    col=uColor*(0.18+0.55*diff)+uColor*fres*1.3+vec3(spec)*0.55+uColor*inner*0.22+uColor*bands*0.35;',
+    '    col=uColor*(0.18+0.55*diff)+uColor*fres*1.3+vec3(spec)*uGloss+uColor*inner*0.22+uColor*bands*0.35;',
     '    col=mix(col,vec3(1.0),0.12*fres);',
     '    a=smoothstep(Rd+0.01,Rd-0.01,r);',
     '  }',
@@ -170,7 +213,7 @@ export const ORB_HTML = `<!DOCTYPE html>
     var loc = gl.getAttribLocation(prog, 'aPos');
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase', 'uAudio'].forEach(function (n) {
+    ['uRes', 'uTime', 'uColor', 'uAmp', 'uGlow', 'uRing', 'uSwirl', 'uPulse', 'uPhase', 'uAudio', 'uFacet', 'uFreq', 'uSharp', 'uGloss', 'uPulseMul'].forEach(function (n) {
       U[n] = gl.getUniformLocation(prog, n);
     });
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -195,8 +238,11 @@ export const ORB_HTML = `<!DOCTYPE html>
     var f = 1 - Math.exp(-dt * 5);
     for (var i = 0; i < KEYS.length; i++) cur[KEYS[i]] += (target[KEYS[i]] - cur[KEYS[i]]) * f;
     for (var c = 0; c < 3; c++) color[c] += (targetColor[c] - color[c]) * f;
+    for (var v = 0; v < VKEYS.length; v++) curV[VKEYS[v]] += (variant[VKEYS[v]] - curV[VKEYS[v]]) * f;
     time += dt;
-    phase += dt * cur.speed;
+    phase += dt * cur.speed * curV.spin;
+    // อัลตรอน: เวลาเดินเป็นขั้น ๆ ให้ดูกระตุก (ผสมกับเวลาเรียบตาม stutter)
+    var shownPhase = phase * (1 - curV.stutter) + (Math.floor(phase * 7) / 7) * curV.stutter;
     if (!window.__externalAudioControl) {
       // Auto voice waveform until RN drives the level via setOrbAudio
       targetAudio = 0.5 + 0.5 * Math.sin(time * 9.0) * Math.sin(time * 3.7 + 1.3);
@@ -207,7 +253,12 @@ export const ORB_HTML = `<!DOCTYPE html>
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(U.uRes, canvas.width, canvas.height);
     gl.uniform1f(U.uTime, time);
-    gl.uniform1f(U.uPhase, phase);
+    gl.uniform1f(U.uPhase, shownPhase);
+    gl.uniform1f(U.uFacet, curV.facet);
+    gl.uniform1f(U.uFreq, curV.freq);
+    gl.uniform1f(U.uSharp, curV.sharp);
+    gl.uniform1f(U.uGloss, curV.gloss);
+    gl.uniform1f(U.uPulseMul, curV.pulse);
     gl.uniform3f(U.uColor, color[0], color[1], color[2]);
     gl.uniform1f(U.uAmp, cur.amp);
     gl.uniform1f(U.uGlow, cur.glow);

@@ -184,3 +184,13 @@ ADR-001 – 010: การตัดสินใจที่ **lock** ไว้�
 | **Rationale** | • pattern ของ agent ฟรี ออฟไลน์ได้ และแม่นกว่าให้ model เดา จึงมาก่อน Jev/LLM<br>• Jev / LLM ตอบได้แค่ `MODEL_INTENTS` (3 ตัวเดิม) เพราะ label อย่างเดียวบอกไม่ได้ว่า agent ตัวไหน — prompt/criteria เดิมจึงไม่เปลี่ยน<br>• agent ล้ม → ตอบเป็นข้อความไทย (ไม่ throw) เพราะไม่ใช่ปัญหาเน็ต/API key คำแนะนำแบบ provider จะชี้ผิดทาง<br>• UI ของ agent ครอบด้วย error boundary + ปุ่มลองใหม่ → agent พังไม่ลากหน้าหลักล้ม<br>• ไม่มี agent ลงทะเบียน = router ทำงานเหมือนเดิมทุกอย่าง |
 | **Consequences** | ➕ เพิ่มความสามารถที่มี UI ได้โดยไม่แตะ ChatHandler / PCCommandHandler / SwitchAssistantHandler<br>➖ Rule มาก่อน Agent → คำสั่ง agent ที่บังเอิญมีคำว่า "เปิด/ปิด…เครื่อง/คอม" ถูก `pc_command` แย่งไป (เช่น "จดบันทึกว่าปิดคอมตอนสี่ทุ่ม")<br>➖ pattern ต้องเขียนให้แคบ ไม่งั้นแย่งข้อความคุยปกติก่อนถึง LLM |
 
+---
+
+## ADR-014 — Prompt injection guard v2
+
+| | |
+|---|---|
+| **Decision** | `toPromptLine()` (`core/memory/promptLine.ts`) นอกจากบีบเป็นบรรทัดเดียว (ADR-011) แล้วยังตรวจ blacklist: "ignore (all/any/the)? (previous/prior/above) instructions", "ignore all instructions", `\bsystem\s*:`, `<|...|>` — ถ้าเจอ → **แทนทั้งบรรทัด**ด้วย `[REDACTED BY GUARD]` (`GUARD_REDACTION`) |
+| **Status** | 🧪 Proposed (2026-10-18) — PR `chore/parking-lot-cleanup` |
+| **Rationale** | • การบีบบรรทัดกันได้แค่ปลอมโครงสร้าง ส่วนประโยคสั่งในบรรทัดเดียวยังหลุด<br>• redact ทั้งบรรทัด ไม่ตัดเฉพาะส่วน เพราะส่วนที่เหลือของข้อความที่พยายามสั่ง model เชื่อถือไม่ได้<br>• ตรวจก่อน `slice(max)` ไม่ให้การตัดความยาวซ่อนรูปแบบ<br>• `\b` หน้า `system` กัน false positive เช่น "filesystem:" / "ecosystem:"<br>• อยู่ที่ `toPromptLine` ที่เดียว → ครอบทุกทางเข้า prompt (memory fact · skill · MCP · agent harness) |
+| **Consequences** | ➕ ทุกทางเข้า prompt ได้ guard เดียวกัน ทดสอบง่าย<br>➖ blacklist จับได้เฉพาะรูปแบบที่รู้จัก (อังกฤษเป็นหลัก; ภาษาไทย/ถ้อยคำอื่น/ข้อความถูกแยกเป็นหลายบรรทัดที่รวมแล้วไม่ตรงรูปแบบ ผ่านได้) — ไม่ใช่การรับประกันความปลอดภัย<br>➖ ข้อความปกติที่บังเอิญมี "System:" (เช่น log ที่ MCP คืน) ถูก redact ทั้งบรรทัด<br>➖ ก่อนให้ module เขียน memory ได้ ควรเพิ่มการครอบ/กรอง *เนื้อหา* อีกชั้น |
