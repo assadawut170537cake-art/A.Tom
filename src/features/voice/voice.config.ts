@@ -1,6 +1,9 @@
 import type { VoiceIdOf, VoiceKind } from '../../core/storage/ProviderSettings';
 import type { STTProviderId, TTSProviderId } from './core/types';
 
+// ค่าเริ่มต้นต่อ persona นิยามที่ core (ProviderSettings) — re-export ให้ import จาก voice.config ได้
+export { DEFAULT_PERSONA_VOICE_MAP } from '../../core/storage/ProviderSettings';
+
 export interface VoiceProviderMeta<Id extends string> {
   id: Id;
   name: string;

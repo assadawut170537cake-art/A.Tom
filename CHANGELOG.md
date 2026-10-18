@@ -12,6 +12,14 @@
 
 ## [Unreleased]
 
+### Parking Lot Cleanup (Phase 4.5 pre-5)
+- **Security (A1, [ADR-014](docs/DECISIONS.md#adr-014--prompt-injection-guard-v2)):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` เมื่อเจอ "ignore previous/all instructions", `system:` (word boundary), `<|...|>` — มีผลกับ memory fact · skill ที่ AI สร้าง · ผลจาก MCP · tool result ที่ผ่านฟังก์ชันนี้
+- **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ
+- **Orb (A3):** variant ต่อ persona (อะตอมเหลี่ยมหยาบหมุนช้า · จาร์วิสเนียน · ไฟรเดย์คมหมุนเร็ว · อัลตรอนกระตุกพัลส์แรง) ผ่าน `setOrbPersona()`
+- **Theme (A4):** Atom `#d35400` → `#E67E22` · Ultron `#ff0033` → `#C0392B` (Boss อนุมัติ)
+- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency
+- **Docs (B1):** `src/modules/README.md` — คู่มือสร้าง module + `demo-module` ตัวอย่าง (ไม่ได้อยู่ในโค้ดแอป)
+
 ### Added
 - **ผู้ช่วยครบชุด (16 ข้อจาก gap analysis):**
   - แชท: ประวัติหลายห้อง + ค้นหา · ปุ่ม ＋ แชทใหม่ · Markdown · เมนูข้อความ (คัดลอก/พูดซ้ำ/ลบ) · error ย่อเป็นแถบเดียว · คำตอบไหลทีละส่วน (streaming) · ค้นเว็บ (Gemini Google Search / OpenRouter web)
@@ -20,14 +28,10 @@
   - ผู้ช่วยใช้ tool (MCP/ทักษะ/อุปกรณ์) ในแชทปกติได้ · เสนอสิ่งที่ควรจำ (ชิป "จำไว้ไหม" ต้องกดยืนยันก่อนบันทึก)
   - ถอดเสียงในเครื่อง (expo-speech-recognition — ไม่ต้องมี key) · พูดแทรกระหว่างผู้ช่วยพูดได้ (ปิดได้ที่ ตั้งค่า › เสียง)
   - Android: กดค้างปุ่มโฮม (เมื่อเลือก A.T.O.M. เป็นผู้ช่วยดิจิทัล) / ปุ่มหูฟัง → คุยด้วยเสียง · ลิงก์ `atom://live|today|memory|new|chat?text=` · ทางลัดไอคอน · widget หน้าจอหลัก (`plugins/withAssistantEntry.js`)
-  - เสียงเริ่มต้นต่อ persona (`PERSONA_VOICE_DEFAULTS`) · Orb รูปทรง/จังหวะเฉพาะตัว (`ORB_STYLES`)
-
-### Changed
-- สีอะตอม `#d35400` → `#f5a623` (แยกจากอัลตรอนชัด — บอสอนุมัติ 2026-10-18)
 
 ### Added (ก่อนหน้า)
-- **ซิงก์ Memory เข้า Supermemory:** `core/memory/SuperMemorySync.ts` (`SuperMemorySyncService`) ฟัง `LocalMemoryAdapter.subscribe()` → fact ที่เพิ่ม/แก้ส่ง `POST https://api.supermemory.ai/v3/documents` (`containerTag: project_atom_memory_base_4folders_atom_core`, `dreaming: instant`) ทีละรายการตามลำดับ · fail-open (เน็ตหลุด / key ผิด / server ล่ม / timeout 10s แค่ log — save() และแชทไม่รอ) · ไม่ส่งการลบ และไม่ส่งของที่ดึงจาก Mark 55 · API key ใน SecureStore (`atom.secret.supermemory.apiKey`) ใส่ได้ที่ **ตั้งค่า › Sync › Supermemory** · boot เรียก `superMemorySync.start()` · `redactSecrets()` ปิด `sm_…`
 - **Build แอป Android (APK ติดตั้งเองได้):** `eas.json` (profile `preview` = APK, `production` = AAB) · package `com.atom.assistant` · `plugins/withCleartextTraffic.js` ให้ release build ต่อ Sync server แบบ http ใน LAN ได้ (ใช้ expo/config-plugins ที่มากับ expo — ไม่มี dependency ใหม่)
+- **ซิงก์ Memory เข้า Supermemory:** `core/memory/SuperMemorySync.ts` (`SuperMemorySyncService`) ฟัง `LocalMemoryAdapter.subscribe()` → fact ที่เพิ่ม/แก้ส่ง `POST https://api.supermemory.ai/v3/documents` (`containerTag: project_atom_memory_base_4folders_atom_core`, `dreaming: instant`) ทีละรายการตามลำดับ · fail-open (เน็ตหลุด / key ผิด / server ล่ม / timeout 10s แค่ log — save() และแชทไม่รอ) · ไม่ส่งการลบ และไม่ส่งของที่ดึงจาก Mark 55 · API key ใน SecureStore (`atom.secret.supermemory.apiKey`) ใส่ได้ที่ **ตั้งค่า › Sync › Supermemory** · boot เรียก `superMemorySync.start()` · `redactSecrets()` ปิด `sm_…`
 - **คุยด้วยเสียงแบบไลฟ์ (Live Voice):** กดค้างที่ Orb หรือปุ่มไมค์ในช่องพิมพ์ → ฟัง → ตรวจจบประโยคจากระดับเสียง (VAD: เงียบ 1.2s, ตัดเสียงสั้นกว่า 0.4s, ยาวสุด 30s, ไม่มีใครพูด 30s ออกเอง) → ถอดเสียงด้วย STT chain เดิม → ข้อความขึ้นเป็นของบอสในแชท → ผู้ช่วยตอบ + พูด → ฟังต่ออัตโนมัติ จนกว่าจะแตะ Orb/ปุ่มไมค์ · สถานะไทย (กำลังฟัง… / กำลังถอดเสียง… / กำลังคิด… / กำลังพูด…) · ไม่อัดเสียงระหว่างผู้ช่วยพูด · ไม่มี STT / key → ออกจากโหมดพร้อมบอกให้ตั้งค่าที่ ตั้งค่า › เสียง · `voice/live/LiveVoiceSession.ts` (state machine, DI) + `jarvis/hooks/useLiveVoice.ts` (expo-audio recorder + metering) — ไม่มี dependency ใหม่
 - **เลือกโมเดล AI จากรายชื่อจริง** (ตั้งค่า › AI): `ModelPicker` แทนตัวเลือกเดิม — กดแล้วโหลดรายชื่อโมเดลจาก API ของผู้ให้บริการทันที (ไม่ต้องกด "โหลดรายการ" ก่อน) · ช่องค้นหา · "โหลดรายชื่อใหม่" · สถานะกำลังโหลด / error ไทย · **"พิมพ์ชื่อเอง"** เมื่อโหลดไม่ได้หรือโมเดลไม่อยู่ในรายการ · ยังไม่บันทึก key → แสดงคำแนะนำ + รายการเริ่มต้น · cache รายชื่อในหน่วยความจำต่อ provider ตลอด session (ล้างเมื่อบันทึก/ลบ key) · `AIProvider.listModels?()` ดึงสดไม่ fallback: Gemini `GET /v1beta/models` (เฉพาะ `generateContent`, ตามหน้า ≤ 5), OpenRouter/OpenAI-compatible `GET {baseURL}/models`, Jev `GET /v1/models` · parser ใช้ type guard (`features/ai/core/modelLists.ts`) · ค่าที่บันทึก (`models[providerId]`) รูปแบบเดิม
 - **4.5.5.3 สั่งงาน Mark 55 จากแชท (Memory Bus):** module `pc-bridge` (`features/pc-bridge/`) โหลดตอน boot → intent `pc_command` ส่งงานเข้า Supabase ผ่าน RPC `mobile_submit_task` แล้วรอผลด้วย `mobile_get_task` (fetch ตรง ไม่มี dependency ใหม่) · คำสั่งที่รองรับ: เช็กเครื่อง (`RUN_DIAGNOSTICS`) · บิลด์ (`EXECUTE_BUILD`) · หน้า **ตั้งค่า › Mark 55 Bus** (Project URL · anon/publishable key · token เครื่อง ใน SecureStore · ทดสอบการเชื่อมต่อ) · `mark55/sql/002_mobile_rpc.sql` (token เก็บเป็น hash, instruction allowlist, จำกัด 20 งาน/นาที/เครื่อง, เห็นเฉพาะงานของเครื่องตัวเอง)
