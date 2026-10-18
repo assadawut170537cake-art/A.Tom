@@ -32,7 +32,7 @@ import {
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry, type ProviderRegistry } from './ProviderRegistry';
-import type { AIProvider, AIProviderId, ChatRequest, ChatResponse } from './types';
+import type { AIProvider, AIProviderId, ChatRequest, ChatResponse, PartialTextListener } from './types';
 
 /** Failures worth retrying on the same provider (auth/missing key never fix themselves). */
 const RETRYABLE = new Set<ProviderErrorKind>(['rate_limit', 'server', 'timeout', 'network']);
@@ -43,6 +43,11 @@ interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
   providerId?: AIProviderId;
   /** Model override for the pinned provider only (models are provider-specific). */
   model?: string;
+  /**
+   * มี = อยากได้คำตอบแบบไหล (ถ้าบอสเปิด streaming และ provider รองรับ)
+   * ก่อนลอง provider ตัวถัดไปจะเรียก `onText('')` ให้ UI ล้างข้อความครึ่งทางของตัวที่ล้ม
+   */
+  onText?: PartialTextListener | undefined;
 }
 
 /**
@@ -64,23 +69,38 @@ export class Orchestrator {
   ) {}
 
   async chat(input: OrchestratorChatInput): Promise<ChatResponse> {
-    const { providerId: pinned, model: pinnedModel, ...rest } = input;
+    const { providerId: pinned, model: pinnedModel, onText, webSearch, ...rest } = input;
     const chain = await this.providerChain(pinned);
     if (!chain.length) {
       throw new ProviderError('orchestrator', 'missing_key', 'ไม่มีผู้ให้บริการ AI ที่เปิดใช้งาน');
     }
 
-    const { timeoutMs, retries, fallback } = await this.settings.getAdvanced();
+    const adv = await this.settings.getAdvanced();
+    const { timeoutMs, retries, fallback } = adv;
     const failures: ProviderError[] = [];
+    let emitted = false;
+    const listener: PartialTextListener | undefined = onText
+      ? (text) => {
+          emitted = text.length > 0;
+          onText(text);
+        }
+      : undefined;
     for (const provider of fallback ? chain : chain.slice(0, 1)) {
       const id = provider.config.id;
       const model =
         (id === pinned && pinnedModel) ||
         (await this.settings.getModelFor(id)) ||
         provider.config.defaultModel;
+      // ค้นเว็บ: Gemini ใช้โควตาฟรี (webSearch) · ตัวอื่นคิดเงินเพิ่ม (webSearchPaid)
+      const search = !!webSearch && (provider.config.type === 'gemini' ? adv.webSearch : adv.webSearchPaid);
+      const req: ChatRequest = { timeoutMs, ...rest, model, webSearch: search };
       for (let attempt = 0; ; attempt++) {
+        if (emitted) listener?.('');
         try {
-          const res = await provider.chat({ timeoutMs, ...rest, model });
+          const res =
+            listener && adv.streaming && provider.chatStream
+              ? await provider.chatStream(req, listener)
+              : await provider.chat(req);
           this.lastGood = id;
           this.rememberAuthFailures(failures);
           return res;

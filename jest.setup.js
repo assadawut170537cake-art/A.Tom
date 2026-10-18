@@ -98,3 +98,6 @@ jest.mock('expo-file-system', () => {
 
 // expo-clipboard เป็น native module — test ตรวจแค่ว่าเรียกด้วยข้อความอะไร
 jest.mock('expo-clipboard', () => ({ setStringAsync: jest.fn(async () => true), getStringAsync: jest.fn(async () => '') }));
+
+// expo/fetch (ใช้กับคำตอบแบบไหล) → ส่งต่อให้ global fetch ตอนเรียก เพื่อให้ mockFetch ของ test ดักได้
+jest.mock('expo/fetch', () => ({ fetch: (...args) => global.fetch(...args) }));

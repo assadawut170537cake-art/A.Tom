@@ -7,11 +7,60 @@ import { getAppRouter } from '../../router/appRouter';
 import type { RouterOutput } from '../../router/core/types';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { useAtomStore } from '../stores/useAtomStore';
-import type { Message } from '../types';
+import type { Message, Persona } from '../types';
 import { stripMarkdown } from '../utils/markdown';
 
 /** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
 let activeTurn = 0;
+
+/** อัปเดตข้อความที่กำลังไหลไม่ถี่กว่านี้ (ms) — ทุก token = re-render รายการแชททุกครั้ง */
+const STREAM_UPDATE_MS = 60;
+
+/**
+ * แสดงคำตอบครึ่งทางเป็นข้อความของผู้ช่วยที่ค่อย ๆ ยาวขึ้น (ยังไม่บันทึกจนตอบจบ)
+ * `''` = provider ถัดไปเริ่มใหม่ → ลบข้อความครึ่งทางของตัวที่ล้ม
+ */
+function createStreamView(persona: Persona, isLatest: () => boolean) {
+  let id: string | null = null;
+  let pending = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const store = () => useAtomStore.getState();
+
+  const flush = () => {
+    timer = null;
+    if (id) store().updateMessage(persona, id, pending, { save: false });
+  };
+
+  return {
+    onPartial(text: string) {
+      if (!isLatest()) return;
+      if (!text) {
+        if (timer) clearTimeout(timer);
+        timer = null;
+        if (id) store().removeMessage(persona, id);
+        id = null;
+        store().setStreamingId(null);
+        return;
+      }
+      pending = text;
+      if (!id) {
+        id = store().pushMessage({ role: 'assistant', content: text, persona }).id;
+        store().setStreamingId(id);
+      } else if (!timer) {
+        timer = setTimeout(flush, STREAM_UPDATE_MS);
+      }
+    },
+    /** จบรอบ: คืน id ข้อความครึ่งทาง (null = ไม่ได้ไหล) แล้วหยุดอัปเดต */
+    finish(): string | null {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      if (store().streamingId === id) store().setStreamingId(null);
+      const done = id;
+      id = null;
+      return done;
+    },
+  };
+}
 
 interface SendResult {
   route: RouterOutput | null;
@@ -47,6 +96,7 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
 
   const turn = ++activeTurn;
   const isLatest = () => turn === activeTurn;
+  const stream = createStreamView(persona, isLatest);
   store.pushMessage({ role: 'user', content, persona });
   store.setUIMode('conversation');
   store.setMood('thinking');
@@ -59,10 +109,18 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),
         history,
+        onPartial: stream.onPartial,
       },
     });
-    // A switch moves the reply (the new persona's greeting) into the new persona's history
-    useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    const partialId = stream.finish();
+    if (partialId && result.persona === persona) {
+      // ข้อความที่ไหลมาแล้วกลายเป็นคำตอบจริง (แทนด้วยฉบับเต็ม เช่นมีแหล่งข้อมูลต่อท้าย) แล้วบันทึก
+      useAtomStore.getState().updateMessage(persona, partialId, result.reply);
+    } else {
+      if (partialId) useAtomStore.getState().removeMessage(persona, partialId);
+      // A switch moves the reply (the new persona's greeting) into the new persona's history
+      useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    }
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);
     // Keys rejected along the way (e.g. Gemini 401 while OpenRouter answered) still need fixing
@@ -80,6 +138,8 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       ? { route, reply: result.reply, agentScreen: result.agentScreen }
       : { route, reply: result.reply };
   } catch (e) {
+    const partialId = stream.finish();
+    if (partialId) useAtomStore.getState().removeMessage(persona, partialId);
     aiOrchestrator.takeNotices(); // already listed in the aggregated error below
     const err = toProviderError('conversation', e);
     const error = redactSecrets(err.message);

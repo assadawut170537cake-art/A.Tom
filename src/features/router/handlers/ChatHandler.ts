@@ -41,7 +41,8 @@ export class ChatHandler implements IntentHandler<'chat'> {
       ...(input.context?.history ?? []).filter((m) => m.role !== 'system').slice(-MAX_HISTORY),
       { role: 'user', content: input.text },
     ];
-    const res = await this.orchestrator.chat({ messages });
+    // แชทเท่านั้นที่ค้นเว็บ/ไหล — classifier และ agent เรียก Orchestrator แบบปกติ
+    const res = await this.orchestrator.chat({ messages, webSearch: true, onText: input.context?.onPartial });
     return { reply: res.content.trim(), persona };
   }
 

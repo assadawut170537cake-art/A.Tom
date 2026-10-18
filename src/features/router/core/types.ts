@@ -25,6 +25,8 @@ export interface RouterInput {
     recentMessages?: string[];
     /** Full role-tagged history for the active persona, used by ChatHandler. */
     history?: ChatMessage[];
+    /** คำตอบครึ่งทางระหว่างที่ AI ยังตอบไม่จบ (ChatHandler ส่งต่อให้ Orchestrator) */
+    onPartial?: ((text: string) => void) | undefined;
   };
 }
 

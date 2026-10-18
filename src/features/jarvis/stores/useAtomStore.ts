@@ -36,6 +36,8 @@ interface AtomState {
   archivesByPersona: Record<Persona, ChatArchive[]>;
   /** ข้อความที่จะใส่ในช่องพิมพ์ (กด "แก้ไข" ข้อความเก่า) — ChatInput รับแล้วเคลียร์ */
   composerDraft: string | null;
+  /** ข้อความของผู้ช่วยที่กำลังไหลเข้ามา (ซ่อนจุดสามจุด "กำลังพิมพ์") */
+  streamingId: string | null;
 
   setUIMode: (mode: UIMode) => void;
   setMood: (mood: OrbMood) => void;
@@ -58,6 +60,7 @@ interface AtomState {
   openChat: (persona: Persona, archiveId: string) => void;
   deleteChat: (persona: Persona, archiveId: string) => void;
   setComposerDraft: (draft: string | null) => void;
+  setStreamingId: (id: string | null) => void;
 }
 
 const emptyArchives = (): Record<Persona, ChatArchive[]> => ({ 1: [], 2: [], 3: [], 4: [] });
@@ -102,6 +105,7 @@ export const useAtomStore = create<AtomState>()(
       dropdownOpen: false,
       archivesByPersona: emptyArchives(),
       composerDraft: null,
+      streamingId: null,
 
       setUIMode: (uiMode) => set({ uiMode }),
       setMood: (mood) => set({ mood }),
@@ -221,6 +225,7 @@ export const useAtomStore = create<AtomState>()(
         if (get().historyLoaded) void saveArchives(persona);
       },
       setComposerDraft: (composerDraft) => set({ composerDraft }),
+      setStreamingId: (streamingId) => set({ streamingId }),
     }),
     {
       name: 'atom-store',

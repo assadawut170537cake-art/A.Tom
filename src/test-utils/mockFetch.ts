@@ -18,6 +18,12 @@ export type Route = [match: RegExp, handler: Handler];
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
 
+/** Server-Sent Events: หนึ่ง `data:` ต่อ event (string = ส่งตามนั้น เช่น '[DONE]') */
+export const sse = (events: unknown[]) =>
+  new Response(events.map((e) => `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`).join(''), {
+    headers: { 'content-type': 'text/event-stream' },
+  });
+
 export const bytes = (data = new Uint8Array([1, 2, 3])) => new Response(data);
 
 export const httpError = (status: number, message = `error ${status}`) =>
