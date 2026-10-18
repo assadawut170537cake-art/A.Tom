@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,8 +28,10 @@ import { OrbLayer } from '../components/orb/OrbLayer';
 import { LAYOUT, PERSONAS } from '../constants';
 import { useAIKeyStatus } from '../hooks/useAIKeyStatus';
 import { useKeyboardOverlap } from '../hooks/useKeyboardOverlap';
+import { useDeepLinks } from '../hooks/useDeepLinks';
 import { useLiveVoice } from '../hooks/useLiveVoice';
 import { sendMessage } from '../services/conversation';
+import { useDeepLinkStore } from '../services/deepLinks';
 import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
 import type { Message } from '../types';
@@ -57,6 +59,11 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const keyStatus = useAIKeyStatus();
 
   const live = useLiveVoice();
+  // atom://live (widget / ปุ่มโฮม) → เปิดโหมดเสียงเมื่อแท็บนี้พร้อม
+  const livePending = useDeepLinkStore((s) => s.livePending);
+  useEffect(() => {
+    if (livePending && useDeepLinkStore.getState().takeLive() && !live.active) live.start();
+  }, [livePending, live]);
 
   const agentId = useAgentPanelStore((s) => s.agentId);
   const closeAgent = useAgentPanelStore((s) => s.close);
@@ -186,6 +193,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
 }
 
 export function MainScreen() {
+  useDeepLinks();
   const insets = useSafeAreaInsets();
   const activeTab = useTabsStore((s) => s.activeTab);
   const navigation = useNavigation();

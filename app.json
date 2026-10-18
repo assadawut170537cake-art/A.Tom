@@ -2,6 +2,7 @@
   "expo": {
     "name": "A.T.O.M.",
     "slug": "atom",
+    "scheme": "atom",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -63,7 +64,8 @@
           "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
           "speechRecognitionPermission": "อนุญาตให้ $(PRODUCT_NAME) แปลงเสียงพูดเป็นข้อความ"
         }
-      ]
+      ],
+      "./plugins/withAssistantEntry"
     ]
   }
 }
