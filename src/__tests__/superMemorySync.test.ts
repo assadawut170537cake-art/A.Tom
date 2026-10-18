@@ -33,7 +33,11 @@ beforeEach(async () => {
 afterEach(() => jest.restoreAllMocks());
 
 function setup(store = keyStore(), timeoutMs?: number) {
-  const service = new SuperMemorySyncService({ local: memory, keyStore: store, ...(timeoutMs ? { timeoutMs } : {}) });
+  const service = new SuperMemorySyncService({
+    local: memory,
+    keyStore: store,
+    ...(timeoutMs ? { timeoutMs } : {}),
+  });
   service.start();
   return service;
 }
@@ -87,7 +91,9 @@ describe('SuperMemorySyncService — ส่งตามสเปก', () => {
     const { calls } = mockFetch([[SUPERMEMORY, () => json({})]]);
     const service = setup(keyStore(null));
     await memory.save(GLOBAL, 'a', '1');
-    expect(await service.enqueue({ target: GLOBAL, key: 'b', value: '2', updatedAt: 1, deleted: false })).toBe('skipped');
+    expect(
+      await service.enqueue({ target: GLOBAL, key: 'b', value: '2', updatedAt: 1, deleted: false }),
+    ).toBe('skipped');
     expect(calls).toHaveLength(0);
   });
 
@@ -104,7 +110,13 @@ describe('SuperMemorySyncService — ส่งตามสเปก', () => {
   test('ของจาก Mark 55 (applyRemote) ไม่ถูกส่งซ้ำ', async () => {
     const { calls } = mockFetch([[SUPERMEMORY, () => json({})]]);
     const service = setup();
-    await memory.applyRemote({ target: GLOBAL, key: 'x', value: 'from-pc', updatedAt: 5, deleted: false });
+    await memory.applyRemote({
+      target: GLOBAL,
+      key: 'x',
+      value: 'from-pc',
+      updatedAt: 5,
+      deleted: false,
+    });
     await service.idle();
     expect(calls).toHaveLength(0);
   });
@@ -146,7 +158,9 @@ describe('SuperMemorySyncService — fail-open', () => {
     const fact = await memory.save(GLOBAL, 'nickname', 'ต้น');
     expect(fact.value).toBe('ต้น');
     expect(await memory.load(GLOBAL, 'nickname')).toEqual(fact);
-    expect(await service.enqueue({ target: GLOBAL, key: 'k', value: 'v', updatedAt: 1, deleted: false })).toBe('failed');
+    expect(
+      await service.enqueue({ target: GLOBAL, key: 'k', value: 'v', updatedAt: 1, deleted: false }),
+    ).toBe('failed');
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('[supermemory]'));
   });
 
@@ -162,16 +176,24 @@ describe('SuperMemorySyncService — fail-open', () => {
       ],
     ]);
     const service = setup();
-    expect(await service.enqueue({ target: GLOBAL, key: 'a', value: '1', updatedAt: 1, deleted: false })).toBe('failed');
+    expect(
+      await service.enqueue({ target: GLOBAL, key: 'a', value: '1', updatedAt: 1, deleted: false }),
+    ).toBe('failed');
     offline = false;
-    expect(await service.enqueue({ target: GLOBAL, key: 'b', value: '2', updatedAt: 2, deleted: false })).toBe('sent');
+    expect(
+      await service.enqueue({ target: GLOBAL, key: 'b', value: '2', updatedAt: 2, deleted: false }),
+    ).toBe('sent');
     expect(calls).toHaveLength(2);
   });
 
   test('อ่าน SecureStore ไม่ได้ → failed (ไม่ throw)', async () => {
     const { calls } = mockFetch([[SUPERMEMORY, () => json({})]]);
-    const service = setup({ get: jest.fn(async () => Promise.reject(new Error('keystore locked'))) });
-    expect(await service.enqueue({ target: GLOBAL, key: 'a', value: '1', updatedAt: 1, deleted: false })).toBe('failed');
+    const service = setup({
+      get: jest.fn(async () => Promise.reject(new Error('keystore locked'))),
+    });
+    expect(
+      await service.enqueue({ target: GLOBAL, key: 'a', value: '1', updatedAt: 1, deleted: false }),
+    ).toBe('failed');
     expect(calls).toHaveLength(0);
   });
 
@@ -199,6 +221,9 @@ describe('boot', () => {
     });
     expect(start).toHaveBeenCalledTimes(1);
     expect(report.memoryFacts).toBe(0);
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Supermemory'), expect.any(Error));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Supermemory'),
+      expect.any(Error),
+    );
   });
 });

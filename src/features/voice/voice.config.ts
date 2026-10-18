@@ -70,7 +70,7 @@ export const VOICE_PROVIDER_FIELDS: {
 
 export function voiceProviderFields<K extends VoiceKind>(
   kind: K,
-  id: VoiceIdOf[K]
+  id: VoiceIdOf[K],
 ): VoiceProviderFields | undefined {
   const table: Partial<Record<VoiceIdOf[K], VoiceProviderFields>> = VOICE_PROVIDER_FIELDS[kind];
   return table[id];

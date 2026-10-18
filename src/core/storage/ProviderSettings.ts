@@ -160,7 +160,9 @@ function validFields(stored: Record<string, unknown>): Partial<SettingsData> {
   };
   keysOf(FIELD_GUARDS).forEach(keep);
   if (dropped.length) {
-    console.error(`[settings] ข้อมูลตั้งค่าเสีย ตัดทิ้งแล้วใช้ค่าเริ่มต้นแทน: ${dropped.join(', ')}`);
+    console.error(
+      `[settings] ข้อมูลตั้งค่าเสีย ตัดทิ้งแล้วใช้ค่าเริ่มต้นแทน: ${dropped.join(', ')}`,
+    );
   }
   // The single trust boundary: stored provider ids are plain strings that this module wrote from
   // the id unions. They are only ever looked up by known ids, so an unknown id is inert.

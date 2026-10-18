@@ -26,12 +26,16 @@ describe('DEFAULT_PERSONA_VOICE_MAP', () => {
       providerId: 'openai',
       voiceId: 'onyx',
     });
-    await expect(ProviderSettings.resolveVoiceFor(3)).resolves.toEqual(DEFAULT_PERSONA_VOICE_MAP[3]);
+    await expect(ProviderSettings.resolveVoiceFor(3)).resolves.toEqual(
+      DEFAULT_PERSONA_VOICE_MAP[3],
+    );
   });
 
   test('"same voice for all" ยังชนะค่าเริ่มต้น', async () => {
     await ProviderSettings.setSharedVoice({ providerId: 'azure', voiceId: 'th-TH-NiwatNeural' });
     await ProviderSettings.setSameVoiceForAll(true);
-    await expect(ProviderSettings.resolveVoiceFor(1)).resolves.toMatchObject({ providerId: 'azure' });
+    await expect(ProviderSettings.resolveVoiceFor(1)).resolves.toMatchObject({
+      providerId: 'azure',
+    });
   });
 });
