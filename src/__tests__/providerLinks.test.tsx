@@ -113,13 +113,14 @@ describe('Settings screens', () => {
   const renderInSafeArea = (node: React.ReactElement) =>
     render(<SafeAreaProvider initialMetrics={METRICS}>{node}</SafeAreaProvider>);
 
-  test('AI Providers: Gemini + OpenRouter + Dahl ×3 get links, Jev does not', async () => {
+  test('AI Providers: Gemini + OpenRouter + xAI + Dahl ×3 get links, Jev does not', async () => {
     await renderInSafeArea(<AISettingsScreen />);
     await screen.findByText('Advanced');
-    expect(links()).toHaveLength(5);
+    expect(links()).toHaveLength(6);
     expect(await pressAllLinks()).toEqual([
       'https://aistudio.google.com/apikey',
       'https://openrouter.ai/keys',
+      'https://console.x.ai',
       'https://dahl.global',
       'https://dahl.global',
       'https://dahl.global',
@@ -136,12 +137,14 @@ describe('Settings screens', () => {
       'https://console.cloud.google.com/apis/credentials', // Google Cloud TTS
       'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices', // Azure TTS
       'https://console.aws.amazon.com/iam/home#/security_credentials', // Polly
+      'https://console.x.ai', // xAI TTS
       'https://platform.openai.com/api-keys', // Whisper
       'https://console.cloud.google.com/apis/credentials', // Google STT
       'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices', // Azure STT
+      'https://console.x.ai', // xAI STT
     ]);
-    // Expo Speech, Play.ht and Custom cards have no link: 9 links for 15 key fields
-    expect(screen.getAllByLabelText('API key')).toHaveLength(15);
+    // Expo Speech, Play.ht and Custom cards have no link: 11 links for 17 key fields
+    expect(screen.getAllByLabelText('API key')).toHaveLength(17);
     expect(nth(links(), 0).props.accessibilityHint).toBe('เปิด aistudio.google.com ในเบราว์เซอร์');
   });
 });

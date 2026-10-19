@@ -307,7 +307,7 @@ describe('C3 — voice errors', () => {
 
   test('STT: every provider offline → network error with Thai summary', async () => {
     for (const id of ['whisper', 'deepgram'] as const) await SecureKeyStore.set(secretKey('stt', id), 'k');
-    for (const id of ['google', 'azure', 'assemblyai', 'revai', 'custom'] as const) {
+    for (const id of ['google', 'azure', 'assemblyai', 'revai', 'xai', 'custom'] as const) {
       await ProviderSettings.setVoiceEnabled('stt', id, false);
     }
     await ProviderSettings.setVoiceEnabled('stt', 'expo', false);

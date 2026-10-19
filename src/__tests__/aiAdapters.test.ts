@@ -65,6 +65,7 @@ describe('registry + factory', () => {
       'dahl-minimax',
       'dahl-deepseek',
       'dahl-glm',
+      'xai',
     ]);
     expect(reg.get('gemini')?.config.name).toBe('Gemini v2');
     expect(reg.listEnabled().map((p) => p.config.id)).toEqual(['gemini', 'openrouter']);

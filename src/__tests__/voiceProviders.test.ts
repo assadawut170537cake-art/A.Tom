@@ -70,17 +70,17 @@ async function unconfigure(kind: 'tts' | 'stt', id: string) {
   await SecureKeyStore.delete(secretKey(kind, id));
 }
 
-test('voice.config lists 9 TTS + 8 STT providers, all registered', () => {
+test('voice.config lists 10 TTS + 9 STT providers, all registered', () => {
   expect(TTS_PROVIDERS.map((p) => p.id)).toEqual([
-    'expo', 'gemini', 'openai', 'elevenlabs', 'google', 'azure', 'polly', 'playht', 'custom',
+    'expo', 'gemini', 'openai', 'elevenlabs', 'google', 'azure', 'polly', 'playht', 'xai', 'custom',
   ]);
   expect(STT_PROVIDERS.map((p) => p.id)).toEqual([
-    'expo', 'whisper', 'deepgram', 'google', 'azure', 'assemblyai', 'revai', 'custom',
+    'expo', 'whisper', 'deepgram', 'google', 'azure', 'assemblyai', 'revai', 'xai', 'custom',
   ]);
   expect(TTS_PROVIDERS.filter((p) => !p.requiresKey).map((p) => p.id)).toEqual(['expo']);
-  expect(voiceRegistry.listTTS()).toHaveLength(9);
+  expect(voiceRegistry.listTTS()).toHaveLength(10);
   expect(voiceRegistry.listTTS().map((p) => p.id)).toEqual(TTS_PROVIDERS.map((p) => p.id));
-  expect(voiceRegistry.listSTT()).toHaveLength(8);
+  expect(voiceRegistry.listSTT()).toHaveLength(9);
 });
 
 // ---------------------------------------------------------------------------------------------
@@ -107,6 +107,19 @@ const TTS_CASES: TTSCase[] = [
     speak: (c) => {
       expect(c.url.pathname).toBe('/v1/audio/speech');
       expect(c.body).toMatchObject({ model: 'gpt-4o-mini-tts', voice: 'nova', input: 'สวัสดี', speed: 1.1, response_format: 'mp3' });
+    },
+  },
+  {
+    id: 'xai',
+    route: [/api\.x\.ai/, (c) => (c.method === 'GET' ? json({ voices: [{ voice_id: 'eve', name: 'Eve' }] }) : bytes())],
+    probe: (c) => {
+      expect(c.url.href).toBe('https://api.x.ai/v1/tts/voices');
+      expect(c.headers.Authorization).toBe('Bearer xai-key');
+    },
+    speak: (c) => {
+      expect(c.url.href).toBe('https://api.x.ai/v1/tts');
+      // ไทยไม่อยู่ในรายการภาษาทางการของ xAI → auto
+      expect(c.body).toEqual({ text: 'สวัสดี', voice_id: 'nova', language: 'auto', speed: 1.1 });
     },
   },
   {
@@ -446,6 +459,21 @@ const STT_CASES: STTCase[] = [
       expect(form.get('model')).toBe('whisper-1');
       expect(form.get('language')).toBe('th');
       // RN ส่งไฟล์ได้เฉพาะ part แบบ { uri, name, type } — ไม่ใช่ File/Blob ของ expo-file-system
+      expect(uploadedPart('file')).toEqual({ uri: 'file:///cache/rec.m4a', name: 'rec.m4a', type: 'audio/mp4' });
+    },
+  },
+  {
+    id: 'xai',
+    uri: 'file:///cache/rec.m4a',
+    route: [/api\.x\.ai/, (c) => (c.method === 'GET' ? json({ voices: [] }) : json({ text: ' สวัสดีครับ ', language: 'th' }))],
+    probe: (c) => expect(c.url.href).toBe('https://api.x.ai/v1/tts/voices'),
+    transcribe: (calls) => {
+      const c = nth(calls, 0);
+      expect(c.url.href).toBe('https://api.x.ai/v1/stt');
+      expect(c.headers.Authorization).toBe('Bearer xai-key');
+      const form = c.body as FormData;
+      expect(form.get('model')).toBe('grok-voice-transcribe-2.0');
+      expect(form.get('language')).toBe('th');
       expect(uploadedPart('file')).toEqual({ uri: 'file:///cache/rec.m4a', name: 'rec.m4a', type: 'audio/mp4' });
     },
   },

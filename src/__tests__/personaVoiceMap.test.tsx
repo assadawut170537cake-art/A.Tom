@@ -211,13 +211,13 @@ describe('PersonaVoiceMapper UI', () => {
     await expect(ProviderSettings.resolveVoiceFor(4)).resolves.toEqual({ providerId: 'expo' });
   });
 
-  test('provider picker lists all 9 TTS providers with key hints', async () => {
+  test('provider picker lists all 10 TTS providers with key hints', async () => {
     await renderMapper();
     await fireEvent.press(nth(screen.getAllByLabelText(/^ผู้ให้บริการเสียง \(TTS\)/), 0));
     for (const name of ['Gemini TTS', 'OpenAI TTS', 'Amazon Polly', 'Play.ht', 'Custom (OpenAI-compatible)']) {
       expect(screen.getByText(name)).toBeTruthy();
     }
     expect(screen.getByText('บนเครื่อง · ไม่ต้องใช้ key')).toBeTruthy();
-    expect(screen.getAllByText('ต้องใช้ API key')).toHaveLength(8);
+    expect(screen.getAllByText('ต้องใช้ API key')).toHaveLength(9);
   });
 });

@@ -28,7 +28,7 @@
 - **Voice:** expo-speech + expo-audio + expo-network
 - **Navigation:** @react-navigation/native-stack (ไม่ใช่ Expo Router)
 - **Icons:** lucide-react-native
-- **AI:** Gemini + OpenRouter + Dahl ×3 (Jev = optional, default off · Dahl Boss เพิ่ม 2026-10-19 · ADR-016)
+- **AI:** Gemini + OpenRouter + Dahl ×3 + xAI Grok (Jev = optional, default off · Dahl Boss เพิ่ม 2026-10-19 · ADR-016 · xAI 2026-10-20 · ADR-018)
 
 ---
 
@@ -54,7 +54,7 @@
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
-        ├── voice/      ← 17 providers (9 TTS + 8 STT), orchestrator
+        ├── voice/      ← 19 providers (10 TTS + 9 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
         ├── marketplace/← ตั้งค่า › Marketplace: MCP servers · Plugins · Skills · ควบคุมอุปกรณ์ (ค้นหา/กรอง/เปิดปิด/ติดตั้ง)
@@ -77,9 +77,9 @@
 
 ## 4. LOCK DECISIONS (Phase 3 — ห้ามแก้)
 
-1. LLM: Gemini + OpenRouter + Dahl (MiniMax / DeepSeek / GLM — Boss เพิ่ม 2026-10-19 · ADR-016)
+1. LLM: Gemini + OpenRouter + Dahl (MiniMax / DeepSeek / GLM — Boss เพิ่ม 2026-10-19 · ADR-016) + xAI Grok (2026-10-20 · ADR-018)
 2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
-3. Voice: 17 providers (TTS 9 + STT 8), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15)
+3. Voice: 19 providers (TTS 10 + STT 9), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15 · xAI TTS/STT 2026-10-20)
 4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
 5. Auto-Switch: Priority + Fallback + sticky lastGood + สลับรุ่นเมื่อโควต้าหมด (ADR-017)
 6. Storage: SecureStore (secrets) + AsyncStorage (data)
@@ -308,6 +308,11 @@
 - `LLMClassifier` ถามโมเดลเฉพาะข้อความที่เข้า `COMMAND_HINT` (คอม/เครื่อง/สั่ง/สลับ/เปลี่ยน/เรียก/ขอคุย/ส่งต่อ/ชื่อ persona) — ไม่เข้า = คืน null → router ตอบ chat (provider `rule`) **ไม่เสีย request** · `new LLMClassifier(orch, false)` = ถามทุกข้อความ (test) · คำสั่งใหม่ที่ไม่มีคำพวกนี้ → เพิ่มคำใน `COMMAND_HINT`
 - Orchestrator: 429 + "quota/exhausted" (`isQuotaError`) → `QuotaGuard.strike()` (พัก 60s ×2 ทุกครั้ง สูงสุด 1 ชม., ต่อ provider+model, หน่วยความจำ) → ลอง `config.quotaFallbackModels` ก่อนไปเจ้าถัดไป · ไม่ retry โควต้า · รุ่นสำรองล้ม (404 ฯลฯ) = ข้ามเงียบ · โมเดลที่พักอยู่ = ไม่ยิง · ทุกตัวพักหมด = ลองตามปกติ · สลับสำเร็จครั้งแรก → notice
 - 429 ทั่วไป (ข้อความไม่มี quota) = กติกาเดิม — test เก่าใช้ `httpError(429)` เปล่า ๆ จึงไม่โดนสลับรุ่น · mock 429 แบบ "exhausted" จะเห็นการยิง Gemini 3 รุ่น
+
+### xAI (ADR-018)
+- สมอง `xai` (OpenAI-compatible `https://api.x.ai/v1`, models dynamic, default `grok-4.20-0309-non-reasoning` = ตอบเร็ว · ปิดไว้ก่อน) · เสียงพูด `XaiTTS` (`POST /v1/tts` → MP3 ดิบ, เสียง `GET /v1/tts/voices`, ค่าเริ่มต้น `eve`, speed บีบ 0.7–1.5) · ฟังเสียง `XaiSTT` (`POST /v1/stt` multipart, `grok-voice-transcribe-2.0`, `language=th` — ไทยรองรับทางการ, `file` ต้องเป็น field สุดท้าย)
+- key: `xaiKey()` (`features/voice/xaiKey.ts`) = key ของการ์ดนั้น (`tts.xai`/`stt.xai`) → ไม่มีก็ใช้ `ai.xai` (บอสใส่ที่การ์ด Grok ที่เดียวพอ)
+- ⚠️ TTS ไทยไม่อยู่ในรายการภาษาทางการของ xAI → ส่ง `language: auto` (ใส่ `th` เสี่ยง 400) · คุณภาพเสียงไทยต้องฟังเองบนเครื่อง
 
 ### Network
 - `isOffline()` fail-open

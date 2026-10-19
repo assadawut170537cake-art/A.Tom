@@ -83,18 +83,18 @@ test('AI settings: cards, key save, test connection, toggle, priority', async ()
   await waitFor(async () => expect((await ProviderSettings.getAdvanced()).retries).toBe(1));
 });
 
-test('Voice settings: 9 TTS + 8 STT providers and both priority lists', async () => {
+test('Voice settings: 10 TTS + 9 STT providers and both priority lists', async () => {
   await openSettings('Voice (TTS + STT)');
   // Card + TTS priority row
   expect(await screen.findAllByText('ElevenLabs')).toHaveLength(2);
-  expect(screen.getAllByText('ทดสอบการเชื่อมต่อ')).toHaveLength(17);
+  expect(screen.getAllByText('ทดสอบการเชื่อมต่อ')).toHaveLength(19);
   expect(screen.getByText('TTS Priority')).toBeTruthy();
   expect(screen.getByText('STT Priority')).toBeTruthy();
   // Azure needs a region field in both sections
   expect(screen.getAllByLabelText('Region').length).toBeGreaterThanOrEqual(2);
 
   // On-device STT test reports it's unavailable
-  const stt = nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 9); // after the 9 TTS cards
+  const stt = nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 10); // after the 10 TTS cards
   await fireEvent.press(stt);
   expect(await screen.findByText(/\[expo\] ยังไม่รองรับการถอดเสียงบนเครื่อง/)).toBeTruthy();
 });

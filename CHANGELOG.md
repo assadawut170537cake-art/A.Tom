@@ -12,6 +12,12 @@
 
 ## [Unreleased]
 
+### xAI ครบชุด ([ADR-018](docs/DECISIONS.md#adr-018--เพิ่ม-xai-grok-สมอง--tts--stt))
+
+**Added**
+- สมอง xAI Grok (ตั้งค่า › AI) · เสียงพูด xAI TTS และฟังเสียง xAI STT (ตั้งค่า › เสียง) — คีย์ xAI ตัวเดียวใช้ได้ทั้งสามทาง
+
+
 ### แอปปรับตัวเองเมื่อโควต้าหมด ([ADR-017](docs/DECISIONS.md#adr-017--แอปปรับตัวเองเมื่อโควต้าหมด-quota-self-healing))
 
 **Changed**

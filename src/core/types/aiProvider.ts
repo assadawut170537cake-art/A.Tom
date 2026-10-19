@@ -11,4 +11,6 @@ export type AIProviderId =
   // Dahl (inference.dahl.global) — แยก provider ต่อโมเดล เพื่อให้แต่ละตัวมี key / ลำดับ / สลับกันเองได้ (Boss ขอ)
   | 'dahl-minimax'
   | 'dahl-deepseek'
-  | 'dahl-glm';
+  | 'dahl-glm'
+  // xAI Grok — key เดียวใช้ได้ทั้งสมอง/เสียงพูด/ฟังเสียง (Boss ขอ 2026-10-20)
+  | 'xai';

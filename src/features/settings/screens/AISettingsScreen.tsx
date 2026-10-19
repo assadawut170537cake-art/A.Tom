@@ -112,6 +112,7 @@ export function AISettingsScreen() {
   const gemini = aiRegistry.get('gemini');
   const openrouter = aiRegistry.get('openrouter');
   const jev = aiRegistry.get('jev');
+  const xai = aiRegistry.get('xai');
   const dahl = (['dahl-minimax', 'dahl-deepseek', 'dahl-glm'] as const).flatMap((id) => {
     const p = aiRegistry.get(id);
     return p ? [p] : [];
@@ -127,6 +128,7 @@ export function AISettingsScreen() {
       <Section title="LLM Providers">
         {gemini && <ProviderCard provider={gemini} />}
         {openrouter && <ProviderCard provider={openrouter} subtitle="โมเดลจาก OpenRouter (โหลดรายการได้)" />}
+        {xai && <ProviderCard provider={xai} subtitle="Grok — key เดียวกันใช้กับเสียงพูด/ฟังเสียงของ xAI ได้" />}
       </Section>
       <Section title="Dahl" hint="inference.dahl.global — ใส่ key ของแต่ละโมเดลแล้วเปิดสวิตช์">
         {dahl.map((p) => (
