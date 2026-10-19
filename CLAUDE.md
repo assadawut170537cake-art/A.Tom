@@ -261,6 +261,14 @@
 - SQL ทดสอบกับ Postgres เปล่าได้ (`mark55/sql/tests/`) — container cloud มี Postgres 16 (`/usr/lib/postgresql/16/bin`)
 - Jest ไม่แปลง `import()` แบบ dynamic → test loader ด้วย factory ของตัวเอง (`MODULE_LOADERS` จริงทดสอบได้แค่ว่ามี key)
 
+### ห้องแชทเดียวกัน PC ↔ มือถือ (ADR-015 — Boss ยืนยัน: อยากได้ "ห้องแชทเดียวกัน" ไม่ใช่ส่งข้อความหากัน)
+- ซิงก์ประวัติแชทข้ามเครื่องผ่าน Mark 55 ตัวเดียวกับ Shared Memory (append-only ไม่มี conflict/tombstone) · ตัวตน = `id` ของข้อความ
+- `core/chat/`: `chatSyncTypes.ts` (`SyncMessage` · ซิงก์เฉพาะ role `user`/`assistant` — `system` เป็นของเฉพาะเครื่อง) · `RemoteChatAdapter.ts` (`GET/POST /api/v1/chat/sync`) · `ChatSync.ts` (คิวค้าง `atom.chat.sync.{queue,cursor}` · poll 20s · backoff 5s→5m · ไม่จับคู่ = ไม่ทำอะไร)
+- ต่อแอปที่ `features/chat/chatSyncBridge.ts` (`startChatSync()` ใน boot): ข้อความใหม่ในเครื่อง → `setLocalMessageSink` → `chatSync.enqueue` · ของเครื่องอื่น → `store.mergeRemoteMessages` (ไม่ผ่าน `pushMessage` จึงไม่ส่งวน) · จับคู่/ยกเลิกจับคู่ตาม `memorySync.subscribe` (จับคู่ครั้งแรก = ส่งแชทที่มีอยู่ขึ้นรอบแรก)
+- `memorySync.connection()` = `{baseUrl, token}` ปัจจุบัน (ช่องทางอื่นใช้ร่วม) · unpair → `chatSync.reset()` (แชทในเครื่องไม่หาย)
+- ⚠️ ชื่อ field wire อิง spec (ไม่มีโค้ด server) — Mark 55 ใช้ชื่ออื่นแก้ที่ `RemoteChatAdapter`/`chatSyncTypes` ที่เดียว · เรียงข้อความตาม `createdAt` (นาฬิกาเครื่องที่พิมพ์) เท่ากัน = ตาม id
+- PC→มือถือ (NOTIFY/DEVICE_TOOL ใน pc-inbox) ยังอยู่ = ใช้เป็น "แจ้งเตือน" ต่างหากจากห้องแชท
+
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)

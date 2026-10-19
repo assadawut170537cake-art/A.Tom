@@ -10,6 +10,7 @@
  *    - `memorySync.start()` — จับคู่ Mark 55 ไว้แล้ว → เริ่มคิว sync + ซิงก์ 1 รอบ · ยังไม่จับคู่ = ไม่ทำอะไร
  *    - `superMemorySync.start()` — ส่ง fact ที่แก้ขึ้น Supermemory เบื้องหลัง (ไม่มี API key = ไม่ส่ง · ล้มแค่ log)
  *    - `pcInbox.start()` — รับงานที่ Mark 55 ส่งหามือถือทุก 15s (ยังไม่ตั้งค่า Mark 55 Bus = ไม่เรียกอะไร)
+ *    - `startChatSync()` — ห้องแชทเดียวกัน (ซิงก์แชทข้ามเครื่องเมื่อจับคู่ Mark 55 แล้ว · ไม่จับคู่ = ไม่ทำอะไร)
  *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory/module (src/dev/)
  *
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
@@ -32,6 +33,7 @@ import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
 import { registerUltronAgent } from './modules/agents/ultron-agent';
 import { loadBootModules } from './modules/loader';
+import { startChatSync } from './features/chat/chatSyncBridge';
 import { pcInbox } from './modules/pc-inbox';
 
 export interface BootReport {
@@ -52,6 +54,8 @@ interface BootDeps {
   supermemory?: Pick<SuperMemorySyncService, 'start'>;
   /** ไม่ส่ง = ไม่ดึง inbox จาก Mark 55 (test เดิม) */
   inbox?: { start(): void };
+  /** ไม่ส่ง = ไม่เริ่มห้องแชทเดียวกัน (test เดิม) */
+  startChat?: () => void;
   /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
   loadModules?: () => Promise<void>;
 }
@@ -62,6 +66,7 @@ const DEFAULT_DEPS: BootDeps = {
   sync: memorySync,
   supermemory: superMemorySync,
   inbox: pcInbox,
+  startChat: () => void startChatSync(),
   loadModules: () => loadBootModules(),
   dev: __DEV__,
   installDevTools: (memory) => {
@@ -120,6 +125,11 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     deps.inbox?.start();
   } catch (e) {
     console.error('[boot] เริ่มรับงานจาก Mark 55 ไม่สำเร็จ — แอปทำงานต่อได้', e);
+  }
+  try {
+    deps.startChat?.();
+  } catch (e) {
+    console.error('[boot] เริ่มห้องแชทเดียวกันไม่สำเร็จ — แชทเครื่องเดียวทำงานต่อได้', e);
   }
 
   if (deps.dev) {

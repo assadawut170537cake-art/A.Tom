@@ -24,6 +24,8 @@
 - **สั่งอุปกรณ์จากแชท/เสียง:** agent "อุปกรณ์" — "ปรับเสียง 30" · "ปรับความสว่าง 50" · "เปิดไฟฉาย" / "ปิดไฟฉาย" · "คัดลอกว่า …" (ต้องเปิด ตั้งค่า › Marketplace › ควบคุมอุปกรณ์ ก่อน) · พูดเลขเป็นคำได้ ("ปรับเสียงสามสิบ", "ความสว่างครึ่ง")
 - **Device (ระดับ A):** ปรับความสว่างได้จริง (expo-brightness — Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก, ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป) · คัดลอกไปคลิปบอร์ดได้จริง (expo-clipboard) · ปรับเสียง + เปิด/ปิดไฟฉาย (`device.flashlight`) ผ่าน native module ของเราเอง `modules/atom-device` (Kotlin, Android) — ⚠️ ยังไม่ได้ build/ทดสอบบนเครื่องจริง
 
+- **ห้องแชทเดียวกัน (PC ↔ มือถือ):** พิมพ์ในมือถือกับหน้าคอมเป็นห้องแชทเดียวกัน — ซิงก์ประวัติแชทข้ามเครื่องผ่าน Mark 55 เมื่อจับคู่แล้ว (ยังไม่จับคู่ = แชทเครื่องเดียวเหมือนเดิม) · ซิงก์เฉพาะบทสนทนาจริง ไม่รวมข้อความแจ้งเตือนในเครื่อง
+
 ### Parking Lot Cleanup (Phase 4.5 pre-5)
 - **Security (A1, [ADR-014](docs/DECISIONS.md#adr-014--prompt-injection-guard-v2)):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` เมื่อเจอ "ignore previous/all instructions", `system:` (word boundary), `<|...|>` — มีผลกับ memory fact · skill ที่ AI สร้าง · ผลจาก MCP · tool result ที่ผ่านฟังก์ชันนี้
 - **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ
