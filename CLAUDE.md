@@ -202,7 +202,7 @@
 - **MCP:** Streamable HTTP JSON-RPC ผ่าน fetch (ไม่มี dep ใหม่) · รายการ server = AsyncStorage `atom.mcp.v1.servers` · token = SecureStore `mcp.<id>` · server ใหม่**ปิดไว้ก่อน** · tool id `mcp.<server>.<tool>` · https เท่านั้น (ยกเว้น localhost)
 - **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · `defaultDriver` = `Linking` + expo-brightness + expo-clipboard (ADR-015 ระดับ A) · ความสว่าง Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก — ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป · เสียง (STREAM_MUSIC) + ไฟฉาย = native module ของเราเอง `modules/atom-device` (Kotlin, Android เท่านั้น, autolink จาก `./modules`) — ไม่มี module (Expo Go / iOS / jest) = "ยังไม่รองรับ" · Kotlin ห้าม throw กรณีที่รู้ล่วงหน้า (expo ห่อเป็นข้อความอังกฤษ) → คืนค่าแล้วให้ JS แปลงเป็นไทย · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
-- ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
+- AgentHarness (LLM loop) ยังไม่ได้ต่อเข้า conversation — เรียกผ่าน `createAppAgent()` เมื่อพร้อม · คำสั่งอุปกรณ์จากแชท/เสียงใช้ agent "อุปกรณ์" (regex) แทนไปก่อน
 
 ### Personas ข้ามอุปกรณ์ + ควบคุมเครื่องเต็มรูปแบบ — ADR-015
 - อะตอม = agent ประจำแอปนี้ ↔ Mark 55 บน PC (ตัวเดียวกัน คุยกันตลอด) · ไฟรเดย์ = แอป Gemini / **Gemini Spark** (โหมด agent ในแอป Gemini) ↔ Gemini Enterprise / Antigravity · จาร์วิส = เข้าประชุม + สายเข้า = สั่งงาน ↔ **Hermes** (ดูแล PC) · อัลตรอน = เบื้องหลัง (Foreground Service) ↔ โปรแกรมไหนก็ได้ที่ต่อ API · ตารางเต็มใน `docs/DECISIONS.md` ADR-015
@@ -218,6 +218,7 @@
 - pattern ของ agent ต้องแคบ (ขึ้นต้นประโยค + คำเชื่อมเช่น "ว่า"/":") เพราะมาก่อน LLM · Rule มาก่อน → คำสั่งที่มี "เปิด/ปิด…คอม/เครื่อง" โดน `pc_command` แย่ง
 - agent ล้ม → AgentHandler ตอบข้อความไทย (ไม่ throw) · UI ครอบ `AgentErrorBoundary` ผ่าน `AgentHost` · โหลด UI ล้มไม่ cache (ลองใหม่ได้)
 - ลงทะเบียน agent ตอน boot (`registerSampleAgents()` ใน `bootApp()`) · test ใช้ `new AgentRegistry()` แยก
+- **agent "อุปกรณ์"** (`src/modules/agents/device-agent.ts`, `registerDeviceAgent()`): "ปรับเสียง 30" / "ความสว่าง 50%" / "เปิด/ปิดไฟฉาย" / "คัดลอกว่า …" → `deviceControl.call()` ตรง ๆ (regex ไม่ผ่าน LLM) · ต้องมีตัวเลขหรือเปิด/ปิดเสมอ (กันแย่งประโยคคุย) · STT ถอดเลขเป็นคำ ("สามสิบ") ยังไม่ match
 
 ### Sync กับ Mark 55 (4.5.4.2–4.5.4.3) — สเปกเต็ม `docs/SYNC_PROTOCOL.md`
 - `memorySync` (core/memory/MemorySync.ts) = ตัวเดียวทั้งแอป: Server URL · pair/unpair · testConnection · เป็นเจ้าของ `SyncQueue` · boot เรียก `start()`
@@ -234,6 +235,7 @@
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
 - release build Android เปิด http ไว้ด้วย config plugin `plugins/withCleartextTraffic.js` (ใช้ expo/config-plugins ที่มากับ expo · ไม่ต้องเพิ่ม expo-build-properties) — การจำกัด http ให้แค่ LAN ทำในโค้ด (`normalizeServerUrl`)
 - Build APK: `npx eas-cli build -p android --profile preview` (eas.json) หรือ local `npx expo prebuild -p android` แล้ว `cd android && ./gradlew assembleRelease` · package `com.atom.assistant` (เปลี่ยนแล้วแอปเดิมอัปเดตทับไม่ได้) · local build เซ็นด้วย debug keystore ของ template
+- `plugins/withGregorianBuildLocale.js`: Windows ภูมิภาคไทย → Java ได้ปี พ.ศ. (2569) → AGP เขียนวันที่ลง zip แบบ MS-DOS (รับแค่ 1980–2107) ไม่ได้ → `VerifyException (no error message)` ที่ `mergeReleaseJavaResource` · plugin เติม `-Duser.language=en -Duser.country=US` ใน `org.gradle.jvmargs` · ห้ามลบ ไม่งั้น build บนเครื่อง Boss ล้ม
 - `plugins/withAndroidProjectName.js`: Gradle 9 ห้ามชื่อโปรเจกต์ขึ้นต้น/ลงท้ายด้วย "." ("A.T.O.M.") → ตั้ง rootProject.name = slug · ห้ามลบ ไม่งั้น build Android ล้ม
 
 ### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)

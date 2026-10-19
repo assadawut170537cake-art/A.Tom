@@ -14,6 +14,7 @@
 
 ### ควบคุมเครื่องเต็มรูปแบบ ([ADR-015](docs/DECISIONS.md#adr-015--บทบาท-4-persona-ข้ามอุปกรณ์--ควบคุมเครื่องเต็มรูปแบบ))
 - **Docs:** ADR-015 — บทบาท 4 persona บนมือถือ/PC (อะตอม ↔ Mark 55 · ไฟรเดย์ ↔ Gemini/Gemini Spark · จาร์วิส ↔ Hermes · อัลตรอน = เบื้องหลัง + sandbox บน PC) และแผนควบคุมเครื่อง 3 ระดับ · Boss อนุมัติ dev build + native code
+- **สั่งอุปกรณ์จากแชท/เสียง:** agent "อุปกรณ์" — "ปรับเสียง 30" · "ปรับความสว่าง 50" · "เปิดไฟฉาย" / "ปิดไฟฉาย" · "คัดลอกว่า …" (ต้องเปิด ตั้งค่า › Marketplace › ควบคุมอุปกรณ์ ก่อน)
 - **Device (ระดับ A):** ปรับความสว่างได้จริง (expo-brightness — Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก, ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป) · คัดลอกไปคลิปบอร์ดได้จริง (expo-clipboard) · ปรับเสียง + เปิด/ปิดไฟฉาย (`device.flashlight`) ผ่าน native module ของเราเอง `modules/atom-device` (Kotlin, Android) — ⚠️ ยังไม่ได้ build/ทดสอบบนเครื่องจริง
 
 ### Parking Lot Cleanup (Phase 4.5 pre-5)
@@ -56,6 +57,7 @@
 - boot เรียก `moduleManager.start()` แทน `moduleRegistry.initAll()` ตรง ๆ · `loadModule()` ลงทะเบียนผ่าน `moduleManager` (ค่าที่บอสบันทึกไว้มีผลทันที)
 
 ### Fixed
+- build Android บน Windows ที่ตั้งภูมิภาคไทยล้มที่ `mergeReleaseJavaResource` (`VerifyException` — Java ได้ปี พ.ศ. 2569 เกินช่วงวันที่ของ zip) → `plugins/withGregorianBuildLocale.js` ให้ Gradle ใช้ locale อังกฤษ
 - build Android ล้มเพราะ Gradle 9 ห้ามชื่อโปรเจกต์ `A.T.O.M.` (ขึ้นต้น/ลงท้ายด้วย ".") → `plugins/withAndroidProjectName.js` ตั้งชื่อ Gradle เป็น `atom`
 - **Sync:** ของที่เครื่องอื่น push เข้ามาระหว่าง pull กับ push ของเราไม่หายแล้ว (`lastSyncAt` = เวลาตอน pull) · push ส่ง `lastSyncAt` ตอน pull ให้ server แยก conflict จริง → การลบ fact ที่ซิงก์แล้วไปถึงเครื่องอื่นได้ · server ปฏิเสธโดยไม่ส่งฉบับมา → ดึงใหม่ทั้งหมดรอบหน้า · กด "ล้างประวัติ" / เปิด auto-sync ก่อนค่าที่บันทึกไว้โหลดเสร็จ ไม่ถูกโหลดทับอีก · conflict log ที่โหลดมาเกิน 50 ถูกตัด
 - `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ

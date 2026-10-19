@@ -34,7 +34,14 @@
       ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
-      "./plugins/withAndroidProjectName"
-    ]
+      "./plugins/withAndroidProjectName",
+      "./plugins/withGregorianBuildLocale"
+    ],
+    "owner": "assadawut17",
+    "extra": {
+      "eas": {
+        "projectId": "78a273fe-5a21-43fb-b184-2eb408cf1290"
+      }
+    }
   }
 }
