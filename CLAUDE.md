@@ -247,6 +247,13 @@
 - key: SecureKeyStore `supermemory.apiKey` เท่านั้น (ใส่ที่ ตั้งค่า › Sync) · ไม่มี key = ไม่ส่ง · ห้ามใช้ `EXPO_PUBLIC_*` (ถูกฝังใน APK)
 - fail-open: ไม่ throw ไม่ retry ส่งไม่ผ่านก็ทิ้ง · ไม่ส่งการลบ (ต้องใช้ document id ที่เครื่องไม่ได้จด) · `applyRemote` ไม่แจ้ง listener → ของจาก Mark 55 ไม่ถูกส่งซ้ำ
 
+### ดึง API key จาก Supermemory (เติมคีย์ให้บอสอัตโนมัติ — Boss ขอ)
+- `secretSync` (`core/memory/SecretSync.ts`): boot เรียก `importOnce()` · กดเองได้ที่ ตั้งค่า › Sync (ปุ่ม "ดึงคีย์มาใส่เครื่อง" = `importOnce(true)` ทับของเดิม)
+- บอสเก็บคีย์ใน Supermemory space `SECRETS_CONTAINER_TAG` (`...atom_secrets` — คนละ space กับ core ที่ sync ขึ้น prompt) เนื้อหาบรรทัดละ `<ชื่อคีย์> = <ค่า>` เช่น `ai.gemini = AIza…` · ชื่อคีย์ = secretKey() ของ SecureKeyStore
+- รับเฉพาะ prefix `ai. / tts. / stt. / mcp. / pcbridge.` (`ALLOWED_KEY_PREFIXES`) — กันเขียน `mark55.auth.token` / `supermemory.apiKey` ทับจากเน็ต · bootstrap ด้วย `supermemory.apiKey` ที่บอสใส่เองที่ ตั้งค่า › Sync
+- คีย์ **ไม่** เข้า prompt (ไหลเข้า SecureStore เท่านั้น — คนละทางกับ memory fact) · ไม่ commit ลง git · fail-open (ไม่มีคีย์/เน็ตล่ม = ข้าม)
+- ⚠️ endpoint/response ของ Supermemory อิงสเปก v3 (`POST /v3/search`) — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
+
 ### Mark 55 Bus — `pc-bridge` (4.5.5.3) · SQL `mark55/sql/002_mobile_rpc.sql`
 - คนละช่องทางกับ Sync (Fastify, memory facts): Bus = สั่งงานให้ Mark 55 รัน ผ่านตาราง `memory_tasks` บน Supabase
 - แอปเรียกได้แค่ RPC `mobile_submit_task` / `mobile_get_task` ด้วย anon/publishable key + **token เครื่อง** (`atm_…`, Supabase เก็บแค่ sha256) · ตารางทั้งหมดปิดสำหรับ anon — **ห้ามเปิด policy ให้ anon** (anon key ดึงจาก APK ได้)

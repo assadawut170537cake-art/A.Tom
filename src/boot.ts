@@ -8,6 +8,7 @@
  *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
  *    - `memorySync.start()` — จับคู่ Mark 55 ไว้แล้ว → เริ่มคิว sync + ซิงก์ 1 รอบ · ยังไม่จับคู่ = ไม่ทำอะไร
+ *    - `secretSync.importOnce()` — ดึง API key จาก Supermemory ใส่ SecureStore (ไม่มีคีย์ Supermemory = ข้าม · ล้มแค่ log)
  *    - `superMemorySync.start()` — ส่ง fact ที่แก้ขึ้น Supermemory เบื้องหลัง (ไม่มี API key = ไม่ส่ง · ล้มแค่ log)
  *    - `pcInbox.start()` — รับงานที่ Mark 55 ส่งหามือถือทุก 15s (ยังไม่ตั้งค่า Mark 55 Bus = ไม่เรียกอะไร)
  *    - `startChatSync()` — ห้องแชทเดียวกัน (ซิงก์แชทข้ามเครื่องเมื่อจับคู่ Mark 55 แล้ว · ไม่จับคู่ = ไม่ทำอะไร)
@@ -18,6 +19,7 @@
 
 import { localMemory } from './core/memory/LocalMemoryAdapter';
 import { memorySync, type MemorySync } from './core/memory/MemorySync';
+import { secretSync, type SecretSync } from './core/memory/SecretSync';
 import { superMemorySync, type SuperMemorySyncService } from './core/memory/SuperMemorySync';
 import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
 import { moduleManager, type ModuleManager } from './core/modules/ModuleManager';
@@ -52,6 +54,8 @@ interface BootDeps {
   sync?: Pick<MemorySync, 'start'>;
   /** ไม่ส่ง = ไม่ส่งขึ้น Supermemory (test เดิม) */
   supermemory?: Pick<SuperMemorySyncService, 'start'>;
+  /** ไม่ส่ง = ไม่ดึงคีย์จาก Supermemory (test เดิม) */
+  secrets?: Pick<SecretSync, 'importOnce'>;
   /** ไม่ส่ง = ไม่ดึง inbox จาก Mark 55 (test เดิม) */
   inbox?: { start(): void };
   /** ไม่ส่ง = ไม่เริ่มห้องแชทเดียวกัน (test เดิม) */
@@ -65,6 +69,7 @@ const DEFAULT_DEPS: BootDeps = {
   memory: localMemory,
   sync: memorySync,
   supermemory: superMemorySync,
+  secrets: secretSync,
   inbox: pcInbox,
   startChat: () => void startChatSync(),
   loadModules: () => loadBootModules(),
@@ -115,6 +120,11 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     await deps.sync?.start(); // start() ไม่ reject อยู่แล้ว — กันไว้อีกชั้น
   } catch (e) {
     console.error('[boot] เริ่ม Sync ไม่สำเร็จ — ใช้ Shared Memory แบบเครื่องเดียว', e);
+  }
+  try {
+    await deps.secrets?.importOnce();
+  } catch (e) {
+    console.error('[boot] ดึงคีย์จาก Supermemory ไม่สำเร็จ — ใส่เองได้ตามปกติ', e);
   }
   try {
     deps.supermemory?.start();
