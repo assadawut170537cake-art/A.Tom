@@ -9,6 +9,7 @@
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
  *    - `memorySync.start()` — จับคู่ Mark 55 ไว้แล้ว → เริ่มคิว sync + ซิงก์ 1 รอบ · ยังไม่จับคู่ = ไม่ทำอะไร
  *    - `superMemorySync.start()` — ส่ง fact ที่แก้ขึ้น Supermemory เบื้องหลัง (ไม่มี API key = ไม่ส่ง · ล้มแค่ log)
+ *    - `pcInbox.start()` — รับงานที่ Mark 55 ส่งหามือถือทุก 15s (ยังไม่ตั้งค่า Mark 55 Bus = ไม่เรียกอะไร)
  *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory/module (src/dev/)
  *
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
@@ -30,6 +31,7 @@ import { registerSampleAgents } from './modules/agents/sample-agent';
 import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
 import { loadBootModules } from './modules/loader';
+import { pcInbox } from './modules/pc-inbox';
 
 export interface BootReport {
   /** null = start() เองล้ม (log แล้ว) */
@@ -47,6 +49,8 @@ interface BootDeps {
   sync?: Pick<MemorySync, 'start'>;
   /** ไม่ส่ง = ไม่ส่งขึ้น Supermemory (test เดิม) */
   supermemory?: Pick<SuperMemorySyncService, 'start'>;
+  /** ไม่ส่ง = ไม่ดึง inbox จาก Mark 55 (test เดิม) */
+  inbox?: { start(): void };
   /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
   loadModules?: () => Promise<void>;
 }
@@ -56,6 +60,7 @@ const DEFAULT_DEPS: BootDeps = {
   memory: localMemory,
   sync: memorySync,
   supermemory: superMemorySync,
+  inbox: pcInbox,
   loadModules: () => loadBootModules(),
   dev: __DEV__,
   installDevTools: (memory) => {
@@ -108,6 +113,11 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     deps.supermemory?.start();
   } catch (e) {
     console.error('[boot] เริ่มส่งขึ้น Supermemory ไม่สำเร็จ — แอปทำงานต่อได้', e);
+  }
+  try {
+    deps.inbox?.start();
+  } catch (e) {
+    console.error('[boot] เริ่มรับงานจาก Mark 55 ไม่สำเร็จ — แอปทำงานต่อได้', e);
   }
 
   if (deps.dev) {

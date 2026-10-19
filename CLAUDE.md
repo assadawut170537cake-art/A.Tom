@@ -254,6 +254,9 @@
 - เพิ่มคำสั่ง: handler ใน `mark55/handlers.py` → INSERT `mobile_instructions` → แถวใน `PC_COMMANDS` (features/pc-bridge/commands.ts)
 - module ตอบข้อความไทยเองทุกกรณี (ไม่ throw) — ถ้า throw ProviderError แชทจะแนะนำ "ตั้งค่า › AI" ซึ่งผิดที่ · รอผล 8s แล้วตอบว่า "ส่งแล้ว" (งานรอในคิวจนกว่า Mark 55 จะเปิด)
 - ⚠️ "เช็กเครื่อง" เฉย ๆ ไม่ผ่าน RuleClassifier (ต้องมี เปิด/ปิด/สั่ง + คอม/เครื่อง) → ขึ้นกับ LLM classifier · พิมพ์ "สั่งคอมเช็กสถานะ" ชัวร์กว่า · "ปิดคอม" = ยังไม่รองรับ (ไม่มี handler)
+- **PC → มือถือ** (`sql/003_mobile_inbox.sql` · `mark55/mobile_outbox.py`): Mark 55 INSERT งาน `target = MOBILE:<device>` / `MOBILE_ALL` · instruction `NOTIFY` (`{text, speak}`) / `DEVICE_TOOL` (`{tool: "device.*", text, args}`) · แอปดึงด้วย `mobile_claim_inbox` (SKIP LOCKED · ค้างเกิน 1 วัน = FAILED expired) แล้วส่งผล `mobile_finish_task`
+- แอป: `PcInbox` (features/pc-bridge) poll ทุก 15s · ต่อเข้าแชท/เสียง/อุปกรณ์ที่ `src/modules/pc-inbox.ts` (`pcInbox.start()` ใน boot) · NOTIFY พูดเฉพาะตอน mood = idle (กันไมค์ได้ยินตัวเองตอนไลฟ์/เฝ้า) · DEVICE_TOOL ตัด `args.confirmed` + ใช้ `deviceConfirmations` ร่วม → "ยืนยัน" ในแชท · ไม่มี push จริง (FCM = dependency ใหม่ ต้องขอ Boss)
+- SQL ทดสอบกับ Postgres เปล่าได้ (`mark55/sql/tests/`) — container cloud มี Postgres 16 (`/usr/lib/postgresql/16/bin`)
 - Jest ไม่แปลง `import()` แบบ dynamic → test loader ด้วย factory ของตัวเอง (`MODULE_LOADERS` จริงทดสอบได้แค่ว่ามี key)
 
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
