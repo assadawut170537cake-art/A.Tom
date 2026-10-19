@@ -24,6 +24,7 @@ import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
+import { registerDeviceAgent } from './modules/agents/device-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { loadBootModules } from './modules/loader';
@@ -68,6 +69,7 @@ export function bootApp(): Promise<BootReport> {
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();
+  registerDeviceAgent();
   return (started ??= startServices());
 }
 
@@ -108,7 +110,7 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     // log ช่วยทดสอบด้วยมือ (เฉพาะ dev) — ปกติโปรเจกต์นี้ใช้แค่ console.error
     console.info(
       `[boot] Shared Memory: ${memoryFacts ?? '?'} facts (แนบใน system prompt ทุกครั้งที่คุย) · ` +
-        `modules พร้อม ${modules?.ready.length ?? 0} / ล้ม ${modules?.failed.length ?? 0}`
+        `modules พร้อม ${modules?.ready.length ?? 0} / ล้ม ${modules?.failed.length ?? 0}`,
     );
     try {
       deps.installDevTools(deps.memory);
