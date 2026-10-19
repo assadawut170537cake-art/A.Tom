@@ -254,6 +254,9 @@
 - เพิ่มคำสั่ง: handler ใน `mark55/handlers.py` → INSERT `mobile_instructions` → แถวใน `PC_COMMANDS` (features/pc-bridge/commands.ts)
 - module ตอบข้อความไทยเองทุกกรณี (ไม่ throw) — ถ้า throw ProviderError แชทจะแนะนำ "ตั้งค่า › AI" ซึ่งผิดที่ · รอผล 8s แล้วตอบว่า "ส่งแล้ว" (งานรอในคิวจนกว่า Mark 55 จะเปิด)
 - ⚠️ "เช็กเครื่อง" เฉย ๆ ไม่ผ่าน RuleClassifier (ต้องมี เปิด/ปิด/สั่ง + คอม/เครื่อง) → ขึ้นกับ LLM classifier · พิมพ์ "สั่งคอมเช็กสถานะ" ชัวร์กว่า · "ปิดคอม" = ยังไม่รองรับ (ไม่มี handler)
+- **PC → มือถือ** (`sql/003_mobile_inbox.sql` · `mark55/mobile_outbox.py`): Mark 55 INSERT งาน `target = MOBILE:<device>` / `MOBILE_ALL` · instruction `NOTIFY` (`{text, speak}`) / `DEVICE_TOOL` (`{tool: "device.*", text, args}`) · แอปดึงด้วย `mobile_claim_inbox` (SKIP LOCKED · ค้างเกิน 1 วัน = FAILED expired) แล้วส่งผล `mobile_finish_task`
+- แอป: `PcInbox` (features/pc-bridge) poll ทุก 15s · ต่อเข้าแชท/เสียง/อุปกรณ์ที่ `src/modules/pc-inbox.ts` (`pcInbox.start()` ใน boot) · NOTIFY พูดเฉพาะตอน mood = idle (กันไมค์ได้ยินตัวเองตอนไลฟ์/เฝ้า) · DEVICE_TOOL ตัด `args.confirmed` + ใช้ `deviceConfirmations` ร่วม → "ยืนยัน" ในแชท · ไม่มี push จริง (FCM = dependency ใหม่ ต้องขอ Boss)
+- SQL ทดสอบกับ Postgres เปล่าได้ (`mark55/sql/tests/`) — container cloud มี Postgres 16 (`/usr/lib/postgresql/16/bin`)
 - Jest ไม่แปลง `import()` แบบ dynamic → test loader ด้วย factory ของตัวเอง (`MODULE_LOADERS` จริงทดสอบได้แค่ว่ามี key)
 
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
@@ -262,6 +265,8 @@
 - VAD จาก metering (dBFS) poll ทุก 100ms: ดัง ≥ `SPEECH_THRESHOLD_DB` (-40) = พูด · เงียบ `SILENCE_END_MS` (1.2s) = จบ · สั้นกว่า `MIN_SPEECH_MS` (0.4s) = เสียงรบกวน · ยาวสุด `MAX_UTTERANCE_MS` (30s) · ไม่มีใครพูด `IDLE_TIMEOUT_MS` (30s) = ออกเอง · เงียบนำหน้า `PRE_SPEECH_RESET_MS` (8s) = ทิ้งไฟล์อัดใหม่
 - ⚠️ ค่า dBFS ต่างกันตามเครื่อง: Android = peak (`maxAmplitude`), iOS = average power → ถ้าเครื่องจริงตัดประโยคเร็ว/ไม่ยอมจบ ปรับ `SPEECH_THRESHOLD_DB` ที่เดียว
 - **ฟังต่อตอนอยู่แอปอื่นได้:** expo-audio `enableBackgroundRecording: true` (app.json) + `allowsBackgroundRecording: true` ตอน start → Android = `AudioRecordingService` (Foreground Service type microphone + แจ้งเตือนค้าง) · ใช้คู่ระดับ B: กดค้าง Orb → สลับไปแอปอื่น → พูด "กดปุ่ม …" · ยังออกเองเมื่อเงียบ 30s (`IDLE_TIMEOUT_MS`)
+- **โหมดเฝ้า (อัลตรอน · ADR-015 ขั้น 4):** `useStandbyStore` (`features/voice/live/standbyStore.ts`, AsyncStorage `atom.voice.v1.standby`) · เปิด = `keepAlive` (ไม่ออกเองเมื่อเงียบ) + แอปไม่อยู่หน้าสุด → `requireWakeWord` (ต้องขึ้นต้นด้วยชื่อ persona — `stripWakeWord()` ใน `wakeWord.ts`, ไม่สลับ persona) · สั่ง: ตั้งค่า › เสียง (สวิตช์) / agent "โหมดเฝ้า" ("เปิดโหมดเฝ้า" / "ปิดโหมดเฝ้า" / "ฟังตลอด") · บันทึกว่าเปิด → เปิดหน้าหลักแล้วฟังเอง · แตะ Orb / session ล้ม → ปิดโหมดเฝ้าตาม · unmount (สลับแท็บ) ไม่ปิด
+- โหมดเฝ้าใช้ Foreground Service ของ expo-audio (ไม่ใช่ของเราเอง) · ตรวจคำปลุกหลัง STT → ทุกประโยคที่ดังพอเสียค่า STT · Android อาจฆ่าแอปเมื่อแบตต่ำ/โหมดประหยัด (ต้องทดสอบบนเครื่อง)
 - ระหว่างผู้ช่วยพูด **ไม่อัดเสียง** (กันได้ยินตัวเอง) — ยังไม่มี barge-in · recorder หยุดแล้วคืน `allowsRecording: false` ทุกครั้ง (iOS playAndRecord ทำเสียง TTS เบา)
 - หยุดระหว่างรอ AI → `sendMessage({ onSpeaking })` คืน false = ไม่พูดคำตอบ · งาน async รอบเก่าทิ้งด้วย `runId` guard
 - ถอดเสียงว่าง → ฟังใหม่เงียบ ๆ · STT ไม่ได้ตั้งค่า (`missing_key`/`unsupported`) → ออกจากโหมด + ข้อความไทยชี้ ตั้งค่า › เสียง · ไมค์ไม่ได้สิทธิ์ → ข้อความจาก `ensureMicPermission()`

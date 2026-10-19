@@ -1,23 +1,26 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { bootApp, startServices } from '../boot';
+import { pcInbox } from '../modules/pc-inbox';
 import { localMemory } from '../core/memory/LocalMemoryAdapter';
 import type { MemoryStore } from '../core/memory/types';
 import { ModuleManager } from '../core/modules/ModuleManager';
 import { ModuleRegistry } from '../core/modules/ModuleRegistry';
 import { ALL_MEMORY_TARGETS } from '../core/memory/types';
-import {
-  DEV_TEST_FACTS,
-  installMemoryDevTools,
-  type AtomDevTools,
-} from '../dev/memoryDevTools';
+import { DEV_TEST_FACTS, installMemoryDevTools, type AtomDevTools } from '../dev/memoryDevTools';
 import { aiRegistry } from '../features/ai/core/ProviderRegistry';
 import { getPersonaPrompt } from '../features/ai/prompts/personaPrompts';
 import { sendMessage } from '../features/jarvis/services/conversation';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { createAppRouter, getAppRouter } from '../features/router/appRouter';
 import { voiceRegistry } from '../features/voice/core/VoiceRegistry';
-import { GEMINI, geminiText, isClassifierCall, mockFetch, type RecordedCall } from '../test-utils/mockFetch';
+import {
+  GEMINI,
+  geminiText,
+  isClassifierCall,
+  mockFetch,
+  type RecordedCall,
+} from '../test-utils/mockFetch';
 import { registerAll, resetSettings, resetStore, setAIKeys } from '../test-utils/setup';
 
 beforeAll(registerAll);
@@ -37,10 +40,17 @@ afterEach(() => jest.restoreAllMocks());
 /** Mocked Gemini: classifier → chat, chat → fixed reply. Returns the system prompt of each chat call. */
 function captureSystemPrompts() {
   const { calls } = mockFetch([
-    [GEMINI, (c) => (isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":0.9}') : geminiText('จำได้ครับ'))],
+    [
+      GEMINI,
+      (c) =>
+        isClassifierCall(c)
+          ? geminiText('{"intent":"chat","confidence":0.9}')
+          : geminiText('จำได้ครับ'),
+    ],
   ]);
   const systemOf = (c: RecordedCall) =>
-    (c.body as { systemInstruction?: { parts: { text: string }[] } }).systemInstruction?.parts[0]?.text;
+    (c.body as { systemInstruction?: { parts: { text: string }[] } }).systemInstruction?.parts[0]
+      ?.text;
   return () => calls.filter((c) => !isClassifierCall(c)).map(systemOf);
 }
 
@@ -55,7 +65,9 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
 
     expect(res.reply).toBe('จำได้ครับ');
     const [system] = prompts();
-    expect(system).toMatch(new RegExp(`^${escape(getPersonaPrompt(1))}\\n\\nสิ่งที่จำได้เกี่ยวกับบอส:\\n`));
+    expect(system).toMatch(
+      new RegExp(`^${escape(getPersonaPrompt(1))}\\n\\nสิ่งที่จำได้เกี่ยวกับบอส:\\n`),
+    );
     expect(system).toContain('- drink: บอสชอบกาแฟดำ');
     expect(system).toContain('- nickname: ลูกพี่เค้ก');
     expect(system).not.toContain('ของจาร์วิส'); // another persona's private fact
@@ -88,8 +100,14 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
     expect(res).toMatchObject({ reply: 'จำได้ครับ' });
     expect(res.error).toBeUndefined();
     expect(prompts()).toEqual([getPersonaPrompt(1)]);
-    expect(error).toHaveBeenCalledWith('[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ', expect.any(Error));
-    expect(useAtomStore.getState().messagesByPersona[1].map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(error).toHaveBeenCalledWith(
+      '[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ',
+      expect.any(Error),
+    );
+    expect(useAtomStore.getState().messagesByPersona[1].map((m) => m.role)).toEqual([
+      'user',
+      'assistant',
+    ]);
   });
 
   test('getAppRouter is a singleton; createAppRouter can take another store', async () => {
@@ -98,7 +116,18 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
       save: jest.fn(),
       load: jest.fn(),
       list: async ({ scope }) =>
-        scope === 'global' ? [{ id: '1', key: 'from', value: 'other store', source: 'user', createdAt: 1, updatedAt: 1 }] : [],
+        scope === 'global'
+          ? [
+              {
+                id: '1',
+                key: 'from',
+                value: 'other store',
+                source: 'user',
+                createdAt: 1,
+                updatedAt: 1,
+              },
+            ]
+          : [],
       remove: jest.fn(),
       clear: jest.fn(),
       sync: jest.fn(),
@@ -110,7 +139,8 @@ describe('app chat path uses Shared Memory (sendMessage → app router → ChatH
 });
 
 describe('boot', () => {
-  const newRegistry = () => new ModuleRegistry({ memory: localMemory, logger: { info: jest.fn(), error: jest.fn() } });
+  const newRegistry = () =>
+    new ModuleRegistry({ memory: localMemory, logger: { info: jest.fn(), error: jest.fn() } });
   const fakeDeps = (overrides: Partial<Parameters<typeof startServices>[0]> = {}) => ({
     modules: new ModuleManager(newRegistry()),
     memory: localMemory,
@@ -135,10 +165,13 @@ describe('boot', () => {
   test('module init blowing up never crashes boot', async () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     const report = await startServices(
-      fakeDeps({ modules: { start: () => Promise.reject(new Error('registry broken')) } })
+      fakeDeps({ modules: { start: () => Promise.reject(new Error('registry broken')) } }),
     );
     expect(report.modules).toBeNull();
-    expect(error).toHaveBeenCalledWith('[boot] เริ่ม module ไม่สำเร็จ — แอปทำงานต่อได้ (ไม่มี module)', expect.any(Error));
+    expect(error).toHaveBeenCalledWith(
+      '[boot] เริ่ม module ไม่สำเร็จ — แอปทำงานต่อได้ (ไม่มี module)',
+      expect.any(Error),
+    );
   });
 
   test('unreadable memory never crashes boot', async () => {
@@ -150,7 +183,9 @@ describe('boot', () => {
   test('dev: logs the fact count and installs the memory dev tools; prod: neither', async () => {
     const installDevTools = jest.fn();
     await startServices(fakeDeps({ dev: true, installDevTools }));
-    expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/^\[boot\] Shared Memory: 0 facts/));
+    expect(console.info).toHaveBeenCalledWith(
+      expect.stringMatching(/^\[boot\] Shared Memory: 0 facts/),
+    );
     expect(installDevTools).toHaveBeenCalledWith(localMemory);
 
     jest.mocked(console.info).mockClear();
@@ -178,6 +213,9 @@ describe('boot', () => {
     await expect(first).resolves.toMatchObject({ modules: { ready: [], failed: [] } });
     expect(aiRegistry.get('gemini')).toBeDefined();
     expect(voiceRegistry.getTTS('gemini')).toBeDefined();
+    // bootApp เริ่ม inbox ของ Mark 55 จริง (setInterval 15s) — หยุดไม่ให้ jest ค้างหลังรันจบ
+    expect(pcInbox.running).toBe(true);
+    pcInbox.stop();
   });
 });
 
@@ -199,20 +237,29 @@ describe('memory dev tools', () => {
     items.get('A.T.O.M.: เพิ่ม fact ทดสอบ')?.();
     await flush();
     for (const f of DEV_TEST_FACTS) {
-      await expect(localMemory.load(f.target, f.key)).resolves.toMatchObject({ value: f.value, source: 'system' });
+      await expect(localMemory.load(f.target, f.key)).resolves.toMatchObject({
+        value: f.value,
+        source: 'system',
+      });
     }
 
     items.get('A.T.O.M.: ล้าง fact ทดสอบ')?.();
     await flush();
-    for (const f of DEV_TEST_FACTS) await expect(localMemory.load(f.target, f.key)).resolves.toBeNull();
-    await expect(localMemory.load({ scope: 'global' }, 'real_fact')).resolves.toMatchObject({ value: 'ของจริงของบอส' });
+    for (const f of DEV_TEST_FACTS)
+      await expect(localMemory.load(f.target, f.key)).resolves.toBeNull();
+    await expect(localMemory.load({ scope: 'global' }, 'real_fact')).resolves.toMatchObject({
+      value: 'ของจริงของบอส',
+    });
   });
 
   test('atomDev is exposed on globalThis for the DevTools console', async () => {
     install();
     const { atomDev } = globalThis as unknown as { atomDev: AtomDevTools }; // test-only peek at the global
     await atomDev.seed();
-    expect((await atomDev.list()).map((f) => f.key).sort()).toEqual(['dev_atom_nickname', 'dev_drink']);
+    expect((await atomDev.list()).map((f) => f.key).sort()).toEqual([
+      'dev_atom_nickname',
+      'dev_drink',
+    ]);
     await atomDev.clear();
     expect(await atomDev.list()).toEqual([]);
   });
