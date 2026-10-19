@@ -300,6 +300,7 @@
 - Dahl = OpenAI-compatible (`DAHL_BASE_URL` ใน providers.config) แยก 3 provider: `dahl-minimax` / `dahl-deepseek` / `dahl-glm` · key = `ai.dahl-<ชื่อ>` (SecureStore — ใส่ในการ์ด หรือเก็บใน Supermemory secrets space ก็ดึงให้เอง) · **ปิดไว้ก่อน** (ไม่มี key แล้วเปิด = โผล่ในข้อความ error ทุกครั้งที่ตัวอื่นล้ม)
 - สลับเองอัตโนมัติ = Orchestrator เดิม (Priority + fallback + lastGood) · ไม่ต้องมีโค้ดเฉพาะ Dahl
 - โมเดลต่อ persona: `ProviderSettings.getLLMFor/setLLMFor` (`llmByPersona`) → ChatHandler pin `providerId` (ล้มยัง fallback) · UI `PersonaLLMMapper` (ตั้งค่า › AI) เลือกแล้ว `setEnabled(id, true)` ให้ · มีผลเฉพาะแชทปกติ
+- "สมอง + เสียง ต่อ Persona" (Boss ขอแยก): `PersonaLLMMapper` มี 2 ช่องต่อ persona — 🧠 สมอง = `setLLMFor` · 🔊 เสียง = `setTTSFor` (เปลี่ยนเจ้า = ล้าง `voiceId` คง speed/pitch) · `sameVoiceForAll` เปิด = แสดงเฉย ๆ · เลือกเสียงละเอียดยังอยู่ที่ หน้าเสียงของ Persona · Gemini TTS ใส่ key แยก (`tts.gemini`) ได้ = คนละโปรเจกต์ คนละโควต้ากับสมอง
 - Orchestrator: ตัวที่ pin **ไม่ตั้งเป็น lastGood** (ไม่งั้น persona "อัตโนมัติ" ลากไปใช้ตัวของ persona อื่น — มี test ใน dahl.test.ts)
 - `stripThinking()` (OpenAICompatibleAdapter) ตัด `<think>…</think>` ของโมเดล reasoning — แท็กเปิดไม่ปิด = ตัดท้ายทิ้ง
 

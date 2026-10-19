@@ -133,7 +133,7 @@ export function AISettingsScreen() {
           <ProviderCard key={p.config.id} provider={p} subtitle={p.config.defaultModel} />
         ))}
       </Section>
-      <Section title="โมเดลต่อ Persona" hint="อัตโนมัติ = สลับเองตาม Priority · เลือกตัวไหน = ใช้ตัวนั้นก่อน ล้มแล้วสลับให้เอง">
+      <Section title="สมอง + เสียง ต่อ Persona" hint="สมอง = โมเดลที่คิดคำตอบ (อัตโนมัติ = สลับเองตาม Priority) · เสียง = ตัวที่พูดออกเสียง แยกกันได้ — เสียงบนเครื่อง (Expo) ไม่กินโควต้า">
         <PersonaLLMMapper />
       </Section>
       <Section title="Router" hint="Jev จัดประเภทคำสั่ง (intent) ก่อนส่งให้ LLM — ไม่ได้ใช้ตอบแชท">
