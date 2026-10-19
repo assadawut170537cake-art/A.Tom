@@ -56,6 +56,7 @@
 - boot เรียก `moduleManager.start()` แทน `moduleRegistry.initAll()` ตรง ๆ · `loadModule()` ลงทะเบียนผ่าน `moduleManager` (ค่าที่บอสบันทึกไว้มีผลทันที)
 
 ### Fixed
+- build Android บน Windows ที่ตั้งภูมิภาคไทยล้มที่ `mergeReleaseJavaResource` (`VerifyException` — Java ได้ปี พ.ศ. 2569 เกินช่วงวันที่ของ zip) → `plugins/withGregorianBuildLocale.js` ให้ Gradle ใช้ locale อังกฤษ
 - build Android ล้มเพราะ Gradle 9 ห้ามชื่อโปรเจกต์ `A.T.O.M.` (ขึ้นต้น/ลงท้ายด้วย ".") → `plugins/withAndroidProjectName.js` ตั้งชื่อ Gradle เป็น `atom`
 - **Sync:** ของที่เครื่องอื่น push เข้ามาระหว่าง pull กับ push ของเราไม่หายแล้ว (`lastSyncAt` = เวลาตอน pull) · push ส่ง `lastSyncAt` ตอน pull ให้ server แยก conflict จริง → การลบ fact ที่ซิงก์แล้วไปถึงเครื่องอื่นได้ · server ปฏิเสธโดยไม่ส่งฉบับมา → ดึงใหม่ทั้งหมดรอบหน้า · กด "ล้างประวัติ" / เปิด auto-sync ก่อนค่าที่บันทึกไว้โหลดเสร็จ ไม่ถูกโหลดทับอีก · conflict log ที่โหลดมาเกิน 50 ถูกตัด
 - `ModuleRegistry.initOne()`: module ที่ไม่มี dependency และ `init()` แบบ sync throw เคยทำให้ `pending` ค้าง → กด "เริ่มใหม่" หรือปิดแล้วเปิดใหม่ก็ไม่ init อีก · ตอนนี้เคลียร์ `pending` หลัง promise settle เสมอ

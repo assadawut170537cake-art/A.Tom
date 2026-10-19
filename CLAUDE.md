@@ -234,6 +234,7 @@
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
 - release build Android เปิด http ไว้ด้วย config plugin `plugins/withCleartextTraffic.js` (ใช้ expo/config-plugins ที่มากับ expo · ไม่ต้องเพิ่ม expo-build-properties) — การจำกัด http ให้แค่ LAN ทำในโค้ด (`normalizeServerUrl`)
 - Build APK: `npx eas-cli build -p android --profile preview` (eas.json) หรือ local `npx expo prebuild -p android` แล้ว `cd android && ./gradlew assembleRelease` · package `com.atom.assistant` (เปลี่ยนแล้วแอปเดิมอัปเดตทับไม่ได้) · local build เซ็นด้วย debug keystore ของ template
+- `plugins/withGregorianBuildLocale.js`: Windows ภูมิภาคไทย → Java ได้ปี พ.ศ. (2569) → AGP เขียนวันที่ลง zip แบบ MS-DOS (รับแค่ 1980–2107) ไม่ได้ → `VerifyException (no error message)` ที่ `mergeReleaseJavaResource` · plugin เติม `-Duser.language=en -Duser.country=US` ใน `org.gradle.jvmargs` · ห้ามลบ ไม่งั้น build บนเครื่อง Boss ล้ม
 - `plugins/withAndroidProjectName.js`: Gradle 9 ห้ามชื่อโปรเจกต์ขึ้นต้น/ลงท้ายด้วย "." ("A.T.O.M.") → ตั้ง rootProject.name = slug · ห้ามลบ ไม่งั้น build Android ล้ม
 
 ### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)

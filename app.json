@@ -34,7 +34,8 @@
       ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
-      "./plugins/withAndroidProjectName"
+      "./plugins/withAndroidProjectName",
+      "./plugins/withGregorianBuildLocale"
     ]
   }
 }
