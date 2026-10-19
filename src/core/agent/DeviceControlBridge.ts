@@ -11,6 +11,10 @@
  * + expo-brightness + expo-clipboard + native module `AtomDevice` ของเราเอง (`modules/atom-device`, Android: เสียง / ไฟฉาย)
  * — ADR-015 ระดับ A · ไม่มี native module (Expo Go / iOS / test) → เสียง + ไฟฉาย = "ยังไม่รองรับ"
  * Android 10+ / iOS ไม่ให้แอปเปิด-ปิด WiFi เอง → เปิดหน้าตั้งค่า WiFi ให้บอสกดเองแทน (ระดับ B AccessibilityService จะกดให้ได้)
+ *
+ * ระดับ B (AccessibilityService ใน `modules/atom-device`): ปุ่มระบบ · กดตามข้อความ · พิมพ์ · อ่านจอ — บอสต้องเปิดสิทธิ์เอง
+ * - ทำงานกับ **แอปที่อยู่หน้าสุด** — สั่งจากในแอปเรา = กดในแอปเรา → ใช้คู่กับ `device.launch` ("เปิดแอป X แล้วกด Y")
+ * - กดปุ่มที่ข้อความเข้าข่าย {@link RISKY_TAP} (ซื้อ/โอน/ลบ/ส่ง…) ต้อง `args.confirmed === true` ไม่งั้นคืน `needsConfirmation`
  */
 
 import * as Brightness from 'expo-brightness';
@@ -46,7 +50,51 @@ export interface DeviceDriver {
   openSettings?(): Promise<void>;
   canOpenUrl?(url: string): Promise<boolean>;
   openUrl?(url: string): Promise<void>;
+  /** เปิดแอปตามชื่อที่เห็นบนหน้าจอหลัก — คืนชื่อแอปที่เปิด, "" = ไม่พบ */
+  launchApp?(query: string): Promise<string>;
+  accessibilityEnabled?(): Promise<boolean>;
+  openAccessibilitySettings?(): Promise<void>;
+  globalAction?(action: NavAction): Promise<boolean>;
+  /** รหัสผลจาก Kotlin: ok · no_service · no_window · not_found · not_clickable · failed */
+  tapText?(text: string, timeoutMs: number): Promise<string>;
+  /** รหัสผลจาก Kotlin: ok · no_service · no_window · no_field · failed */
+  typeText?(text: string): Promise<string>;
+  /** null = ยังไม่เปิดสิทธิ์ */
+  readScreen?(): Promise<string | null>;
 }
+
+export const NAV_ACTIONS = [
+  'back',
+  'home',
+  'recents',
+  'notifications',
+  'quick_settings',
+  'lock',
+  'screenshot',
+] as const;
+export type NavAction = (typeof NAV_ACTIONS)[number];
+
+/** คำ (ไทย/อังกฤษ) → ปุ่มระบบ · ใช้ทั้งใน tool และ agent */
+export const NAV_WORDS: { action: NavAction; label: string; pattern: RegExp }[] = [
+  { action: 'back', label: 'ย้อนกลับ', pattern: /ย้อนกลับ|\bback\b/i },
+  { action: 'home', label: 'กลับหน้าโฮม', pattern: /หน้าโฮม|โฮม|\bhome\b/i },
+  { action: 'recents', label: 'เปิดแอปล่าสุด', pattern: /แอปล่าสุด|สลับแอป|\brecents?\b/i },
+  { action: 'notifications', label: 'เปิดแจ้งเตือน', pattern: /แจ้งเตือน|\bnotifications?\b/i },
+  {
+    action: 'quick_settings',
+    label: 'เปิดตั้งค่าด่วน',
+    pattern: /ตั้งค่าด่วน|\bquick\s*settings\b/i,
+  },
+  { action: 'lock', label: 'ล็อกหน้าจอ', pattern: /ล็อก|ล็อค|\block\b/i },
+  { action: 'screenshot', label: 'แคปหน้าจอ', pattern: /แคป|จับภาพ|\bscreenshot\b/i },
+];
+
+/** ข้อความบนปุ่มที่กดแล้วอาจเสียเงิน/เสียข้อมูล/ส่งของออกไป → ต้องให้บอสยืนยันก่อน */
+export const RISKY_TAP =
+  /ซื้อ|ชำระ|จ่าย|โอน|ถอน|ลบ|ส่ง|ยืนยัน|ตกลง|สั่ง|buy|pay|purchase|checkout|order|transfer|withdraw|delete|remove|send|confirm|submit/i;
+
+export const ACCESSIBILITY_OFF_REPLY =
+  'ยังไม่ได้เปิดสิทธิ์ "การช่วยเหลือพิเศษ" ให้ A.T.O.M. — พิมพ์ "เปิดสิทธิ์ควบคุมมือถือ" แล้วเลือก "A.T.O.M. ควบคุมเครื่อง"';
 
 /** driver เริ่มต้น: React Native Linking เท่านั้น */
 export const linkingDriver: DeviceDriver = {
@@ -77,21 +125,49 @@ async function setScreenBrightness(level: number): Promise<void> {
   await Brightness.setBrightnessAsync(level);
 }
 
-/** ฟังก์ชันของ `modules/atom-device` (Kotlin) — sync ฝั่ง JS · setTorch คืน false = เครื่องไม่มีแฟลช */
+/**
+ * ฟังก์ชันของ `modules/atom-device` (Kotlin) — sync ฝั่ง JS ยกเว้น tapText · setTorch คืน false = เครื่องไม่มีแฟลช
+ * ฟังก์ชันระดับ B เป็น optional เพราะ APK ที่ build ก่อนหน้านี้มีแค่ setVolume / setTorch
+ */
 export interface AtomDeviceNative {
   setVolume(level: number): void;
   setTorch(on: boolean): boolean;
+  launchApp?(query: string): string;
+  isAccessibilityEnabled?(): boolean;
+  openAccessibilitySettings?(): void;
+  globalAction?(action: string): boolean;
+  tapText?(text: string, timeoutMs: number): Promise<string>;
+  typeText?(text: string): string;
+  readScreen?(): string | null;
 }
 
-/** เติมเสียง / ไฟฉายเข้า driver เมื่อมี native module · ไม่มี → ไม่ใส่ (tool ขึ้น "ยังไม่รองรับ") */
+/** เติมความสามารถของ native module เข้า driver · ไม่มี module / ฟังก์ชันไหนไม่มี → ไม่ใส่ (tool ขึ้น "ยังไม่รองรับ") */
 export function nativeDriverParts(native: AtomDeviceNative | null): DeviceDriver {
   if (!native) return {};
-  return {
+  const parts: DeviceDriver = {
     setVolume: async (level) => native.setVolume(level),
     setTorch: async (on) => {
       if (!native.setTorch(on)) throw new GuardError('เครื่องนี้ไม่มีไฟแฟลช');
     },
   };
+  const {
+    launchApp,
+    isAccessibilityEnabled,
+    openAccessibilitySettings,
+    globalAction,
+    tapText,
+    typeText,
+    readScreen,
+  } = native;
+  if (launchApp) parts.launchApp = async (query) => launchApp(query);
+  if (isAccessibilityEnabled) parts.accessibilityEnabled = async () => isAccessibilityEnabled();
+  if (openAccessibilitySettings)
+    parts.openAccessibilitySettings = async () => openAccessibilitySettings();
+  if (globalAction) parts.globalAction = async (action) => globalAction(action);
+  if (tapText) parts.tapText = (text, timeoutMs) => tapText(text, timeoutMs);
+  if (typeText) parts.typeText = async (text) => typeText(text);
+  if (readScreen) parts.readScreen = async () => readScreen();
+  return parts;
 }
 
 /** driver ของแอป: Linking + expo-brightness + expo-clipboard + AtomDevice (ถ้ามี) */
@@ -114,6 +190,42 @@ interface DeviceTool {
 }
 
 class GuardError extends Error {}
+
+/** ต้องให้บอสยืนยันก่อน — call() แปลงเป็น `needsConfirmation: true` */
+class ConfirmationRequired extends Error {}
+
+async function requireAccessibility(d: DeviceDriver): Promise<void> {
+  if (!(await d.accessibilityEnabled?.())) throw new GuardError(ACCESSIBILITY_OFF_REPLY);
+}
+
+const TAP_RESULT: Record<string, (text: string) => string> = {
+  no_service: () => ACCESSIBILITY_OFF_REPLY,
+  no_window: () => 'ยังอ่านหน้าจอไม่ได้ — ลองสั่งใหม่อีกครั้ง',
+  not_found: (t) => `ไม่พบ "${t}" บนหน้าจอ`,
+  not_clickable: (t) => `เจอ "${t}" แต่กดไม่ได้`,
+  no_field: () => 'ไม่มีช่องพิมพ์ที่เลือกอยู่ — แตะช่องพิมพ์ก่อน หรือสั่ง "กด <ชื่อช่อง>"',
+  failed: (t) => `สั่ง "${t}" ไม่สำเร็จ`,
+};
+
+/** แปลงรหัสผลจาก Kotlin — ไม่ใช่ "ok" = throw ข้อความไทย */
+function expectOk(code: string, text: string): void {
+  if (code === 'ok') return;
+  throw new GuardError(
+    (TAP_RESULT[code] ?? TAP_RESULT.failed)?.(text) ?? `สั่ง "${text}" ไม่สำเร็จ`,
+  );
+}
+
+/** ปุ่มระบบจาก args.action หรือคำในข้อความ ("กดย้อนกลับ", "home") */
+export function parseNavAction(call: AgentToolCall): NavAction {
+  const raw = call.args?.action;
+  const direct = NAV_ACTIONS.find((a) => a === raw);
+  if (direct) return direct;
+  const text = `${call.target ?? ''} ${call.text}`;
+  const hit = NAV_WORDS.find((w) => w.pattern.test(text));
+  if (!hit)
+    throw new GuardError(`ไม่รู้จักปุ่มนี้ — ใช้ได้: ${NAV_WORDS.map((w) => w.label).join(' / ')}`);
+  return hit.action;
+}
 
 /** ระดับจาก args.level / target / text ("50%", "0.5") → 0–1 */
 export function parseLevel(call: AgentToolCall): number {
@@ -218,6 +330,88 @@ const DEVICE_TOOLS: DeviceTool[] = [
     },
   },
   {
+    id: 'device.launch',
+    name: 'เปิดแอปตามชื่อ',
+    description: 'เปิดแอปตามชื่อที่เห็นบนหน้าจอหลัก (args.name เช่น "LINE", "YouTube")',
+    supported: (d) => !!d.launchApp,
+    run: async (d, call) => {
+      const name = (argString(call, 'name') ?? call.target ?? call.text).trim();
+      if (!name) throw new GuardError('ต้องบอกชื่อแอป เช่น "เปิดแอป LINE"');
+      const opened = await d.launchApp?.(name);
+      if (!opened) throw new GuardError(`ไม่พบแอปชื่อ "${name}" ในเครื่อง`);
+      return `เปิด ${opened} แล้ว`;
+    },
+  },
+  {
+    id: 'device.nav',
+    name: 'ปุ่มระบบ',
+    description:
+      'ย้อนกลับ / หน้าโฮม / แอปล่าสุด / แจ้งเตือน / ตั้งค่าด่วน / ล็อกจอ / แคปจอ (args.action)',
+    supported: (d) => !!d.globalAction,
+    run: async (d, call) => {
+      const action = parseNavAction(call);
+      await requireAccessibility(d);
+      if (!(await d.globalAction?.(action)))
+        throw new GuardError('เครื่องนี้ทำคำสั่งนี้ไม่ได้ (ต้อง Android 9 ขึ้นไปสำหรับล็อก/แคปจอ)');
+      return `${NAV_WORDS.find((w) => w.action === action)?.label ?? action}แล้ว`;
+    },
+  },
+  {
+    id: 'device.tap',
+    name: 'กดบนหน้าจอ',
+    description:
+      'กดปุ่ม/ข้อความบนแอปที่อยู่หน้าสุด (args.text) · ปุ่มเสี่ยงต้อง args.confirmed=true',
+    supported: (d) => !!d.tapText,
+    run: async (d, call) => {
+      const text = (argString(call, 'text') ?? call.target ?? call.text).trim();
+      if (!text) throw new GuardError('ต้องบอกว่าจะกดอะไร เช่น "กดปุ่ม ถัดไป"');
+      if (RISKY_TAP.test(text) && call.args?.confirmed !== true) {
+        throw new ConfirmationRequired(
+          `⚠️ "${text}" อาจเป็นคำสั่งสำคัญ (ซื้อ/โอน/ลบ/ส่ง) — พิมพ์ "ยืนยัน" ภายใน 1 นาทีเพื่อกด หรือ "ยกเลิก"`,
+        );
+      }
+      await requireAccessibility(d);
+      const timeoutMs = isNumber(call.args?.timeoutMs) ? call.args.timeoutMs : 0;
+      expectOk((await d.tapText?.(text, timeoutMs)) ?? 'failed', text);
+      return `กด "${text}" แล้ว`;
+    },
+  },
+  {
+    id: 'device.type',
+    name: 'พิมพ์ข้อความ',
+    description: 'ใส่ข้อความลงช่องที่เลือกอยู่ในแอปหน้าสุด (args.text)',
+    supported: (d) => !!d.typeText,
+    run: async (d, call) => {
+      const text = argString(call, 'text') ?? call.text;
+      if (!text) throw new GuardError('ต้องบอกข้อความที่จะพิมพ์ เช่น "พิมพ์ว่า สวัสดี"');
+      await requireAccessibility(d);
+      expectOk((await d.typeText?.(text.slice(0, 5_000))) ?? 'failed', text);
+      return 'พิมพ์แล้ว';
+    },
+  },
+  {
+    id: 'device.read_screen',
+    name: 'อ่านหน้าจอ',
+    description: 'ข้อความที่มองเห็นบนแอปหน้าสุด',
+    supported: (d) => !!d.readScreen,
+    run: async (d) => {
+      await requireAccessibility(d);
+      const text = (await d.readScreen?.())?.trim();
+      return text ? `บนหน้าจอมี:\n${text}` : 'หน้าจอไม่มีข้อความให้อ่าน';
+    },
+  },
+  {
+    id: 'device.accessibility_settings',
+    name: 'เปิดสิทธิ์ควบคุมเครื่อง',
+    description: 'เปิดหน้าตั้งค่า การช่วยเหลือพิเศษ ให้บอสเปิดสิทธิ์ A.T.O.M.',
+    supported: (d) => !!d.openAccessibilitySettings,
+    run: async (d) => {
+      if (await d.accessibilityEnabled?.()) return 'เปิดสิทธิ์ควบคุมเครื่องไว้แล้ว';
+      await d.openAccessibilitySettings?.();
+      return 'เปิดหน้าการช่วยเหลือพิเศษแล้ว — เลือก "A.T.O.M. ควบคุมเครื่อง" แล้วเปิดสวิตช์';
+    },
+  },
+  {
     id: 'device.settings',
     name: 'ตั้งค่าแอป',
     description: 'เปิดหน้าตั้งค่าของแอปในเครื่อง',
@@ -299,6 +493,8 @@ export class DeviceControlBridge implements AgentToolProvider {
     try {
       return { ok: true, output: await tool.run(this.driver, call) };
     } catch (e) {
+      if (e instanceof ConfirmationRequired)
+        return { ok: false, output: e.message, needsConfirmation: true };
       const reason = e instanceof Error ? e.message : String(e);
       return {
         ok: false,

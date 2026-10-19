@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="atom_accessibility_label">A.T.O.M. ควบคุมเครื่อง</string>
+  <string name="atom_accessibility_description">ให้ A.T.O.M. กดปุ่ม พิมพ์ข้อความ และอ่านหน้าจอแทนบอสเมื่อสั่งด้วยเสียงหรือแชท — ทำงานเฉพาะตอนที่บอสสั่ง ไม่เก็บหรือส่งข้อมูลหน้าจอไปที่ใด คำสั่งเสี่ยง (ซื้อ โอน ลบ ส่ง) ต้องยืนยันก่อนทุกครั้ง</string>
+</resources>

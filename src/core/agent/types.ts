@@ -62,6 +62,8 @@ export interface AgentToolResult {
   ok: boolean;
   /** ผลที่ส่งกลับให้ LLM (ผ่าน redactSecrets แล้ว) */
   output: string;
+  /** true = ยังไม่ได้ทำ เพราะต้องให้บอสยืนยันก่อน (เรียกซ้ำด้วย `args.confirmed: true`) */
+  needsConfirmation?: boolean | undefined;
 }
 
 export interface AgentStep {

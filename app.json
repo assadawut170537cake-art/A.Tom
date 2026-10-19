@@ -29,7 +29,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
+          "enableBackgroundRecording": true
         }
       ],
       "expo-asset",
