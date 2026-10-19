@@ -28,7 +28,7 @@
 - **Voice:** expo-speech + expo-audio + expo-network
 - **Navigation:** @react-navigation/native-stack (ไม่ใช่ Expo Router)
 - **Icons:** lucide-react-native
-- **AI:** Gemini + OpenRouter + Dahl ×3 + xAI Grok (Jev = optional, default off · Dahl Boss เพิ่ม 2026-10-19 · ADR-016 · xAI 2026-10-20 · ADR-018)
+- **AI:** Gemini + OpenRouter + Dahl ×3 + xAI Grok (Jev = ตัวตัดสินใจหลัก default on · ADR-019 · Dahl Boss เพิ่ม 2026-10-19 · ADR-016 · xAI 2026-10-20 · ADR-018)
 
 ---
 
@@ -78,7 +78,7 @@
 ## 4. LOCK DECISIONS (Phase 3 — ห้ามแก้)
 
 1. LLM: Gemini + OpenRouter + Dahl (MiniMax / DeepSeek / GLM — Boss เพิ่ม 2026-10-19 · ADR-016) + xAI Grok (2026-10-20 · ADR-018)
-2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
+2. Jev: **default เปิด = ตัวตัดสินใจหลัก** (Boss เปลี่ยน 2026-10-20 · ADR-019) · ไม่มี key/ล่ม = สลับไปตัวกรองคำ + LLM classifier เอง · ใช้ classifier เท่านั้น
 3. Voice: 19 providers (TTS 10 + STT 9), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15 · xAI TTS/STT 2026-10-20)
 4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
 5. Auto-Switch: Priority + Fallback + sticky lastGood + สลับรุ่นเมื่อโควต้าหมด (ADR-017)
@@ -319,7 +319,7 @@
 - Timeout: AbortController + ProviderError
 
 ### Jev
-- Default ปิด, threshold `>= 0.7`
+- Default **เปิด** (ADR-019), threshold `>= 0.7` · ไม่มี key → `JevAdapter` โยน missing_key → classifier คืน null → LLM classifier (เฉพาะข้อความที่เข้า `COMMAND_HINT`) → chat · test `resetSettings()` ปิด Jev ไว้ (test เก่าอิงค่านี้)
 ---
 
 ## 9. PARKING LOT (ก่อน Phase 4.5)

@@ -138,8 +138,8 @@ export function AISettingsScreen() {
       <Section title="สมอง + เสียง ต่อ Persona" hint="สมอง = โมเดลที่คิดคำตอบ (อัตโนมัติ = สลับเองตาม Priority) · เสียง = ตัวที่พูดออกเสียง แยกกันได้ — เสียงบนเครื่อง (Expo) ไม่กินโควต้า">
         <PersonaLLMMapper />
       </Section>
-      <Section title="Router" hint="Jev จัดประเภทคำสั่ง (intent) ก่อนส่งให้ LLM — ไม่ได้ใช้ตอบแชท">
-        {jev && <ProviderCard provider={jev} subtitle="TypeSafe System One" />}
+      <Section title="Router (ตัดสินใจ)" hint="Jev ตัดสินว่าเป็นคุย/คำสั่ง — แยกจากสมองที่ตอบแชท · Jev ใช้ไม่ได้ = สลับเองอัตโนมัติ">
+        {jev && <ProviderCard provider={jev} subtitle="ตัดสินใจหลัก (ค่าเริ่มต้น) — ไม่มี key / ล่ม = สลับไปตัวกรองคำ + AI ให้เอง" />}
       </Section>
       <Section title="Priority" hint="ลากที่ไอคอน ⋮⋮ หรือกด ↑↓ — ตัวบนสุดถูกเรียกก่อน">
         <PriorityList items={priority.items} onChange={priority.change} onDragStateChange={setDragging} />

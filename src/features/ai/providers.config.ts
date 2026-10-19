@@ -48,7 +48,9 @@ export const PROVIDERS: AIProviderConfig[] = [
     baseURL: 'https://api.typesafe.ai',
     defaultModel: 'jev-latest',
     models: ['jev-latest', 'jev-preview'],
-    enabled: false,
+    // ตัวตัดสินใจหลักโดยค่าเริ่มต้น (Boss เปลี่ยน Lock 2 · 2026-10-20 · ADR-019) — ไม่มี key / ล่ม = router
+    // สลับไปใช้ตัวกรองคำ + LLM classifier ให้เอง (JevClassifier คืน null)
+    enabled: true,
     purpose: 'router',
   },
   dahl('dahl-minimax', 'Dahl · MiniMax M2.7', 'MiniMaxAI/MiniMax-M2.7'),

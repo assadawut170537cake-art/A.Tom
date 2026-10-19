@@ -68,7 +68,7 @@ describe('registry + factory', () => {
       'xai',
     ]);
     expect(reg.get('gemini')?.config.name).toBe('Gemini v2');
-    expect(reg.listEnabled().map((p) => p.config.id)).toEqual(['gemini', 'openrouter']);
+    expect(reg.listEnabled().map((p) => p.config.id)).toEqual(['gemini', 'openrouter', 'jev']); // Jev เปิดเป็นค่าเริ่มต้น (ADR-019)
     expect(reg.get('custom')).toBeUndefined();
   });
 
