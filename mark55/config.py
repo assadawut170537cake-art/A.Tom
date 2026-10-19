@@ -63,6 +63,11 @@ POLL_INTERVAL: float = _env_float("MARK55_POLL_INTERVAL", 2.0)
 LOG_LEVEL: str = _env_log_level("MARK55_LOG_LEVEL", "INFO")
 LOG_FORMAT: str = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
+# อัลตรอน (sandbox) — โฟลเดอร์เก็บ pending/ released/ · image ที่ใช้รัน · เวลาสูงสุดต่อครั้ง (วินาที)
+ULTRON_ROOT: str = os.getenv("MARK55_ULTRON_ROOT", str(Path.home() / ".mark55" / "ultron"))
+ULTRON_IMAGE: str = os.getenv("MARK55_ULTRON_IMAGE", "python:3.12-slim")
+ULTRON_TIMEOUT: int = int(_env_float("MARK55_ULTRON_TIMEOUT", 120))
+
 # Supabase — Mark 55 ใช้ service_role key (ข้าม RLS) · ห้ามใส่ใน git / แชท / แอปมือถือ
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "").strip()

@@ -30,6 +30,7 @@ import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
+import { registerUltronAgent } from './modules/agents/ultron-agent';
 import { loadBootModules } from './modules/loader';
 import { pcInbox } from './modules/pc-inbox';
 
@@ -77,6 +78,7 @@ export function bootApp(): Promise<BootReport> {
   registerSampleAgents();
   registerRouteEscortAgent();
   registerStandbyAgent();
+  registerUltronAgent();
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());
