@@ -457,6 +457,13 @@ function fakeDriver(overrides: Partial<FakeDriver> = {}): FakeDriver {
     openSettings: jest.fn(async () => {}),
     canOpenUrl: jest.fn(async () => true),
     openUrl: jest.fn(async () => {}),
+    launchApp: jest.fn(async () => 'LINE'),
+    accessibilityEnabled: jest.fn(async () => true),
+    openAccessibilitySettings: jest.fn(async () => {}),
+    globalAction: jest.fn(async () => true),
+    tapText: jest.fn(async () => 'ok'),
+    typeText: jest.fn(async () => 'ok'),
+    readScreen: jest.fn(async () => 'แชท\nโทร'),
     ...overrides,
   };
 }
@@ -479,7 +486,7 @@ describe('DeviceControlBridge', () => {
     await new DeviceControlBridge(driver).setEnabled(true);
     const device = new DeviceControlBridge(driver);
     expect(await device.isEnabled()).toBe(true);
-    expect(device.listTools()).toHaveLength(7);
+    expect(device.listTools()).toHaveLength(13);
     await expect(
       device.call({ tool: 'device.volume', text: '', args: { level: 150 } }),
     ).resolves.toEqual({
@@ -548,7 +555,16 @@ describe('DeviceControlBridge', () => {
         .capabilities()
         .filter((c) => !c.supported)
         .map((c) => c.id),
-    ).toEqual(['device.volume', 'device.flashlight']);
+    ).toEqual([
+      'device.volume',
+      'device.flashlight',
+      'device.launch',
+      'device.nav',
+      'device.tap',
+      'device.type',
+      'device.read_screen',
+      'device.accessibility_settings',
+    ]);
     await expect(device.call({ tool: 'device.volume', text: '50' })).resolves.toEqual({
       ok: false,
       output: 'เครื่องนี้ยังไม่รองรับ "ปรับเสียง"',
