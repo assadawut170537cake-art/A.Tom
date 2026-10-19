@@ -14,6 +14,7 @@
 
 **Repo:** `assadawut170537cake-art/A.Tom` (branch: `main`)
 **Owner:** คุณเค้ก — พูดไทย
+**ผู้ใช้:** บอสใช้คนเดียว **ไม่เผยแพร่** (Boss ยืนยัน 2026-10-20) — ไม่ต้องออกแบบเผื่อหลายผู้ใช้ / Play Store · ติดตั้ง APK เอง · ผู้ให้บริการเสียงหลัก = Gemini (xAI เพิ่มไว้สำรอง)
 **Workflow:** DeepSeek (architect) → Claude Code (coder) → Argon/Gemini (reviewer)
 
 ---
