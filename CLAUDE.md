@@ -252,7 +252,7 @@
 - บอสเก็บคีย์ใน Supermemory space `SECRETS_CONTAINER_TAG` (`...atom_secrets` — คนละ space กับ core ที่ sync ขึ้น prompt) เนื้อหาบรรทัดละ `<ชื่อคีย์> = <ค่า>` เช่น `ai.gemini = AIza…` · ชื่อคีย์ = secretKey() ของ SecureKeyStore
 - รับเฉพาะ prefix `ai. / tts. / stt. / mcp. / pcbridge.` (`ALLOWED_KEY_PREFIXES`) — กันเขียน `mark55.auth.token` / `supermemory.apiKey` ทับจากเน็ต · bootstrap ด้วย `supermemory.apiKey` ที่บอสใส่เองที่ ตั้งค่า › Sync
 - คีย์ **ไม่** เข้า prompt (ไหลเข้า SecureStore เท่านั้น — คนละทางกับ memory fact) · ไม่ commit ลง git · fail-open (ไม่มีคีย์/เน็ตล่ม = ข้าม)
-- ⚠️ endpoint/response ของ Supermemory อิงสเปก v3 (`POST /v3/search`) — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
+- ⚠️ ใช้ `POST /v3/documents/list` (`includeContent: true`) — **ไม่ใช่** `/v3/search` (คำค้นว่าง = 400) · endpoint/response อิง OpenAPI v3 — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
 
 ### Mark 55 Bus — `pc-bridge` (4.5.5.3) · SQL `mark55/sql/002_mobile_rpc.sql`
 - คนละช่องทางกับ Sync (Fastify, memory facts): Bus = สั่งงานให้ Mark 55 รัน ผ่านตาราง `memory_tasks` บน Supabase

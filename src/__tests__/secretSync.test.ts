@@ -77,6 +77,7 @@ describe('parseDocuments', () => {
       'stt.azure = c',
       'mcp.x = d\npcbridge.anonKey = e',
     ]);
+    expect(parseDocuments({ memories: [{ content: 'ai.dahl-glm = m' }] })).toEqual(['ai.dahl-glm = m']);
     expect(parseDocuments({ documents: [{ content: 'ai.gemini = z' }] })).toEqual([
       'ai.gemini = z',
     ]);
@@ -113,9 +114,9 @@ describe('SecretSync.importOnce', () => {
 
     const call = nth(calls, 0);
     expect(call.url).toBe(SECRETS_SEARCH_ENDPOINT);
-    expect(JSON.parse(call.init.body as string)).toMatchObject({
-      containerTags: [SECRETS_CONTAINER_TAG],
-    });
+    const sent = JSON.parse(call.init.body as string);
+    expect(sent).toMatchObject({ containerTags: [SECRETS_CONTAINER_TAG], includeContent: true });
+    expect(sent).not.toHaveProperty('q'); // /v3/search ปฏิเสธคำค้นว่าง → ใช้ documents/list
     expect((call.init.headers as Record<string, string>).Authorization).toBe('Bearer sm-key');
   });
 
