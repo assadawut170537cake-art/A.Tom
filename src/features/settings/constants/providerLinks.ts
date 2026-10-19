@@ -13,6 +13,7 @@ export const PROVIDER_KEY_URLS = {
   elevenlabs: 'https://elevenlabs.io/app/settings/api-keys',
   azure: 'https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices',
   polly: 'https://console.aws.amazon.com/iam/home#/security_credentials',
+  dahl: 'https://dahl.global',
   custom: null,
 } as const satisfies Record<string, string | null>;
 
@@ -26,6 +27,9 @@ export type KeyScope = 'ai' | 'tts' | 'stt';
 const KEY_URL_SOURCE: Partial<Record<`${KeyScope}.${string}`, keyof typeof PROVIDER_KEY_URLS>> = {
   'ai.gemini': 'gemini',
   'ai.openrouter': 'openrouter',
+  'ai.dahl-minimax': 'dahl',
+  'ai.dahl-deepseek': 'dahl',
+  'ai.dahl-glm': 'dahl',
   'ai.custom': 'custom',
   'tts.gemini': 'gemini',
   'tts.openai': 'openai',

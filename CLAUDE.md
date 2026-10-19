@@ -28,7 +28,7 @@
 - **Voice:** expo-speech + expo-audio + expo-network
 - **Navigation:** @react-navigation/native-stack (ไม่ใช่ Expo Router)
 - **Icons:** lucide-react-native
-- **AI:** Gemini + OpenRouter (Jev = optional, default off)
+- **AI:** Gemini + OpenRouter + Dahl ×3 (Jev = optional, default off · Dahl Boss เพิ่ม 2026-10-19 · ADR-016)
 
 ---
 
@@ -77,7 +77,7 @@
 
 ## 4. LOCK DECISIONS (Phase 3 — ห้ามแก้)
 
-1. LLM: Gemini + OpenRouter
+1. LLM: Gemini + OpenRouter + Dahl (MiniMax / DeepSeek / GLM — Boss เพิ่ม 2026-10-19 · ADR-016)
 2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
 3. Voice: 17 providers (TTS 9 + STT 8), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15)
 4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
@@ -295,6 +295,13 @@
 - parser รายชื่อโมเดลอยู่ `features/ai/core/modelLists.ts` (type guard, ไม่ cast) · Gemini ส่ง key ทาง header `x-goog-api-key` ไม่ใช่ `?key=`
 - cache = `modelListCache` (หน่วยความจำ, ต่อ provider, ทั้ง session) · บันทึก/ลบ key → ProviderCard ล้าง cache + remount picker (`key={keyVersion}`)
 - "พิมพ์ชื่อเอง" ต้องมีเสมอ (Boss ขอ) — ค่าที่บันทึกยังเป็น string เดียวใน `ProviderSettings.models[id]`
+
+### Dahl + โมเดลต่อ persona (ADR-016)
+- Dahl = OpenAI-compatible (`DAHL_BASE_URL` ใน providers.config) แยก 3 provider: `dahl-minimax` / `dahl-deepseek` / `dahl-glm` · key = `ai.dahl-<ชื่อ>` (SecureStore — ใส่ในการ์ด หรือเก็บใน Supermemory secrets space ก็ดึงให้เอง) · **ปิดไว้ก่อน** (ไม่มี key แล้วเปิด = โผล่ในข้อความ error ทุกครั้งที่ตัวอื่นล้ม)
+- สลับเองอัตโนมัติ = Orchestrator เดิม (Priority + fallback + lastGood) · ไม่ต้องมีโค้ดเฉพาะ Dahl
+- โมเดลต่อ persona: `ProviderSettings.getLLMFor/setLLMFor` (`llmByPersona`) → ChatHandler pin `providerId` (ล้มยัง fallback) · UI `PersonaLLMMapper` (ตั้งค่า › AI) เลือกแล้ว `setEnabled(id, true)` ให้ · มีผลเฉพาะแชทปกติ
+- Orchestrator: ตัวที่ pin **ไม่ตั้งเป็น lastGood** (ไม่งั้น persona "อัตโนมัติ" ลากไปใช้ตัวของ persona อื่น — มี test ใน dahl.test.ts)
+- `stripThinking()` (OpenAICompatibleAdapter) ตัด `<think>…</think>` ของโมเดล reasoning — แท็กเปิดไม่ปิด = ตัดท้ายทิ้ง
 
 ### Network
 - `isOffline()` fail-open

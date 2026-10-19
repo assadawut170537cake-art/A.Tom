@@ -81,7 +81,8 @@ export class Orchestrator {
       for (let attempt = 0; ; attempt++) {
         try {
           const res = await provider.chat({ timeoutMs, ...rest, model });
-          this.lastGood = id;
+          // ตัวที่ถูกระบุ (เช่นโมเดลประจำ persona) ไม่นับเป็น lastGood — ไม่งั้น persona ที่ตั้ง "อัตโนมัติ" ลากไปใช้ตาม
+          if (id !== pinned) this.lastGood = id;
           this.rememberAuthFailures(failures);
           return res;
         } catch (e) {

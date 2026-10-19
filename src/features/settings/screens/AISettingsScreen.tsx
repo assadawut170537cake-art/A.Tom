@@ -8,6 +8,7 @@ import {
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry } from '../../ai/core/ProviderRegistry';
 import type { AIProviderId } from '../../ai/core/types';
+import { PersonaLLMMapper } from '../components/PersonaLLMMapper';
 import { PriorityList } from '../components/PriorityList';
 import { ProviderCard } from '../components/ProviderCard';
 import { ProviderToggle } from '../components/ProviderToggle';
@@ -111,6 +112,10 @@ export function AISettingsScreen() {
   const gemini = aiRegistry.get('gemini');
   const openrouter = aiRegistry.get('openrouter');
   const jev = aiRegistry.get('jev');
+  const dahl = (['dahl-minimax', 'dahl-deepseek', 'dahl-glm'] as const).flatMap((id) => {
+    const p = aiRegistry.get(id);
+    return p ? [p] : [];
+  });
 
   return (
     <ScrollView
@@ -122,6 +127,14 @@ export function AISettingsScreen() {
       <Section title="LLM Providers">
         {gemini && <ProviderCard provider={gemini} />}
         {openrouter && <ProviderCard provider={openrouter} subtitle="โมเดลจาก OpenRouter (โหลดรายการได้)" />}
+      </Section>
+      <Section title="Dahl" hint="inference.dahl.global — ใส่ key ของแต่ละโมเดลแล้วเปิดสวิตช์">
+        {dahl.map((p) => (
+          <ProviderCard key={p.config.id} provider={p} subtitle={p.config.defaultModel} />
+        ))}
+      </Section>
+      <Section title="โมเดลต่อ Persona" hint="อัตโนมัติ = สลับเองตาม Priority · เลือกตัวไหน = ใช้ตัวนั้นก่อน ล้มแล้วสลับให้เอง">
+        <PersonaLLMMapper />
       </Section>
       <Section title="Router" hint="Jev จัดประเภทคำสั่ง (intent) ก่อนส่งให้ LLM — ไม่ได้ใช้ตอบแชท">
         {jev && <ProviderCard provider={jev} subtitle="TypeSafe System One" />}

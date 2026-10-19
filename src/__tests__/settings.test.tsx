@@ -75,7 +75,7 @@ test('AI settings: cards, key save, test connection, toggle, priority', async ()
   // Move OpenRouter above Gemini
   await fireEvent.press(screen.getByLabelText('เลื่อน OpenRouter ขึ้น'));
   await waitFor(async () =>
-    expect(await ProviderSettings.getPriority()).toEqual(['openrouter', 'gemini'])
+    expect((await ProviderSettings.getPriority()).slice(0, 2)).toEqual(['openrouter', 'gemini'])
   );
 
   // Advanced: retries +1

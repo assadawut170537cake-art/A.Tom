@@ -113,11 +113,17 @@ describe('Settings screens', () => {
   const renderInSafeArea = (node: React.ReactElement) =>
     render(<SafeAreaProvider initialMetrics={METRICS}>{node}</SafeAreaProvider>);
 
-  test('AI Providers: Gemini + OpenRouter get links, Jev does not', async () => {
+  test('AI Providers: Gemini + OpenRouter + Dahl ×3 get links, Jev does not', async () => {
     await renderInSafeArea(<AISettingsScreen />);
     await screen.findByText('Advanced');
-    expect(links()).toHaveLength(2);
-    expect(await pressAllLinks()).toEqual(['https://aistudio.google.com/apikey', 'https://openrouter.ai/keys']);
+    expect(links()).toHaveLength(5);
+    expect(await pressAllLinks()).toEqual([
+      'https://aistudio.google.com/apikey',
+      'https://openrouter.ai/keys',
+      'https://dahl.global',
+      'https://dahl.global',
+      'https://dahl.global',
+    ]);
   });
 
   test('Voice: links for Gemini, OpenAI, ElevenLabs, Google, Azure, Polly (TTS) and Whisper, Google, Azure (STT)', async () => {

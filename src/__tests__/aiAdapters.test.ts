@@ -58,7 +58,14 @@ describe('registry + factory', () => {
     const reg = new ProviderRegistry();
     PROVIDERS.forEach((p) => reg.register(createProvider(p)));
     reg.register(createProvider({ ...config('gemini'), name: 'Gemini v2' }));
-    expect(reg.list().map((p) => p.config.id)).toEqual(['gemini', 'openrouter', 'jev']);
+    expect(reg.list().map((p) => p.config.id)).toEqual([
+      'gemini',
+      'openrouter',
+      'jev',
+      'dahl-minimax',
+      'dahl-deepseek',
+      'dahl-glm',
+    ]);
     expect(reg.get('gemini')?.config.name).toBe('Gemini v2');
     expect(reg.listEnabled().map((p) => p.config.id)).toEqual(['gemini', 'openrouter']);
     expect(reg.get('custom')).toBeUndefined();

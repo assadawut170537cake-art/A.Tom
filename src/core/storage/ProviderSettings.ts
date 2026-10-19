@@ -62,6 +62,8 @@ interface SettingsData {
   enabled: Partial<Record<AIProviderId, boolean>>;
   priority: AIProviderId[];
   models: Partial<Record<AIProviderId, string>>;
+  /** LLM ที่ persona นี้ใช้ก่อน (ไม่ตั้ง = อัตโนมัติตาม Priority) — ล้มยัง fallback ตัวอื่นต่อ */
+  llmByPersona: Partial<Record<Persona, AIProviderId>>;
   ttsByPersona: Partial<Record<Persona, PersonaVoice>>;
   /** When true every persona speaks with sharedVoice. */
   sameVoiceForAll: boolean;
@@ -78,6 +80,7 @@ const empty = (): SettingsData => ({
   enabled: {},
   priority: [],
   models: {},
+  llmByPersona: {},
   ttsByPersona: {},
   sameVoiceForAll: false,
   options: {},
@@ -93,6 +96,7 @@ interface StoredSettings {
   enabled: Record<string, boolean>;
   priority: string[];
   models: Record<string, string>;
+  llmByPersona: Record<string, string>;
   ttsByPersona: Record<string, StoredVoice>;
   sameVoiceForAll: boolean;
   sharedVoice: StoredVoice;
@@ -131,6 +135,7 @@ const FIELD_GUARDS: { [K in keyof StoredSettings]: Guard<StoredSettings[K]> } = 
   enabled: recordOf(isBoolean),
   priority: (v): v is string[] => isArrayOf(v, isString),
   models: recordOf(isString),
+  llmByPersona: recordOf(isString),
   ttsByPersona: recordOf(isStoredVoice),
   sameVoiceForAll: isBoolean,
   sharedVoice: isStoredVoice,
@@ -246,6 +251,18 @@ export const ProviderSettings = {
   setModelFor(providerId: AIProviderId, model: string): Promise<void> {
     return update((d) => {
       d.models[providerId] = model;
+    });
+  },
+
+  /** undefined = อัตโนมัติ (ตาม Priority + lastGood) */
+  async getLLMFor(persona: Persona): Promise<AIProviderId | undefined> {
+    return (await load()).llmByPersona[persona];
+  },
+  /** `undefined` = กลับไปอัตโนมัติ */
+  setLLMFor(persona: Persona, providerId: AIProviderId | undefined): Promise<void> {
+    return update((d) => {
+      if (providerId === undefined) delete d.llmByPersona[persona];
+      else d.llmByPersona[persona] = providerId;
     });
   },
 

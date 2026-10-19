@@ -218,3 +218,14 @@ ADR-001 – 010: การตัดสินใจที่ **lock** ไว้�
 **ลำดับงาน:** (1) ADR นี้ · (2) ระดับ A · (3) ระดับ B AccessibilityService · (4) อัลตรอน + sandbox + ปุ่มอนุมัติ/ทำลาย
 
 **สถานะ (2026-10-19):** (1) ✅ · (2) ✅ ทดสอบบนเครื่องแล้ว · (3) ✅ โค้ด + compile ผ่าน — สั่งจากแชทได้ผ่าน agent "อุปกรณ์" · ข้อจำกัด: ทำกับแอปหน้าสุด จึงใช้ "เปิดแอป X แล้วกด Y" ไปก่อน จนกว่าจะมีตัวฟังคำสั่งเบื้องหลัง (Foreground Service ของอัลตรอน) · งานหลายขั้นให้ AI เลือก tool ต่อกันเอง = agent "งาน" (AgentHarness) · (4) ✅ โค้ด: โหมดเฝ้า (ฟังตลอด + คำปลุก ผ่าน background recording ของ expo-audio) · PC → มือถือ (inbox) · sandbox อัลตรอนบน PC (Docker + ปลด/ทำลาย — LLM บนมือถือเขียนโค้ด, PC แค่รัน) · ยังไม่มี Foreground Service ของเราเอง (ใช้ของ expo-audio)
+
+---
+
+## ADR-016 — เพิ่ม Dahl (3 โมเดล) + เลือก LLM ต่อ persona
+
+| | |
+|---|---|
+| **Decision** | เพิ่มผู้ให้บริการ **Dahl** (`https://inference.dahl.global/v1`, OpenAI-compatible) เป็น 3 provider แยกกัน: `dahl-minimax` (MiniMax M2.7) · `dahl-deepseek` (DeepSeek V4 Flash) · `dahl-glm` (GLM 5.3 Flash) · เพิ่ม **โมเดลต่อ persona** (`ProviderSettings.llmByPersona`, ตั้งค่า › AI) — "อัตโนมัติ" = ตามลำดับ Priority เหมือนเดิม |
+| **Status** | ✅ Accepted (2026-10-19) — Boss ขอเอง ("ให้ 3 โมเดลสลับกันเองอัตโนมัติ หรือแยกโมเดลละ persona") · ขยาย Lock Decision 1 (เดิม Gemini + OpenRouter) |
+| **Rationale** | • แยก provider ต่อโมเดล เพราะบอสได้ key แยกต่อโมเดล และให้แต่ละตัวอยู่ใน fallback chain ได้เอง (429/5xx/key ผิด → สลับไปตัวถัดไปอัตโนมัติ ใช้ Orchestrator เดิม ไม่ต้องเขียนกลไกใหม่)<br>• ผูก persona = `providerId` ที่ pin ใน `Orchestrator.chat()` (ลองตัวนั้นก่อน ล้มยัง fallback) — ตัวที่ pin **ไม่นับเป็น lastGood** ไม่งั้น persona ที่ตั้ง "อัตโนมัติ" ลากไปใช้ตาม<br>• โมเดล reasoning ใส่ `<think>…</think>` ปนในคำตอบ → `stripThinking()` ใน OpenAICompatibleAdapter (กันแชทพูดความคิด + agent อ่าน JSON ไม่ได้) |
+| **Consequences** | ➕ สลับโมเดลเองเมื่อตัวใดล่ม · ให้ persona แต่ละตัวมีสมองต่างกันได้<br>➖ Dahl ปิดไว้ก่อน (ยังไม่มี key) — เปิดเองที่การ์ด หรือเลือกเป็นโมเดลของ persona (เลือกแล้วเปิดให้)<br>➖ ผูก persona มีผลกับแชทปกติ (ChatHandler) เท่านั้น — agent "งาน" / classifier ยังใช้ลำดับอัตโนมัติ |

@@ -12,6 +12,16 @@
 
 ## [Unreleased]
 
+### Dahl + โมเดลต่อ persona ([ADR-016](docs/DECISIONS.md#adr-016--เพิ่ม-dahl-3-โมเดล--เลือก-llm-ต่อ-persona))
+
+**Added**
+- ผู้ให้บริการ AI ใหม่ Dahl 3 โมเดล (MiniMax M2.7 · DeepSeek V4 Flash · GLM 5.3 Flash) — การ์ดแยกใน ตั้งค่า › AI · สลับกันเองอัตโนมัติผ่าน Priority/Fallback เดิม
+- "โมเดลต่อ Persona" ใน ตั้งค่า › AI — แต่ละ persona เลือก LLM เองได้ หรือ "อัตโนมัติ"
+
+**Fixed**
+- โมเดล reasoning ที่ใส่ `<think>…</think>` ในคำตอบ — ตัดทิ้งก่อนแสดง/พูด
+
+
 ### ควบคุมเครื่องเต็มรูปแบบ ([ADR-015](docs/DECISIONS.md#adr-015--บทบาท-4-persona-ข้ามอุปกรณ์--ควบคุมเครื่องเต็มรูปแบบ))
 - **Docs:** ADR-015 — บทบาท 4 persona บนมือถือ/PC (อะตอม ↔ Mark 55 · ไฟรเดย์ ↔ Gemini/Gemini Spark · จาร์วิส ↔ Hermes · อัลตรอน = เบื้องหลัง + sandbox บน PC) และแผนควบคุมเครื่อง 3 ระดับ · Boss อนุมัติ dev build + native code
 - **อัลตรอน sandbox:** "อัลตรอน ทำว่า สุ่มเลข 6 หลัก" → AI เขียนโค้ด → Mark 55 รันใน Docker ที่ไม่มีเน็ต/แตะเครื่องจริงไม่ได้ → ผลเด้งกลับแชท → "ปลด" (เก็บผล) หรือ "ทำลาย" (ลบทิ้ง) · ต้องมี Docker Desktop บน Mark 55 + รัน `mark55/sql/004_ultron.sql` · ทดสอบกับ Docker จริงแล้ว (บล็อกเน็ต · root อ่านอย่างเดียว · หมดเวลา)
