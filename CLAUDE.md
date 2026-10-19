@@ -260,6 +260,7 @@
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)
 - VAD จาก metering (dBFS) poll ทุก 100ms: ดัง ≥ `SPEECH_THRESHOLD_DB` (-40) = พูด · เงียบ `SILENCE_END_MS` (1.2s) = จบ · สั้นกว่า `MIN_SPEECH_MS` (0.4s) = เสียงรบกวน · ยาวสุด `MAX_UTTERANCE_MS` (30s) · ไม่มีใครพูด `IDLE_TIMEOUT_MS` (30s) = ออกเอง · เงียบนำหน้า `PRE_SPEECH_RESET_MS` (8s) = ทิ้งไฟล์อัดใหม่
 - ⚠️ ค่า dBFS ต่างกันตามเครื่อง: Android = peak (`maxAmplitude`), iOS = average power → ถ้าเครื่องจริงตัดประโยคเร็ว/ไม่ยอมจบ ปรับ `SPEECH_THRESHOLD_DB` ที่เดียว
+- **ฟังต่อตอนอยู่แอปอื่นได้:** expo-audio `enableBackgroundRecording: true` (app.json) + `allowsBackgroundRecording: true` ตอน start → Android = `AudioRecordingService` (Foreground Service type microphone + แจ้งเตือนค้าง) · ใช้คู่ระดับ B: กดค้าง Orb → สลับไปแอปอื่น → พูด "กดปุ่ม …" · ยังออกเองเมื่อเงียบ 30s (`IDLE_TIMEOUT_MS`)
 - ระหว่างผู้ช่วยพูด **ไม่อัดเสียง** (กันได้ยินตัวเอง) — ยังไม่มี barge-in · recorder หยุดแล้วคืน `allowsRecording: false` ทุกครั้ง (iOS playAndRecord ทำเสียง TTS เบา)
 - หยุดระหว่างรอ AI → `sendMessage({ onSpeaking })` คืน false = ไม่พูดคำตอบ · งาน async รอบเก่าทิ้งด้วย `runId` guard
 - ถอดเสียงว่าง → ฟังใหม่เงียบ ๆ · STT ไม่ได้ตั้งค่า (`missing_key`/`unsupported`) → ออกจากโหมด + ข้อความไทยชี้ ตั้งค่า › เสียง · ไมค์ไม่ได้สิทธิ์ → ข้อความจาก `ensureMicPermission()`
