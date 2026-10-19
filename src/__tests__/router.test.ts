@@ -6,6 +6,7 @@ import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { JevClassifier } from '../features/router/classifiers/JevClassifier';
 import {
   CLASSIFIER_SYSTEM_PROMPT,
+  COMMAND_HINT,
   LLMClassifier,
   parseClassification,
 } from '../features/router/classifiers/LLMClassifier';
@@ -160,7 +161,20 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
 
   test('returns null when the LLM answers with something unparseable', async () => {
     mockFetch([[GEMINI, () => geminiText('I think it is a chat')]]);
-    await expect(new LLMClassifier().classify({ text: 'อืม' })).resolves.toBeNull();
+    await expect(new LLMClassifier().classify({ text: 'อืม เครื่องนี้' })).resolves.toBeNull();
+  });
+
+  test('ข้อความคุยธรรมดา (ไม่มีคำใบ้คำสั่ง) → ไม่ถามโมเดลเลย · ปิดตัวกรอง = ถามทุกข้อความ', async () => {
+    const { spy } = mockFetch([[GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')]]);
+    await expect(new LLMClassifier().classify({ text: 'วันนี้เหนื่อยจัง' })).resolves.toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+    for (const text of ['ขอคุยกับไฟรเดย์', 'เช็กเครื่องหน่อย', 'switch to ultron', 'ส่งต่อให้ PC'])
+      expect(COMMAND_HINT.test(text)).toBe(true);
+    for (const text of ['สวัสดี', 'เล่านิทานหน่อย', 'ร้อนมาก', 'pcs ที่ไหนถูก'])
+      expect(COMMAND_HINT.test(text)).toBe(false);
+    await expect(
+      new LLMClassifier(undefined, false).classify({ text: 'วันนี้เหนื่อยจัง' })
+    ).resolves.toMatchObject({ intent: 'chat', provider: 'llm' });
   });
 });
 
@@ -328,7 +342,7 @@ describe('IntentRouter pipeline', () => {
       [JEV, () => httpError(503)],
       [GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')],
     ]);
-    const out = await new IntentRouter().route({ text: 'เล่าเรื่องตลกหน่อย' });
+    const out = await new IntentRouter().route({ text: 'เล่าเรื่องตลกเกี่ยวกับคอมหน่อย' });
     expect(out.provider).toBe('llm');
     expect(hosts()).toEqual(['api.typesafe.ai', 'generativelanguage.googleapis.com']);
   });
@@ -437,7 +451,7 @@ describe('Fetch mock sanity', () => {
     const { calls } = mockFetch([
       [GEMINI, (c) => (isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":1}') : geminiText('hi'))],
     ]);
-    await new LLMClassifier().classify({ text: 'x' });
+    await new LLMClassifier().classify({ text: 'เช็กเครื่อง' });
     await new ChatHandler().handle({ text: 'x' });
     expect(calls.map(isClassifierCall)).toEqual([true, false]);
   });

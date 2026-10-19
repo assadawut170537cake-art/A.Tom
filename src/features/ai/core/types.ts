@@ -14,6 +14,11 @@ export interface AIProviderConfig {
   models: string[] | 'dynamic';
   enabled: boolean;
   purpose?: 'llm' | 'router';
+  /**
+   * รุ่นสำรองของเจ้าเดียวกันเมื่อโมเดลที่เลือก "โควต้าหมด" — โควต้าฟรีนับแยกต่อโมเดล จึงสลับรุ่นแล้วคุยต่อได้
+   * เรียงจากตัวที่อยากใช้ก่อน · ไม่มี = ไปเจ้าถัดไปเลย (ADR-017)
+   */
+  quotaFallbackModels?: string[];
 }
 
 export interface ChatMessage {

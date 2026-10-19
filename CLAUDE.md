@@ -81,7 +81,7 @@
 2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
 3. Voice: 17 providers (TTS 9 + STT 8), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15)
 4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
-5. Auto-Switch: Priority + Fallback + sticky lastGood
+5. Auto-Switch: Priority + Fallback + sticky lastGood + สลับรุ่นเมื่อโควต้าหมด (ADR-017)
 6. Storage: SecureStore (secrets) + AsyncStorage (data)
 7. Settings: 3 หน้า (Hub + AI + Voice) + Persona Voice Map
 8. Chat History: แยกต่อ persona (key: `atom.history.v1.<1-4>`)
@@ -302,6 +302,11 @@
 - โมเดลต่อ persona: `ProviderSettings.getLLMFor/setLLMFor` (`llmByPersona`) → ChatHandler pin `providerId` (ล้มยัง fallback) · UI `PersonaLLMMapper` (ตั้งค่า › AI) เลือกแล้ว `setEnabled(id, true)` ให้ · มีผลเฉพาะแชทปกติ
 - Orchestrator: ตัวที่ pin **ไม่ตั้งเป็น lastGood** (ไม่งั้น persona "อัตโนมัติ" ลากไปใช้ตัวของ persona อื่น — มี test ใน dahl.test.ts)
 - `stripThinking()` (OpenAICompatibleAdapter) ตัด `<think>…</think>` ของโมเดล reasoning — แท็กเปิดไม่ปิด = ตัดท้ายทิ้ง
+
+### แอปปรับตัวเองเมื่อโควต้าหมด (ADR-017)
+- `LLMClassifier` ถามโมเดลเฉพาะข้อความที่เข้า `COMMAND_HINT` (คอม/เครื่อง/สั่ง/สลับ/เปลี่ยน/เรียก/ขอคุย/ส่งต่อ/ชื่อ persona) — ไม่เข้า = คืน null → router ตอบ chat (provider `rule`) **ไม่เสีย request** · `new LLMClassifier(orch, false)` = ถามทุกข้อความ (test) · คำสั่งใหม่ที่ไม่มีคำพวกนี้ → เพิ่มคำใน `COMMAND_HINT`
+- Orchestrator: 429 + "quota/exhausted" (`isQuotaError`) → `QuotaGuard.strike()` (พัก 60s ×2 ทุกครั้ง สูงสุด 1 ชม., ต่อ provider+model, หน่วยความจำ) → ลอง `config.quotaFallbackModels` ก่อนไปเจ้าถัดไป · ไม่ retry โควต้า · รุ่นสำรองล้ม (404 ฯลฯ) = ข้ามเงียบ · โมเดลที่พักอยู่ = ไม่ยิง · ทุกตัวพักหมด = ลองตามปกติ · สลับสำเร็จครั้งแรก → notice
+- 429 ทั่วไป (ข้อความไม่มี quota) = กติกาเดิม — test เก่าใช้ `httpError(429)` เปล่า ๆ จึงไม่โดนสลับรุ่น · mock 429 แบบ "exhausted" จะเห็นการยิง Gemini 3 รุ่น
 
 ### Network
 - `isOffline()` fail-open

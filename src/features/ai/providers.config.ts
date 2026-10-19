@@ -26,6 +26,8 @@ export const PROVIDERS: AIProviderConfig[] = [
     baseURL: 'https://generativelanguage.googleapis.com',
     defaultModel: 'gemini-3-flash',
     models: ['gemini-3-pro', 'gemini-3-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+    // โควต้าฟรีนับต่อโมเดล → หมดที่ตัวหนึ่ง สลับไปรุ่นเล็กที่โควต้าสูงกว่า (รุ่นที่ไม่มีจริง = ข้ามเอง)
+    quotaFallbackModels: ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
     enabled: true,
     purpose: 'llm',
   },

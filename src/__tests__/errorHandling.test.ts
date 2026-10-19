@@ -213,7 +213,7 @@ describe('C2 — Jev → Gemini fallback', () => {
       [JEV, () => jevChoice('chat', 0.99)],
       [GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')],
     ]);
-    const out = await new IntentRouter().route({ text: 'เล่านิทานหน่อย' });
+    const out = await new IntentRouter().route({ text: 'เช็กเครื่องให้หน่อย' }); // มีคำใบ้คำสั่ง → ถาม LLM
     expect(out).toEqual({ intent: 'chat', confidence: 0.9, provider: 'llm' });
     expect(hosts()).toEqual(['generativelanguage.googleapis.com']);
   });
@@ -234,7 +234,7 @@ describe('C2 — Jev → Gemini fallback', () => {
     await ProviderSettings.setEnabled('jev', true);
     await setAIKeys(['gemini', 'openrouter']);
     const { hosts } = mockFetch([[GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')]]);
-    expect((await new IntentRouter().route({ text: 'อืม' })).provider).toBe('llm');
+    expect((await new IntentRouter().route({ text: 'อืม เครื่องช้าจัง' })).provider).toBe('llm');
     expect(hosts()).toEqual(['generativelanguage.googleapis.com']);
   });
 });

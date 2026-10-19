@@ -7,7 +7,7 @@
  * RuleClassifier (regex, ฟรี, ใช้ได้แม้ออฟไลน์)
  *   → AgentClassifier (pattern ของ agent ที่ลงทะเบียนไว้, ฟรี — ไม่มี agent = ข้าม)
  *     → JevClassifier (เฉพาะเมื่อเปิด Jev, confidence ≥ 0.7)
- *       → LLMClassifier (ถาม AI Orchestrator ให้ตอบ JSON)
+ *       → LLMClassifier (ถาม AI Orchestrator ให้ตอบ JSON — เฉพาะข้อความที่เข้า COMMAND_HINT · ADR-017)
  *         → default: chat
  * ```
  *

@@ -258,7 +258,7 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
 
   describe('lastGood sticky behaviour (429)', () => {
     test('Gemini 429 → OpenRouter; the next call goes to OpenRouter first, Gemini is skipped', async () => {
-      const { hosts } = mockFetch([
+      const { hosts, calls } = mockFetch([
         [GEMINI, () => httpError(429, 'Resource has been exhausted')],
         [OPENROUTER, () => openRouterText('จาก OpenRouter')],
       ]);
@@ -266,11 +266,17 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
 
       const first = await orch.chat({ messages: MESSAGES });
       expect(first.providerId).toBe('openrouter');
-      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai']);
+      // โควต้าหมด (exhausted) → ลองรุ่นสำรองของ Gemini ก่อน (ADR-017) แล้วค่อย OpenRouter
+      expect(calls.filter((c) => GEMINI.test(c.url.href)).map((c) => c.url.pathname.split('/')[3])).toEqual([
+        'gemini-3-flash:generateContent',
+        'gemini-2.5-flash:generateContent',
+        'gemini-2.5-flash-lite:generateContent',
+      ]);
+      expect(hosts().at(-1)).toBe('openrouter.ai');
 
       const second = await orch.chat({ messages: MESSAGES });
       expect(second.providerId).toBe('openrouter');
-      expect(hosts().slice(2)).toEqual(['openrouter.ai']); // sticky: no Gemini attempt
+      expect(hosts().slice(4)).toEqual(['openrouter.ai']); // sticky: no Gemini attempt
       expect((await orch.pickProvider())?.config.id).toBe('openrouter');
     });
 

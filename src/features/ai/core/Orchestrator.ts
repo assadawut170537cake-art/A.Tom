@@ -13,6 +13,9 @@
  * key ที่ถูกปฏิเสธระหว่างที่ตัวถัดไปตอบได้ จะเก็บไว้ให้ `takeNotices()` เพื่อแจ้งบอส
  * ล้มทุกตัว → ProviderError เดียวที่รวมสาเหตุของทุกเจ้า
  *
+ * โควต้าหมด (429 + "quota") → พักโมเดลนั้นไว้ (QuotaGuard) แล้วลองรุ่นสำรองของเจ้าเดียวกัน
+ * (`quotaFallbackModels` — โควต้าฟรีนับแยกต่อโมเดล) ก่อนไปเจ้าถัดไป · ADR-017
+ *
  * `aiOrchestrator` คือ instance ที่แอปใช้ร่วมกัน · test สร้าง `new Orchestrator(registry, settings)` เอง
  *
  * @see ../../../../docs/ARCHITECTURE.md — หัวข้อ 4 Orchestrator pattern
@@ -32,11 +35,29 @@ import {
   type ProviderSettingsStore,
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry, type ProviderRegistry } from './ProviderRegistry';
-import type { AIProvider, AIProviderId, ChatRequest, ChatResponse } from './types';
+import { QuotaGuard, isQuotaError } from './QuotaGuard';
+import type {
+  AIProvider,
+  AIProviderConfig,
+  AIProviderId,
+  ChatRequest,
+  ChatResponse,
+} from './types';
 
 /** Failures worth retrying on the same provider (auth/missing key never fix themselves). */
 const RETRYABLE = new Set<ProviderErrorKind>(['rate_limit', 'server', 'timeout', 'network']);
 const RETRY_DELAY_MS = 800;
+
+interface Plan {
+  provider: AIProvider;
+  /** [ตัวที่บอสเลือก, ...รุ่นสำรองเมื่อโควต้าหมด] */
+  models: string[];
+}
+
+/** ตัวที่เลือกก่อนเสมอ แล้วตามด้วยรุ่นสำรอง (ไม่ซ้ำ) */
+function modelsToTry(config: AIProviderConfig, preferred: string): string[] {
+  return [preferred, ...(config.quotaFallbackModels ?? []).filter((m) => m !== preferred)];
+}
 
 interface OrchestratorChatInput extends Omit<ChatRequest, 'model'> {
   /** Pin a provider; it is tried first, the rest of the chain is still used as fallback. */
@@ -60,7 +81,8 @@ export class Orchestrator {
 
   constructor(
     private readonly registry: ProviderRegistry = aiRegistry,
-    private readonly settings: ProviderSettingsStore = ProviderSettings
+    private readonly settings: ProviderSettingsStore = ProviderSettings,
+    private readonly quota: QuotaGuard = new QuotaGuard()
   ) {}
 
   async chat(input: OrchestratorChatInput): Promise<ChatResponse> {
@@ -71,31 +93,28 @@ export class Orchestrator {
     }
 
     const { timeoutMs, retries, fallback } = await this.settings.getAdvanced();
-    const failures: ProviderError[] = [];
+    const plans: Plan[] = [];
     for (const provider of fallback ? chain : chain.slice(0, 1)) {
       const id = provider.config.id;
-      const model =
+      const preferred =
         (id === pinned && pinnedModel) ||
         (await this.settings.getModelFor(id)) ||
         provider.config.defaultModel;
-      for (let attempt = 0; ; attempt++) {
-        try {
-          const res = await provider.chat({ timeoutMs, ...rest, model });
-          // ตัวที่ถูกระบุ (เช่นโมเดลประจำ persona) ไม่นับเป็น lastGood — ไม่งั้น persona ที่ตั้ง "อัตโนมัติ" ลากไปใช้ตาม
-          if (id !== pinned) this.lastGood = id;
-          this.rememberAuthFailures(failures);
-          return res;
-        } catch (e) {
-          const err = toProviderError(id, e);
-          if (!err.shouldFallback) throw err;
-          if (attempt < retries && RETRYABLE.has(err.kind)) {
-            await sleep(RETRY_DELAY_MS * (attempt + 1));
-            continue;
-          }
-          if (this.lastGood === id) this.lastGood = null;
-          failures.push(err);
-          break;
-        }
+      plans.push({ provider, models: modelsToTry(provider.config, preferred) });
+    }
+    // ทุกตัวพักอยู่ = ลองตามปกติ (ดีกว่าตอบล้มโดยไม่ได้ลองสักตัว)
+    const ignoreCooldown = plans.every(({ provider, models }) =>
+      models.every((m) => this.quota.isCooling(provider.config.id, m))
+    );
+
+    const failures: ProviderError[] = [];
+    for (const plan of plans) {
+      const res = await this.tryProvider(plan, { timeoutMs, ...rest }, retries, ignoreCooldown, failures);
+      if (res) {
+        // ตัวที่ถูกระบุ (เช่นโมเดลประจำ persona) ไม่นับเป็น lastGood — ไม่งั้น persona ที่ตั้ง "อัตโนมัติ" ลากไปใช้ตาม
+        if (plan.provider.config.id !== pinned) this.lastGood = plan.provider.config.id;
+        this.rememberAuthFailures(failures);
+        return res;
       }
     }
     throw new ProviderError(
@@ -103,6 +122,65 @@ export class Orchestrator {
       commonKind(failures),
       `ผู้ให้บริการทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
     );
+  }
+
+  /**
+   * ลองโมเดลของ provider นี้ตามลำดับ: ตัวที่บอสเลือก → รุ่นสำรองใน `quotaFallbackModels`
+   * - โควต้าหมด → พักโมเดลนั้น (QuotaGuard) แล้วลองรุ่นถัดไปทันที ไม่ retry (รอไปก็ไม่หาย)
+   * - โมเดลที่พักอยู่ = ข้ามโดยไม่ยิง · รุ่นสำรองล้มด้วยเหตุอื่น (เช่น 404 ไม่มีรุ่นนี้) = ข้ามเงียบ ๆ
+   * - ตัวที่บอสเลือกล้มด้วยเหตุอื่น = กติกาเดิม (retry / fallback เจ้าถัดไป / โยน)
+   * คืน null = ไปเจ้าถัดไป (ใส่สาเหตุไว้ใน `failures`)
+   */
+  private async tryProvider(
+    { provider, models }: Plan,
+    req: Omit<ChatRequest, 'model'>,
+    retries: number,
+    ignoreCooldown: boolean,
+    failures: ProviderError[]
+  ): Promise<ChatResponse | null> {
+    const id = provider.config.id;
+    const preferred = models[0] ?? provider.config.defaultModel;
+    let ranOut = false; // ตัวที่บอสเลือกเพิ่งหมดรอบนี้ → ถ้ารุ่นสำรองตอบได้ ให้บอสรู้
+    let tried = false;
+    for (const [index, model] of models.entries()) {
+      if (!ignoreCooldown && this.quota.isCooling(id, model)) continue;
+      tried = true;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const res = await provider.chat({ ...req, model });
+          this.quota.clear(id, model);
+          if (ranOut && index > 0) {
+            this.notices.add(
+              `${provider.config.name}: โควต้าของ ${preferred} หมดชั่วคราว — สลับไปใช้ ${model} ให้เองแล้ว`
+            );
+          }
+          return res;
+        } catch (e) {
+          const err = toProviderError(id, e);
+          if (isQuotaError(err)) {
+            if (this.quota.strike(id, model) === 1 && index === 0) ranOut = true;
+            if (index === 0) failures.push(err);
+            break; // รุ่นถัดไป
+          }
+          if (index > 0) break; // รุ่นสำรองใช้ไม่ได้ — ไม่ใช่ความผิดของตัวที่บอสเลือก
+          if (!err.shouldFallback) throw err;
+          if (attempt < retries && RETRYABLE.has(err.kind)) {
+            await sleep(RETRY_DELAY_MS * (attempt + 1));
+            continue;
+          }
+          if (this.lastGood === id) this.lastGood = null;
+          failures.push(err);
+          return null;
+        }
+      }
+    }
+    if (this.lastGood === id) this.lastGood = null;
+    if (!tried) {
+      failures.push(
+        new ProviderError(id, 'rate_limit', 'โควต้าหมด — พักไว้ชั่วคราว จะลองใหม่เองเมื่อครบเวลา')
+      );
+    }
+    return null;
   }
 
   /**
