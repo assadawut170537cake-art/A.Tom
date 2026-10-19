@@ -7,6 +7,7 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import {
@@ -14,6 +15,7 @@ import {
   type LiveRecorder,
   type LiveVoiceState,
 } from '../../voice/live/LiveVoiceSession';
+import { useStandbyStore } from '../../voice/live/standbyStore';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 
@@ -65,24 +67,40 @@ export function createRecorderAdapter(recorder: AudioRecorder): LiveRecorder {
   };
 }
 
+export const STANDBY_OFF_MESSAGE = 'ปิดโหมดเฝ้าแล้ว — ไมค์หยุดฟัง';
+
 export interface LiveVoiceControls {
   state: LiveVoiceState;
   active: boolean;
+  /** โหมดเฝ้าเปิดอยู่ (ฟังตลอด + ต้องเรียกชื่อตอนอยู่แอปอื่น) */
+  standby: boolean;
   start: () => void;
   stop: () => void;
+}
+
+/** โหมดเฝ้า + แอปไม่ได้อยู่หน้าสุด = ต้องเรียกชื่อก่อนสั่ง */
+export function needsWakeWord(standby: boolean, appState: string): boolean {
+  return standby && appState !== 'active';
 }
 
 /**
  * โหมดคุยด้วยเสียงแบบไลฟ์บนหน้าหลัก: ต่อ LiveVoiceSession เข้ากับ expo-audio + STT + sendMessage
  * และแปลงสถานะเป็น mood ของ Orb (ฟัง = listening · ถอดเสียง = thinking · คิด/พูด = sendMessage เดินเอง)
+ *
+ * โหมดเฝ้า ({@link useStandbyStore}): เปิด → เริ่มฟังเอง (ตอน mount ด้วยถ้าบันทึกไว้) · ปิด → หยุด
+ * บอสแตะหยุด หรือ session ล้ม (เช่น STT ยังไม่ตั้งค่า) ระหว่างเฝ้า → ปิดโหมดเฝ้าตาม (ไม่ค้างว่าเปิดแต่ไม่ได้ฟัง)
+ * สลับแท็บ (unmount) ไม่ปิดโหมดเฝ้า — กลับมาหน้าหลักแล้วฟังต่อเอง
  */
 export function useLiveVoice(): LiveVoiceControls {
   const recorder = useAudioRecorder(LIVE_RECORDING_OPTIONS);
   const [state, setState] = useState<LiveVoiceState>('idle');
+  const standby = useStandbyStore((s) => s.enabled);
   const sessionRef = useRef<LiveVoiceSession | null>(null);
 
   // สร้าง session ต่อ recorder (recorder เปลี่ยนเมื่อ options เปลี่ยนเท่านั้น) · unmount / สลับแท็บ → ปิดไมค์ทันที
   useEffect(() => {
+    /** cleanup กำลังทำงาน — idle จากการ unmount ไม่ปิดโหมดเฝ้า */
+    let unmounting = false;
     const session = new LiveVoiceSession({
       recorder: createRecorderAdapter(recorder),
       ensureMic: () => voiceOrchestrator.requestMicrophone(),
@@ -92,8 +110,15 @@ export function useLiveVoice(): LiveVoiceControls {
         await sendMessage(text, { onSpeaking: hooks.onSpeaking });
       },
       stopSpeech: () => voiceOrchestrator.stop(),
+      keepAlive: () => useStandbyStore.getState().enabled,
+      requireWakeWord: () =>
+        needsWakeWord(useStandbyStore.getState().enabled, AppState.currentState),
       onStateChange: (next) => {
         setState(next);
+        // จบเองระหว่างเฝ้า (ล้ม / บอสแตะหยุด) → ปิดโหมดเฝ้าตาม · unmount ไม่นับ
+        if (next === 'idle' && !unmounting && useStandbyStore.getState().enabled) {
+          void useStandbyStore.getState().setEnabled(false);
+        }
         const store = useAtomStore.getState();
         if (next === 'listening') store.setMood('listening');
         else if (next === 'transcribing') store.setMood('thinking');
@@ -106,7 +131,30 @@ export function useLiveVoice(): LiveVoiceControls {
         useAtomStore.getState().pushMessage({ role: 'system', content: message }),
     });
     sessionRef.current = session;
+
+    const begin = () => {
+      if (session.active) return;
+      const store = useAtomStore.getState();
+      store.closeDropdown();
+      store.setUIMode('conversation');
+      void session.start();
+    };
+    // เปิดโหมดเฝ้า (หรือโหลดมาว่าเปิดค้างไว้) → เริ่มฟัง · ปิด → หยุด + บอก
+    const unsubscribe = useStandbyStore.subscribe((now, prev) => {
+      if (now.enabled && now.loaded && !(prev.enabled && prev.loaded)) begin();
+      else if (!now.enabled && prev.enabled) {
+        session.stop();
+        useAtomStore.getState().pushMessage({ role: 'system', content: STANDBY_OFF_MESSAGE });
+      }
+    });
+    const standbyNow = useStandbyStore.getState();
+    if (standbyNow.loaded) {
+      if (standbyNow.enabled) begin();
+    } else void standbyNow.load();
+
     return () => {
+      unmounting = true;
+      unsubscribe();
       session.stop();
       if (sessionRef.current === session) sessionRef.current = null;
     };
@@ -123,5 +171,5 @@ export function useLiveVoice(): LiveVoiceControls {
 
   const stop = useCallback(() => sessionRef.current?.stop(), []);
 
-  return { state, active: state !== 'idle', start, stop };
+  return { state, active: state !== 'idle', standby, start, stop };
 }

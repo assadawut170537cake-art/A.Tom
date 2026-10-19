@@ -10,10 +10,14 @@
  * - เสียงสั้นกว่า `MIN_SPEECH_MS` = เสียงรบกวน (ไม่ส่งถอดเสียง ฟังต่อ)
  * - พูดยาวเกิน `MAX_UTTERANCE_MS` = ตัดส่งเลย · ไม่มีใครพูดเลย `IDLE_TIMEOUT_MS` = ออกจากโหมดไลฟ์เอง
  *
+ * โหมดเฝ้า (อัลตรอน, ADR-015 ขั้น 4): `keepAlive()` = true → ไม่ออกเองเมื่อเงียบ · `requireWakeWord()` = true
+ * (แอปอยู่เบื้องหลัง) → ตอบเฉพาะประโยคที่ขึ้นต้นด้วยชื่อ persona ({@link stripWakeWord}) ที่เหลือทิ้งเงียบ ๆ
+ *
  * ระหว่างผู้ช่วยพูด **ไม่บันทึกเสียง** (กันไมค์ได้ยินเสียงตัวเองแล้ววนตอบตัวเอง) — ยังไม่รองรับพูดแทรก (barge-in)
  */
 
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
+import { stripWakeWord } from './wakeWord';
 
 /** ดังกว่านี้ (dBFS) = มีคนพูด — Android ได้ค่า peak (maxAmplitude), iOS ได้ค่าเฉลี่ย จึงเลือกค่ากลาง ๆ */
 export const SPEECH_THRESHOLD_DB = -40;
@@ -89,6 +93,10 @@ export interface LiveVoiceDeps {
   onStateChange?(state: LiveVoiceState): void;
   /** ข้อความไทยที่ควรแสดงในแชท (error / เหตุผลที่ออกจากโหมดไลฟ์) */
   onMessage?(message: string): void;
+  /** true = ไม่ออกเองเมื่อเงียบ {@link IDLE_TIMEOUT_MS} (โหมดเฝ้า) — อ่านทุก tick จึงเปลี่ยนกลางทางได้ */
+  keepAlive?(): boolean;
+  /** true = ต้องขึ้นต้นด้วยชื่อ persona ถึงจะตอบ (โหมดเฝ้าตอนแอปอยู่เบื้องหลัง) — อ่านหลังถอดเสียงทุกประโยค */
+  requireWakeWord?(): boolean;
   timers?: LiveTimers;
 }
 
@@ -222,7 +230,7 @@ export class LiveVoiceSession {
       return;
     }
 
-    if (now - this.listenStartedAt >= IDLE_TIMEOUT_MS) {
+    if (!this.deps.keepAlive?.() && now - this.listenStartedAt >= IDLE_TIMEOUT_MS) {
       void this.fail(IDLE_TIMEOUT_MESSAGE);
       return;
     }
@@ -278,6 +286,8 @@ export class LiveVoiceSession {
       this.deps.recorder.discard?.(uri);
     }
     if (!this.isCurrent(run)) return;
+    // ไม่ได้เรียกชื่อ (เสียงทีวี/คนคุยกัน) หรือเรียกชื่อเฉย ๆ → ฟังต่อเงียบ ๆ
+    if (text && this.deps.requireWakeWord?.()) text = stripWakeWord(text) ?? '';
     // ถอดเสียงแล้วว่าง (พูดไม่ชัด / เสียงลม) → ฟังใหม่เงียบ ๆ ไม่ต้องรบกวนบอส
     if (!text) {
       await this.listen(run);

@@ -27,6 +27,7 @@ import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
+import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
 import { loadBootModules } from './modules/loader';
 
@@ -70,6 +71,7 @@ export function bootApp(): Promise<BootReport> {
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();
+  registerStandbyAgent();
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());

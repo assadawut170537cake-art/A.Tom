@@ -126,7 +126,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
         {keyStatus === 'missing' && (
           <ApiKeyNotice onPress={() => navigation.navigate('AISettings')} />
         )}
-        <LiveVoiceStatus state={live.state} color={persona.color} />
+        <LiveVoiceStatus state={live.state} color={persona.color} standby={live.standby} />
         <ChatInput
           ref={inputRef}
           onSend={onSend}
