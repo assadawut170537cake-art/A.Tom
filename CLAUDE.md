@@ -218,7 +218,7 @@
 - pattern ของ agent ต้องแคบ (ขึ้นต้นประโยค + คำเชื่อมเช่น "ว่า"/":") เพราะมาก่อน LLM · Rule มาก่อน → คำสั่งที่มี "เปิด/ปิด…คอม/เครื่อง" โดน `pc_command` แย่ง
 - agent ล้ม → AgentHandler ตอบข้อความไทย (ไม่ throw) · UI ครอบ `AgentErrorBoundary` ผ่าน `AgentHost` · โหลด UI ล้มไม่ cache (ลองใหม่ได้)
 - ลงทะเบียน agent ตอน boot (`registerSampleAgents()` ใน `bootApp()`) · test ใช้ `new AgentRegistry()` แยก
-- **agent "อุปกรณ์"** (`src/modules/agents/device-agent.ts`, `registerDeviceAgent()`): "ปรับเสียง 30" / "ความสว่าง 50%" / "เปิด/ปิดไฟฉาย" / "คัดลอกว่า …" → `deviceControl.call()` ตรง ๆ (regex ไม่ผ่าน LLM) · ต้องมีตัวเลขหรือเปิด/ปิดเสมอ (กันแย่งประโยคคุย) · STT ถอดเลขเป็นคำ ("สามสิบ") ยังไม่ match
+- **agent "อุปกรณ์"** (`src/modules/agents/device-agent.ts`, `registerDeviceAgent()`): "ปรับเสียง 30" / "ความสว่าง 50%" / "เปิด/ปิดไฟฉาย" / "คัดลอกว่า …" → `deviceControl.call()` ตรง ๆ (regex ไม่ผ่าน LLM) · ต้องมีตัวเลขหรือเปิด/ปิดเสมอ (กันแย่งประโยคคุย) · เลขเป็นคำไทย ("สามสิบ", "ครึ่ง", "เต็ม") แปลงด้วย `parseThaiNumber()` (`thaiNumber.ts`, 0–100 เท่านั้น)
 
 ### Sync กับ Mark 55 (4.5.4.2–4.5.4.3) — สเปกเต็ม `docs/SYNC_PROTOCOL.md`
 - `memorySync` (core/memory/MemorySync.ts) = ตัวเดียวทั้งแอป: Server URL · pair/unpair · testConnection · เป็นเจ้าของ `SyncQueue` · boot เรียก `start()`
@@ -306,7 +306,7 @@
 13. ✅ **Voice Persona Map default** (A2) — `DEFAULT_PERSONA_VOICE_MAP` (นิยามใน `core/storage/ProviderSettings.ts`, re-export ที่ `voice.config.ts`) · `resolveVoiceFor()` = shared voice → ค่าที่ตั้ง → default · default ใช้ Expo Speech แยกด้วย pitch/speed เท่านั้น (ไม่ใส่ voiceId เพราะ identifier ต่างกันตามเครื่อง)
     เดิม: — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
     (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
-14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ⚠️ GLSL ใหม่ยังไม่ได้ลองบน GPU จริง (ผ่านบน WebGL SwiftShader แล้ว)
+14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ✅ Boss ทดสอบบนเครื่องจริงแล้ว (2026-10-19) — แต่ละ persona รูปทรงต่างกัน
     facet เดิมปัดมุมเป็นขั้น → รัศมีกระโดด เกิดรอยแฉกในแสงเรือง (อะตอม/อัลตรอน) → แก้เป็นรูป 9 เหลี่ยมที่ต่อเนื่อง
     เดิม: — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
 15. ✅ **สี Atom vs Ultron ต่างชัด** (A4) — Atom `#E67E22` · Ultron `#C0392B` (contrast บนดำ ≥ 3:1 มี test) · Boss อนุมัติเปลี่ยน lock Phase 2 แล้ว

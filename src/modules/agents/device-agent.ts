@@ -11,19 +11,20 @@
  * ใช้ regex ไม่ผ่าน LLM: เร็ว ใช้ออฟไลน์ได้ และตีความระดับผิดไม่ได้ · pattern ต้องมีตัวเลข/คำว่าเปิด-ปิดเสมอ
  * (แคบพอไม่แย่งประโยคคุยปกติ เพราะ AgentClassifier มาก่อน Jev/LLM)
  * ⚠️ Rule มาก่อน Agent → ประโยคที่มี "เปิด/ปิด" + "เครื่อง" (เช่น "ปิดเสียงเครื่อง") ไปเป็น `pc_command`
- * ⚠️ STT ที่ถอดเลขเป็นคำ ("สามสิบ") ยังไม่ match — ต้องพูด/ถอดเป็นตัวเลข
+ * เลขเป็นคำไทย ("ปรับเสียงสามสิบ", "ความสว่างครึ่ง") แปลงด้วย {@link parseThaiNumber} เพราะ STT บางตัวถอดเป็นคำ
  * การควบคุมอุปกรณ์ปิดอยู่ → bridge ตอบข้อความไทยชี้ไป ตั้งค่า › Marketplace เอง
  */
 
 import { deviceControl, type DeviceControlBridge } from '../../core/agent/DeviceControlBridge';
 import { agentRegistry, type AgentRegistry } from '../../core/agents/AgentRegistry';
 import type { AgentDefinition } from '../../core/agents/types';
+import { parseThaiNumber, THAI_NUMBER_PATTERN } from './thaiNumber';
 
 export const DEVICE_AGENT_ID = 'device';
 
 /** คำลงท้ายที่ STT / การพิมพ์มักแถมมา ("ปรับเสียง 30 ครับ", "เปิดไฟฉายหน่อย!") */
 const TAIL = String.raw`\s*(?:ให้หน่อย|หน่อย|ครับ|ค่ะ|คะ|นะ|ที)*\s*[.!]?$`;
-const LEVEL = String.raw`\s*(?:เป็น|ไปที่|ที่|ให้เป็น)?\s*(?<command>\d{1,3}(?:\.\d+)?)\s*(?:%|เปอร์เซ็นต์|เปอร์เซ็น)?`;
+const LEVEL = String.raw`\s*(?:เป็น|ไปที่|ที่|ให้เป็น)?\s*(?<command>\d{1,3}(?:\.\d+)?|${THAI_NUMBER_PATTERN})\s*(?:%|เปอร์เซ็นต์|เปอร์เซ็น)?`;
 const VERB = String.raw`^(?:ช่วย)?(?:ปรับ|ตั้ง|เปลี่ยน)?\s*`;
 
 /** capability → tool ของ DeviceControlBridge (id เดียวกันเพื่อให้ตามรอยง่าย) */
@@ -84,7 +85,11 @@ export function createDeviceAgent(bridge: DeviceControlBridge = deviceControl): 
         return {
           reply: 'ไม่เข้าใจคำสั่งอุปกรณ์ครับ — ลองพิมพ์เช่น "ปรับเสียง 30" หรือ "เปิดไฟฉาย"',
         };
-      const result = await bridge.call({ tool, text: commandText });
+      // ระดับเป็นคำไทย → ตัวเลขก่อนส่ง (parseLevel ของ bridge อ่านได้แค่ตัวเลข)
+      const isLevel = tool === 'device.volume' || tool === 'device.brightness';
+      const level = isLevel ? parseThaiNumber(commandText) : null;
+      const text = level === null ? commandText : String(level);
+      const result = await bridge.call({ tool, text });
       return { reply: result.ok ? `${result.output}ครับ` : result.output };
     },
   };

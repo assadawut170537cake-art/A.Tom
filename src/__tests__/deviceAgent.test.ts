@@ -11,6 +11,7 @@ import {
   registerDeviceAgent,
 } from '../modules/agents/device-agent';
 import { createNoteAgent } from '../modules/agents/sample-agent';
+import { parseThaiNumber } from '../modules/agents/thaiNumber';
 
 type FakeDriver = Required<
   Pick<DeviceDriver, 'setVolume' | 'setBrightness' | 'setTorch' | 'setClipboard'>
@@ -141,5 +142,45 @@ describe('device agent: running', () => {
     registerDeviceAgent(registry);
     registerDeviceAgent(registry);
     expect(registry.list().map((a) => a.id)).toEqual([DEVICE_AGENT_ID]);
+  });
+});
+
+describe('Thai number words (STT may spell numbers out)', () => {
+  test.each([
+    ['สามสิบ', 30],
+    ['ยี่สิบห้า', 25],
+    ['สิบ', 10],
+    ['สิบเอ็ด', 11],
+    ['ห้า', 5],
+    ['ศูนย์', 0],
+    ['ร้อย', 100],
+    ['หนึ่งร้อย', 100],
+    ['เก้าสิบเก้า', 99],
+    ['ครึ่ง', 50],
+    ['เต็ม', 100],
+    ['42', 42],
+  ])('parseThaiNumber("%s") = %d', (word, value) => {
+    expect(parseThaiNumber(word)).toBe(value);
+  });
+
+  test.each(['', 'หน่อย', 'สามสิบกว่า', 'abc'])('parseThaiNumber("%s") = null', (word) => {
+    expect(parseThaiNumber(word)).toBeNull();
+  });
+
+  test('"ปรับเสียงสามสิบ" / "ความสว่างครึ่ง" / "เสียงยี่สิบห้าเปอร์เซ็นต์" reach the driver as numbers', async () => {
+    let r = await say('ปรับเสียงสามสิบ');
+    expect(r.driver.setVolume).toHaveBeenCalledWith(0.3);
+    expect(r.reply).toBe('ตั้งเสียงเป็น 30% แล้วครับ');
+
+    r = await say('ความสว่างครึ่ง');
+    expect(r.driver.setBrightness).toHaveBeenCalledWith(0.5);
+
+    r = await say('เสียงยี่สิบห้าเปอร์เซ็นต์ครับ');
+    expect(r.driver.setVolume).toHaveBeenCalledWith(0.25);
+  });
+
+  test('"เสียงห้ามดัง" is still ordinary chat', async () => {
+    const { classifier } = await setup();
+    expect(classifier.check('เสียงห้ามดัง')).toBeNull();
   });
 });
