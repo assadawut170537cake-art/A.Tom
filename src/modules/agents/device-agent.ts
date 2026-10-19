@@ -27,12 +27,17 @@ import { deviceControl, type DeviceControlBridge } from '../../core/agent/Device
 import type { AgentToolCall, AgentToolResult } from '../../core/agent/types';
 import { agentRegistry, type AgentRegistry } from '../../core/agents/AgentRegistry';
 import type { AgentDefinition, AgentRunResult } from '../../core/agents/types';
+import {
+  CONFIRM_WINDOW_MS,
+  createConfirmationStore,
+  deviceConfirmations,
+  type ConfirmationStore,
+} from './confirmations';
 import { parseThaiNumber, THAI_NUMBER_PATTERN } from './thaiNumber';
 
 export const DEVICE_AGENT_ID = 'device';
 
-/** คำสั่งเสี่ยงที่รอยืนยันได้นานเท่านี้ (ms) — นานกว่านั้นจอเปลี่ยนไปแล้ว กดอาจผิดปุ่ม */
-export const CONFIRM_WINDOW_MS = 60_000;
+export { CONFIRM_WINDOW_MS };
 /** "เปิดแอป X แล้วกด Y" — รอให้แอปที่เพิ่งเปิดวาดจอเสร็จได้นานสุดเท่านี้ */
 export const LAUNCH_THEN_TAP_TIMEOUT_MS = 6_000;
 
@@ -65,14 +70,15 @@ const reply = (result: AgentToolResult): AgentRunResult => ({
 export function createDeviceAgent(
   bridge: DeviceControlBridge = deviceControl,
   now: () => number = Date.now,
+  /** ใช้ร่วมกับ agent งาน (แอปส่ง `deviceConfirmations`) · ไม่ส่ง = ของตัวเอง (test แยกกันได้) */
+  confirmations: ConfirmationStore = createConfirmationStore(now),
 ): AgentDefinition {
-  /** คำสั่งเสี่ยงล่าสุดที่รอบอส "ยืนยัน" — มีได้ทีละอันเดียว */
-  let pending: { call: AgentToolCall; expiresAt: number } | null = null;
+  const execute = (call: AgentToolCall) => bridge.call(call);
 
   /** เรียก bridge · ถ้าต้องยืนยัน → จำไว้ให้ "ยืนยัน" รอบหน้า */
   async function run(call: AgentToolCall): Promise<AgentToolResult> {
     const result = await bridge.call(call);
-    if (result.needsConfirmation) pending = { call, expiresAt: now() + CONFIRM_WINDOW_MS };
+    if (result.needsConfirmation) confirmations.hold(call, execute);
     return result;
   }
 
@@ -203,17 +209,15 @@ export function createDeviceAgent(
     ],
     async run({ commandText, capabilityId }) {
       if (capabilityId === 'device.confirm') {
-        const waiting = pending;
-        pending = null;
-        if (!waiting || now() > waiting.expiresAt) return { reply: 'ไม่มีคำสั่งที่รอยืนยันครับ' };
-        return reply(
-          await bridge.call({ ...waiting.call, args: { ...waiting.call.args, confirmed: true } }),
-        );
+        const result = await confirmations.confirm();
+        return result ? reply(result) : { reply: 'ไม่มีคำสั่งที่รอยืนยันครับ' };
       }
       if (capabilityId === 'device.cancel') {
-        const had = pending !== null && now() <= pending.expiresAt;
-        pending = null;
-        return { reply: had ? 'ยกเลิกแล้วครับ ไม่ได้กดอะไร' : 'ไม่มีคำสั่งที่รอยืนยันครับ' };
+        return {
+          reply: confirmations.cancel()
+            ? 'ยกเลิกแล้วครับ ไม่ได้กดอะไร'
+            : 'ไม่มีคำสั่งที่รอยืนยันครับ',
+        };
       }
 
       const tool = capabilityId ? TOOL_OF[capabilityId] : undefined;
@@ -249,5 +253,6 @@ export function createDeviceAgent(
 
 /** ลงทะเบียน agent อุปกรณ์ (เรียกซ้ำได้ — fast refresh / bootApp ซ้ำ) */
 export function registerDeviceAgent(registry: AgentRegistry = agentRegistry): void {
-  if (!registry.has(DEVICE_AGENT_ID)) registry.register(createDeviceAgent());
+  if (!registry.has(DEVICE_AGENT_ID))
+    registry.register(createDeviceAgent(deviceControl, Date.now, deviceConfirmations));
 }

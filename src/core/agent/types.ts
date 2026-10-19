@@ -73,7 +73,8 @@ export interface AgentStep {
   toolResult?: AgentToolResult | undefined;
 }
 
-export type AgentStopReason = 'final' | 'max_steps';
+/** `needs_confirmation` = tool ขอให้บอสยืนยันก่อน — หยุด loop แล้วส่ง `pending` ให้ผู้เรียกถามบอส */
+export type AgentStopReason = 'final' | 'max_steps' | 'needs_confirmation';
 
 export interface AgentRunInput {
   text: string;
@@ -90,6 +91,8 @@ export interface AgentRunResult {
   reply: string;
   steps: AgentStep[];
   stopReason: AgentStopReason;
+  /** มีเมื่อ `stopReason === 'needs_confirmation'` — คำสั่งที่รอบอสยืนยัน (เรียกซ้ำด้วย `args.confirmed: true`) */
+  pending?: AgentToolCall | undefined;
 }
 
 export interface AgentHooks {
