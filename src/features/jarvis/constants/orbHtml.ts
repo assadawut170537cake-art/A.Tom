@@ -20,7 +20,7 @@ const hexToRgb = (hex: string): [number, number, number] => {
 };
 
 const PERSONA_COLORS = JSON.stringify(
-  Object.fromEntries(Object.values(PERSONAS).map((p) => [p.id, hexToRgb(p.color)]))
+  Object.fromEntries(Object.values(PERSONAS).map((p) => [p.id, hexToRgb(p.color)])),
 );
 
 /**

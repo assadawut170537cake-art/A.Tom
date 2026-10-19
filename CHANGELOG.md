@@ -12,12 +12,16 @@
 
 ## [Unreleased]
 
+### ควบคุมเครื่องเต็มรูปแบบ ([ADR-015](docs/DECISIONS.md#adr-015--บทบาท-4-persona-ข้ามอุปกรณ์--ควบคุมเครื่องเต็มรูปแบบ))
+- **Docs:** ADR-015 — บทบาท 4 persona บนมือถือ/PC (อะตอม ↔ Mark 55 · ไฟรเดย์ ↔ Gemini/Gemini Spark · จาร์วิส ↔ Hermes · อัลตรอน = เบื้องหลัง + sandbox บน PC) และแผนควบคุมเครื่อง 3 ระดับ · Boss อนุมัติ dev build + native code
+- **Device (ระดับ A):** ปรับความสว่างได้จริง (expo-brightness — Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก, ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป) · คัดลอกไปคลิปบอร์ดได้จริง (expo-clipboard) · ปรับเสียง + เปิด/ปิดไฟฉาย (`device.flashlight`) ผ่าน native module ของเราเอง `modules/atom-device` (Kotlin, Android) — ⚠️ ยังไม่ได้ build/ทดสอบบนเครื่องจริง
+
 ### Parking Lot Cleanup (Phase 4.5 pre-5)
 - **Security (A1, [ADR-014](docs/DECISIONS.md#adr-014--prompt-injection-guard-v2)):** `toPromptLine()` redact ทั้งบรรทัดเป็น `[REDACTED BY GUARD]` เมื่อเจอ "ignore previous/all instructions", `system:` (word boundary), `<|...|>` — มีผลกับ memory fact · skill ที่ AI สร้าง · ผลจาก MCP · tool result ที่ผ่านฟังก์ชันนี้
 - **Voice (A2):** `DEFAULT_PERSONA_VOICE_MAP` — persona ที่ยังไม่ตั้งเสียงได้ pitch/speed ของตัวเอง (Expo Speech) แทนเสียงเดียวกันหมด · ค่าที่บอสตั้งชนะเสมอ
 - **Orb (A3):** variant ต่อ persona (อะตอมเหลี่ยมหยาบหมุนช้า · จาร์วิสเนียน · ไฟรเดย์คมหมุนเร็ว · อัลตรอนกระตุกพัลส์แรง) ผ่าน `setOrbPersona()`
 - **Theme (A4):** Atom `#d35400` → `#E67E22` · Ultron `#ff0033` → `#C0392B` (Boss อนุมัติ)
-- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency
+- **Tooling (A5):** `.prettierrc` · `.prettierignore` · scripts `format` / `format:check` · `prettier` เป็น devDependency (Boss อนุมัติ) · format เฉพาะไฟล์ที่งานนี้แตะ
 - **Docs (B1):** `src/modules/README.md` — คู่มือสร้าง module + `demo-module` ตัวอย่าง (ไม่ได้อยู่ในโค้ดแอป)
 
 ### Added

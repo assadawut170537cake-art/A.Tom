@@ -20,7 +20,7 @@
 
 ## 2. TECH STACK (LOCK — ห้ามเปลี่ยนโดยไม่ขอ)
 
-- **Runtime:** Expo + React Native + TypeScript (strict)
+- **Runtime:** Expo + React Native + TypeScript (strict) · **dev build** (ไม่ใช่ Expo Go — มี native code Kotlin ได้, Boss อนุมัติ 2026-10-18 · ADR-015)
 - **State:** Zustand
 - **Style:** NativeWind + Reanimated
 - **Orb 3D:** WebView
@@ -47,7 +47,7 @@
     │   ├── agent/      ← AgentHarness (loop + hooks) · MCPClientBridge · SkillEngine · DeviceControlBridge
     │   └── agents/     ← AgentRegistry (agent ที่สั่งจากแชทได้ + UI lazy) · components/AgentErrorBoundary
     │
-    ├── modules/        ← loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
+    ├── modules/        ← (คนละอันกับ `./modules/` ที่ root = native module เช่น atom-device) loader.ts (stub) — ระดับแอป เพราะตาราง loader ต้อง import module จาก features/
     │   └── agents/     ← sample-agent.ts (agent "โน้ต") · noteStore · NoteAgentScreen
     ├── dev/            ← เครื่องมือทดสอบตอนพัฒนา (memoryDevTools, moduleDevTools — ติดตั้งเฉพาะ __DEV__)
     ├── boot.ts         ← ลำดับเปิดแอป: register providers → moduleManager.start() → นับ memory facts
@@ -201,8 +201,15 @@
 - `memory` → แนบ facts (global + persona) ผ่าน `toPromptLine()` (ย้ายไป `core/memory/promptLine.ts`, ChatHandler re-export)
 - **MCP:** Streamable HTTP JSON-RPC ผ่าน fetch (ไม่มี dep ใหม่) · รายการ server = AsyncStorage `atom.mcp.v1.servers` · token = SecureStore `mcp.<id>` · server ใหม่**ปิดไว้ก่อน** · tool id `mcp.<server>.<tool>` · https เท่านั้น (ยกเว้น localhost)
 - **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
-- **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · driver เริ่มต้นใช้แค่ `Linking` → volume / brightness / clipboard = "ยังไม่รองรับ" จนกว่าจะเพิ่ม expo-brightness / expo-clipboard ฯลฯ (ต้องขอ Boss) · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
+- **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · `defaultDriver` = `Linking` + expo-brightness + expo-clipboard (ADR-015 ระดับ A) · ความสว่าง Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก — ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป · เสียง (STREAM_MUSIC) + ไฟฉาย = native module ของเราเอง `modules/atom-device` (Kotlin, Android เท่านั้น, autolink จาก `./modules`) — ไม่มี module (Expo Go / iOS / jest) = "ยังไม่รองรับ" · Kotlin ห้าม throw กรณีที่รู้ล่วงหน้า (expo ห่อเป็นข้อความอังกฤษ) → คืนค่าแล้วให้ JS แปลงเป็นไทย · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
 - ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
+
+### Personas ข้ามอุปกรณ์ + ควบคุมเครื่องเต็มรูปแบบ — ADR-015
+- อะตอม = agent ประจำแอปนี้ ↔ Mark 55 บน PC (ตัวเดียวกัน คุยกันตลอด) · ไฟรเดย์ = แอป Gemini / **Gemini Spark** (โหมด agent ในแอป Gemini) ↔ Gemini Enterprise / Antigravity · จาร์วิส = เข้าประชุม + สายเข้า = สั่งงาน ↔ **Hermes** (ดูแล PC) · อัลตรอน = เบื้องหลัง (Foreground Service) ↔ โปรแกรมไหนก็ได้ที่ต่อ API · ตารางเต็มใน `docs/DECISIONS.md` ADR-015
+- Boss ต้องการ **ควบคุมมือถือด้วยเสียงได้ 100%** ไม่ใช่แค่เพิ่ม/ลดเสียง → ระดับ A native module → ระดับ B AccessibilityService (ทุกแอป) → ระดับ C Shizuku/root (ทางเลือก)
+- แอป Gemini ไม่มี API ให้แอปอื่นสั่งแล้วรับผลกลับ → สั่งได้ผ่าน AccessibilityService เท่านั้น · อย่าสัญญาว่าสั่ง Gemini Spark ตรง ๆ ได้
+- งานเบื้องหลังบน Android = Foreground Service (ต้องมีแจ้งเตือนค้าง) · โค้ดของอัลตรอนรันใน Docker sandbox บน PC เท่านั้น แล้วรอบอส "ปลด" / "ทำลาย"
+- คำสั่งอันตรายผ่าน AccessibilityService (ซื้อ/โอน/ลบ/ส่งข้อความ) ต้องถามยืนยันก่อนเสมอ
 
 ### Agents (intent `agent`) — ADR-013
 - ลำดับ router: Rule → **AgentClassifier** → Jev → LLM → chat · ไม่มี agent ลงทะเบียน = ทำงานเหมือนเดิม
@@ -286,7 +293,7 @@
 
 ### หลัง Phase 4.5
 9. ✅ Prettier config (A5) — `.prettierrc` + `.prettierignore` + scripts `format` / `format:check`
-   ✅ `prettier` อยู่ใน devDependencies แล้ว (Boss อนุมัติ 2026-10-18) · ยังไม่ได้ format ไฟล์ใด ๆ (ห้าม reformat ทั้ง repo โดยไม่บอก)
+   ✅ `prettier` อยู่ใน devDependencies แล้ว (Boss อนุมัติ 2026-10-18) · format เฉพาะไฟล์ .ts/.tsx/.js ที่งานนี้แตะ — ไฟล์อื่นยังไม่ได้ format (ห้าม `npm run format` ทั้ง repo โดยไม่บอก Boss)
 10. Module อื่นๆ — คู่มือสร้าง module: `src/modules/README.md` (B1)
 
 ### Nice to Have

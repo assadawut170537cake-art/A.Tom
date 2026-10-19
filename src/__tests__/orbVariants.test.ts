@@ -12,7 +12,7 @@ function loadOrbPage() {
     win,
     doc,
     () => 0,
-    () => undefined
+    () => undefined,
   );
   return win as {
     setOrbPersona: (p: number) => void;
@@ -40,7 +40,8 @@ describe('Orb variants ต่อ persona', () => {
 
   test('page ฝังตาราง variant ครบ และ shader ใช้ uniform ใหม่', () => {
     expect(ORB_HTML).toContain(JSON.stringify(ORB_VARIANTS));
-    for (const u of ['uFacet', 'uFreq', 'uSharp', 'uGloss', 'uPulseMul']) expect(ORB_HTML).toContain(u);
+    for (const u of ['uFacet', 'uFreq', 'uSharp', 'uGloss', 'uPulseMul'])
+      expect(ORB_HTML).toContain(u);
   });
 
   test('facet ใช้มุมละ 2π/9 พอดี — มุมสุดท้ายทับมุมแรก ไม่มีรอยต่อที่ ±π', () => {

@@ -4,9 +4,18 @@ import { LocalMemoryAdapter } from '../core/memory/LocalMemoryAdapter';
 import type { MemoryStore } from '../core/memory/types';
 import { loadModule } from '../modules/loader';
 import { ModuleRegistry, consoleLogger, moduleRegistry } from '../core/modules/ModuleRegistry';
-import { isCommandModule, type AtomModule, type CommandModule, type ModuleContext } from '../core/modules/types';
+import {
+  isCommandModule,
+  type AtomModule,
+  type CommandModule,
+  type ModuleContext,
+} from '../core/modules/types';
 import { Orchestrator } from '../features/ai/core/Orchestrator';
-import { ChatHandler, MAX_MEMORY_FACTS, toPromptLine } from '../features/router/handlers/ChatHandler';
+import {
+  ChatHandler,
+  MAX_MEMORY_FACTS,
+  toPromptLine,
+} from '../features/router/handlers/ChatHandler';
 import {
   PCCommandHandler,
   PC_BRIDGE_MODULE_ID,
@@ -41,7 +50,7 @@ beforeEach(() => {
 
 function fakeModule(
   id: string,
-  opts: { deps?: string[]; enabled?: boolean; initError?: Error; disposeError?: Error } = {}
+  opts: { deps?: string[]; enabled?: boolean; initError?: Error; disposeError?: Error } = {},
 ): AtomModule & { init: jest.Mock; dispose: jest.Mock } {
   return {
     id,
@@ -86,7 +95,9 @@ describe('ModuleRegistry', () => {
       { id: 'a', name: 'Module a', enabled: true, state: 'idle', dependencies: [] },
       { id: 'b', name: 'Module b', enabled: false, state: 'idle', dependencies: ['a'] },
     ]);
-    expect(() => registry.register(fakeModule('a'))).toThrow('[modules] module "a" ลงทะเบียนไว้แล้ว');
+    expect(() => registry.register(fakeModule('a'))).toThrow(
+      '[modules] module "a" ลงทะเบียนไว้แล้ว',
+    );
   });
 
   test('unregister disposes a ready module and removes it', async () => {
@@ -116,13 +127,15 @@ describe('ModuleRegistry', () => {
       fakeModule('app', { deps: ['pc-bridge', 'memory-sync'] }),
       fakeModule('pc-bridge', { deps: ['transport'] }),
       fakeModule('memory-sync'),
-      fakeModule('transport')
+      fakeModule('transport'),
     );
     const report = await registry.initAll();
     expect(journal).toEqual(['init:transport', 'init:pc-bridge', 'init:memory-sync', 'init:app']);
     expect(report).toEqual({ ready: ['transport', 'pc-bridge', 'memory-sync', 'app'], failed: [] });
     expect(registry.list().every((m) => m.state === 'ready')).toBe(true);
-    expect(nth((registry.get('app') as unknown as { init: jest.Mock }).init.mock.calls, 0)).toEqual([ctx]);
+    expect(nth((registry.get('app') as unknown as { init: jest.Mock }).init.mock.calls, 0)).toEqual(
+      [ctx],
+    );
   });
 
   test('initAll is idempotent and skips disabled modules', async () => {
@@ -139,7 +152,7 @@ describe('ModuleRegistry', () => {
     const { registry, ctx } = registryWith(
       fakeModule('broken', { initError: new Error('no device') }),
       fakeModule('needs-broken', { deps: ['broken'] }),
-      fakeModule('fine')
+      fakeModule('fine'),
     );
     const report = await registry.initAll();
     expect(report.ready).toEqual(['fine']);
@@ -162,7 +175,7 @@ describe('ModuleRegistry', () => {
       fakeModule('off', { enabled: false }),
       fakeModule('needs-off', { deps: ['off'] }),
       fakeModule('x', { deps: ['y'] }),
-      fakeModule('y', { deps: ['x'] })
+      fakeModule('y', { deps: ['x'] }),
     );
     const { failed } = await registry.initAll();
     expect(failed).toEqual([
@@ -177,13 +190,16 @@ describe('ModuleRegistry', () => {
     const { registry, ctx } = registryWith(
       fakeModule('top', { deps: ['mid'] }),
       fakeModule('mid', { deps: ['base'], disposeError: new Error('stuck') }),
-      fakeModule('base')
+      fakeModule('base'),
     );
     await registry.initAll();
     journal = [];
     await registry.disposeAll();
     expect(journal).toEqual(['dispose:top', 'dispose:mid', 'dispose:base']);
-    expect(ctx.logger.error).toHaveBeenCalledWith('[modules] dispose "mid" ไม่สำเร็จ', expect.any(Error));
+    expect(ctx.logger.error).toHaveBeenCalledWith(
+      '[modules] dispose "mid" ไม่สำเร็จ',
+      expect.any(Error),
+    );
     expect(registry.list().every((m) => m.state === 'idle')).toBe(true);
     await registry.disposeAll(); // nothing left to dispose
     expect(journal).toHaveLength(3);
@@ -194,7 +210,7 @@ describe('ModuleRegistry', () => {
       fakeModule('base'),
       fakeModule('uses-base', { deps: ['base'] }),
       fakeModule('uses-uses', { deps: ['uses-base'] }),
-      fakeModule('independent')
+      fakeModule('independent'),
     );
     await registry.initAll();
     journal = [];
@@ -223,9 +239,18 @@ describe('ModuleRegistry', () => {
       attempts += 1;
       if (attempts < 3) throw new Error(`fail ${attempts}`);
     });
-    const { registry } = registryWith({ id: 'sync', name: 'Sync', enabled: true, init, dispose: jest.fn() });
+    const { registry } = registryWith({
+      id: 'sync',
+      name: 'Sync',
+      enabled: true,
+      init,
+      dispose: jest.fn(),
+    });
     await expect(registry.ensureReady('sync')).rejects.toThrow('fail 1');
-    await expect(registry.initAll()).resolves.toEqual({ ready: [], failed: [{ id: 'sync', reason: 'fail 2' }] });
+    await expect(registry.initAll()).resolves.toEqual({
+      ready: [],
+      failed: [{ id: 'sync', reason: 'fail 2' }],
+    });
     await registry.disable('sync');
     registry.enable('sync');
     await registry.ensureReady('sync');
@@ -255,7 +280,7 @@ describe('ModuleRegistry', () => {
       () =>
         new Promise<void>((r) => {
           release = () => r();
-        })
+        }),
     );
     const { registry } = registryWith(slow);
     const both = Promise.all([registry.ensureReady('slow'), registry.ensureReady('slow')]);
@@ -279,20 +304,22 @@ describe('loader', () => {
   test('no loader for an id → "Not implemented (Phase 4.5+)"', async () => {
     const { registry } = registryWith();
     await expect(loadModule('not-a-module', registry)).rejects.toThrow(
-      '[modules] ยังไม่มี loader สำหรับ "not-a-module" — Not implemented (Phase 4.5+)'
+      '[modules] ยังไม่มี loader สำหรับ "not-a-module" — Not implemented (Phase 4.5+)',
     );
   });
 
   test('loads, registers once, and validates the id', async () => {
     const { registry } = registryWith();
     const factory = jest.fn(async () => fakeModule('demo'));
-    await expect(loadModule('demo', registry, { demo: factory })).resolves.toMatchObject({ id: 'demo' });
+    await expect(loadModule('demo', registry, { demo: factory })).resolves.toMatchObject({
+      id: 'demo',
+    });
     await loadModule('demo', registry, { demo: factory });
     expect(factory).toHaveBeenCalledTimes(1);
     expect(registry.has('demo')).toBe(true);
-    await expect(loadModule('liar', registry, { liar: async () => fakeModule('other') })).rejects.toThrow(
-      'loader ของ "liar" คืน module "other"'
-    );
+    await expect(
+      loadModule('liar', registry, { liar: async () => fakeModule('other') }),
+    ).rejects.toThrow('loader ของ "liar" คืน module "other"');
   });
 });
 
@@ -300,45 +327,73 @@ describe('loader', () => {
 // C2 — PCCommandHandler module hook
 // ---------------------------------------------------------------------------------------------
 
-function pcBridge(execute: CommandModule['execute'], enabled = true): CommandModule & { init: jest.Mock } {
+function pcBridge(
+  execute: CommandModule['execute'],
+  enabled = true,
+): CommandModule & { init: jest.Mock } {
   return { ...fakeModule(PC_BRIDGE_MODULE_ID, { enabled }), execute: jest.fn(execute) };
 }
 
 describe('PCCommandHandler → pc-bridge module', () => {
   const input = { text: 'ปิดคอมให้หน่อย', context: { activePersona: 4 as const } };
-  const route = { intent: 'pc_command' as const, confidence: 0.9, provider: 'rule' as const, entities: { action: 'ปิด', target: 'คอม' } };
+  const route = {
+    intent: 'pc_command' as const,
+    confidence: 0.9,
+    provider: 'rule' as const,
+    entities: { action: 'ปิด', target: 'คอม' },
+  };
 
   test('no module, a disabled one, or one without execute() → Phase 3 stub reply', async () => {
     const { registry } = registryWith();
-    await expect(new PCCommandHandler(registry).handle(input, route)).resolves.toEqual({ reply: PC_BRIDGE_STUB_REPLY, persona: 4 });
+    await expect(new PCCommandHandler(registry).handle(input, route)).resolves.toEqual({
+      reply: PC_BRIDGE_STUB_REPLY,
+      persona: 4,
+    });
 
     const disabled = registryWith(pcBridge(async () => ({ reply: 'x' }), false)).registry;
-    await expect(new PCCommandHandler(disabled).handle(input)).resolves.toMatchObject({ reply: PC_BRIDGE_STUB_REPLY });
+    await expect(new PCCommandHandler(disabled).handle(input)).resolves.toMatchObject({
+      reply: PC_BRIDGE_STUB_REPLY,
+    });
 
     const plain = registryWith(fakeModule(PC_BRIDGE_MODULE_ID)).registry;
-    await expect(new PCCommandHandler(plain).handle(input)).resolves.toMatchObject({ reply: PC_BRIDGE_STUB_REPLY });
+    await expect(new PCCommandHandler(plain).handle(input)).resolves.toMatchObject({
+      reply: PC_BRIDGE_STUB_REPLY,
+    });
   });
 
   test('module present → initialised on first use, then executes with the route entities', async () => {
-    const bridge = pcBridge(async (cmd) => ({ reply: `กำลัง${cmd.action ?? ''}${cmd.target ?? ''}` }));
+    const bridge = pcBridge(async (cmd) => ({
+      reply: `กำลัง${cmd.action ?? ''}${cmd.target ?? ''}`,
+    }));
     const { registry } = registryWith(bridge);
     const handler = new PCCommandHandler(registry);
-    await expect(handler.handle(input, route)).resolves.toEqual({ reply: 'กำลังปิดคอม', persona: 4 });
+    await expect(handler.handle(input, route)).resolves.toEqual({
+      reply: 'กำลังปิดคอม',
+      persona: 4,
+    });
     await handler.handle({ text: 'เปิดเครื่อง' });
     expect(bridge.init).toHaveBeenCalledTimes(1);
-    expect(bridge.execute).toHaveBeenLastCalledWith({ text: 'เปิดเครื่อง', action: undefined, target: undefined });
+    expect(bridge.execute).toHaveBeenLastCalledWith({
+      text: 'เปิดเครื่อง',
+      action: undefined,
+      target: undefined,
+    });
   });
 
   test('module failures surface as a Thai ProviderError (never a silent stub)', async () => {
     const failing = registryWith(pcBridge(async () => Promise.reject(new Error('offline'))));
-    await expect(new PCCommandHandler(failing.registry).handle(input, route)).rejects.toMatchObject({
-      providerId: PC_BRIDGE_MODULE_ID,
-      kind: 'unsupported',
-      message: '[pc-bridge] สั่งงานคอมไม่สำเร็จ: offline',
-    });
+    await expect(new PCCommandHandler(failing.registry).handle(input, route)).rejects.toMatchObject(
+      {
+        providerId: PC_BRIDGE_MODULE_ID,
+        kind: 'unsupported',
+        message: '[pc-bridge] สั่งงานคอมไม่สำเร็จ: offline',
+      },
+    );
     const badInit = pcBridge(async () => ({ reply: 'x' }));
     badInit.init.mockRejectedValueOnce('no pairing');
-    await expect(new PCCommandHandler(registryWith(badInit).registry).handle(input)).rejects.toMatchObject({
+    await expect(
+      new PCCommandHandler(registryWith(badInit).registry).handle(input),
+    ).rejects.toMatchObject({
       message: '[pc-bridge] สั่งงานคอมไม่สำเร็จ: no pairing',
     });
   });
@@ -350,7 +405,8 @@ describe('PCCommandHandler → pc-bridge module', () => {
 
 describe('ChatHandler + shared memory', () => {
   const systemText = (call: RecordedCall) =>
-    (call.body as { systemInstruction?: { parts: { text: string }[] } }).systemInstruction?.parts[0]?.text;
+    (call.body as { systemInstruction?: { parts: { text: string }[] } }).systemInstruction?.parts[0]
+      ?.text;
 
   const chatCall = async (memory?: MemoryStore, persona: 1 | 2 | 3 | 4 = 1) => {
     const { calls } = mockFetch([[GEMINI, () => geminiText('ตอบ')]]);
@@ -386,7 +442,11 @@ describe('ChatHandler + shared memory', () => {
   });
 
   test('fact ปกติไม่ถูกเปลี่ยน (รวมคำลงท้าย system: เช่น filesystem:)', () => {
-    for (const ok of ['ชอบกาแฟดำ ไม่ใส่น้ำตาล', 'ใช้ filesystem: ext4', 'please do not ignore the doc']) {
+    for (const ok of [
+      'ชอบกาแฟดำ ไม่ใส่น้ำตาล',
+      'ใช้ filesystem: ext4',
+      'please do not ignore the doc',
+    ]) {
       expect(toPromptLine(ok)).toBe(ok);
     }
   });
@@ -398,7 +458,14 @@ describe('ChatHandler + shared memory', () => {
   });
 
   test('keys from a store that does not validate them are collapsed too', async () => {
-    const fact = (key: string, value: string) => ({ id: key, key, value, source: 'user' as const, createdAt: 1, updatedAt: 1 });
+    const fact = (key: string, value: string) => ({
+      id: key,
+      key,
+      value,
+      source: 'user' as const,
+      createdAt: 1,
+      updatedAt: 1,
+    });
     const loose: MemoryStore = {
       save: jest.fn(),
       load: jest.fn(),
@@ -438,7 +505,8 @@ describe('ChatHandler + shared memory', () => {
     jest.spyOn(Date, 'now').mockImplementation(() => now++);
     await memory.save({ scope: 'global' }, 'tone', 'ทางการ');
     await memory.save({ scope: 'persona', persona: 1 }, 'tone', 'กวน ๆ');
-    for (let i = 0; i < MAX_MEMORY_FACTS + 5; i++) await memory.save({ scope: 'global' }, `f${i}`, `v${i}`);
+    for (let i = 0; i < MAX_MEMORY_FACTS + 5; i++)
+      await memory.save({ scope: 'global' }, `f${i}`, `v${i}`);
     const lines = (await chatCall(memory, 1))?.split('\n').filter((l) => l.startsWith('- ')) ?? [];
     expect(lines).toHaveLength(MAX_MEMORY_FACTS);
     expect(lines).not.toContain('- tone: ทางการ');
@@ -456,6 +524,9 @@ describe('ChatHandler + shared memory', () => {
       sync: jest.fn(),
     };
     await expect(chatCall(broken)).resolves.toBe('PROMPT');
-    expect(errorSpy).toHaveBeenCalledWith('[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ', expect.any(Error));
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[chat] อ่าน shared memory ไม่ได้ — ตอบโดยไม่ใช้ความจำ',
+      expect.any(Error),
+    );
   });
 });
