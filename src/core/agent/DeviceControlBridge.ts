@@ -360,7 +360,7 @@ const DEVICE_TOOLS: DeviceTool[] = [
     id: 'device.tap',
     name: 'กดบนหน้าจอ',
     description:
-      'กดปุ่ม/ข้อความบนแอปที่อยู่หน้าสุด (args.text) · ปุ่มเสี่ยงต้อง args.confirmed=true',
+      'กดปุ่ม/ข้อความบนแอปที่อยู่หน้าสุด (args.text) · ปุ่มเสี่ยง (ซื้อ/โอน/ลบ/ส่ง) ระบบจะถามบอสยืนยันเอง',
     supported: (d) => !!d.tapText,
     run: async (d, call) => {
       const text = (argString(call, 'text') ?? call.target ?? call.text).trim();

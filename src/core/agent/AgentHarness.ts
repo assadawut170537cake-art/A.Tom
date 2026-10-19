@@ -11,6 +11,8 @@
  * - ผลของ tool ผ่าน `redactSecrets()` ก่อนกลับเข้า prompt
  * - tool มาจาก ModuleRegistry (CommandModule) ก่อน แล้วค่อย `providers` (MCP / Skill / Device)
  * - `memory`: แนบ facts (global + persona) ผ่าน `toPromptLine()` เป็น context
+ * - tool ขอยืนยัน (`needsConfirmation`) → หยุดทันที (`stopReason: 'needs_confirmation'` + `pending`) ให้ผู้เรียกถามบอส
+ *   และตัด `args.confirmed` ที่ LLM ใส่มาทิ้งเสมอ — การยืนยันต้องมาจากบอสเท่านั้น (กัน LLM/prompt injection กดปุ่มเสี่ยงเอง)
  */
 
 import { redactSecrets } from '../http/errors';
@@ -37,12 +39,22 @@ import type {
 export const DEFAULT_MAX_STEPS = 5;
 /** facts ล่าสุดที่แนบเป็น context */
 export const AGENT_MEMORY_FACTS = 10;
-export const MAX_STEPS_REPLY = 'ขอโทษครับบอส ทำงานนี้เกินจำนวนขั้นที่กำหนดแล้ว — ลองสั่งให้เจาะจงขึ้นอีกนิด';
+export const MAX_STEPS_REPLY =
+  'ขอโทษครับบอส ทำงานนี้เกินจำนวนขั้นที่กำหนดแล้ว — ลองสั่งให้เจาะจงขึ้นอีกนิด';
 
 type ToolHost = Pick<ModuleRegistry, 'get' | 'isEnabled' | 'ensureReady' | 'list'>;
 
 const errorText = (e: unknown) => redactSecrets(e instanceof Error ? e.message : String(e));
 const optString = (v: unknown) => (isString(v) && v.trim() !== '' ? v.trim() : undefined);
+
+/** `args` ที่ไม่มี `confirmed` (undefined ถ้าไม่เหลืออะไร) — สิทธิ์ยืนยันเป็นของบอส ไม่ใช่ของ LLM */
+function withoutConfirmation(
+  args: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!args) return undefined;
+  const { confirmed: _confirmed, ...rest } = args;
+  return Object.keys(rest).length ? rest : undefined;
+}
 
 /** แปลงคำตอบ LLM → decision · ไม่ใช่ JSON ที่รู้จัก = คำตอบสุดท้ายเป็นข้อความตรง ๆ */
 export function parseDecision(raw: string): AgentDecision {
@@ -76,7 +88,7 @@ export class AgentHarness {
   constructor(
     private readonly llm: AgentLLM,
     private readonly tools: ToolHost,
-    options: AgentHarnessOptions = {}
+    options: AgentHarnessOptions = {},
   ) {
     this.maxSteps = Math.max(1, Math.floor(options.maxSteps ?? DEFAULT_MAX_STEPS));
     this.hooks = options.hooks ?? {};
@@ -93,7 +105,9 @@ export class AgentHarness {
         : [];
     });
     const seen = new Set(modules.map((t) => t.id));
-    const extra = this.providers.flatMap((p) => this.safeList(p)).filter((t) => !seen.has(t.id) && seen.add(t.id));
+    const extra = this.providers
+      .flatMap((p) => this.safeList(p))
+      .filter((t) => !seen.has(t.id) && seen.add(t.id));
     return [...modules, ...extra];
   }
 
@@ -110,29 +124,51 @@ export class AgentHarness {
 
         if (decision.type === 'final') {
           await this.emit('onStep', step);
-          const result: AgentRunResult = { input, reply: decision.reply, steps, stopReason: 'final' };
+          const result: AgentRunResult = {
+            input,
+            reply: decision.reply,
+            steps,
+            stopReason: 'final',
+          };
           await this.emit('onComplete', result);
           return result;
         }
 
+        const args = withoutConfirmation(decision.args);
         const call: AgentToolCall = {
           tool: decision.tool,
           action: decision.action,
           target: decision.target,
           text: decision.text ?? input.text,
-          ...(decision.args && { args: decision.args }),
+          ...(args && { args }),
         };
         const toolResult = await this.dispatch(call);
         step.toolCall = call;
         step.toolResult = toolResult;
         await this.emit('onToolCall', call, toolResult);
         await this.emit('onStep', step);
+        if (toolResult.needsConfirmation) {
+          const result: AgentRunResult = {
+            input,
+            reply: toolResult.output,
+            steps,
+            stopReason: 'needs_confirmation',
+            pending: call,
+          };
+          await this.emit('onComplete', result);
+          return result;
+        }
         messages.push({
           role: 'user',
           content: `ผลจาก tool "${call.tool}" (${toolResult.ok ? 'สำเร็จ' : 'ล้มเหลว'}): ${toolResult.output}`,
         });
       }
-      const result: AgentRunResult = { input, reply: MAX_STEPS_REPLY, steps, stopReason: 'max_steps' };
+      const result: AgentRunResult = {
+        input,
+        reply: MAX_STEPS_REPLY,
+        steps,
+        stopReason: 'max_steps',
+      };
       await this.emit('onComplete', result);
       return result;
     } catch (e) {
@@ -145,11 +181,17 @@ export class AgentHarness {
   async dispatch(call: AgentToolCall): Promise<AgentToolResult> {
     const module = this.tools.get(call.tool);
     if (!module) return this.dispatchToProvider(call);
-    if (!this.tools.isEnabled(call.tool)) return { ok: false, output: `tool "${call.tool}" ถูกปิดอยู่` };
-    if (!isCommandModule(module)) return { ok: false, output: `"${call.tool}" ไม่ใช่ tool ที่สั่งงานได้` };
+    if (!this.tools.isEnabled(call.tool))
+      return { ok: false, output: `tool "${call.tool}" ถูกปิดอยู่` };
+    if (!isCommandModule(module))
+      return { ok: false, output: `"${call.tool}" ไม่ใช่ tool ที่สั่งงานได้` };
     try {
       await this.tools.ensureReady(call.tool);
-      const { reply } = await module.execute({ text: call.text, action: call.action, target: call.target });
+      const { reply } = await module.execute({
+        text: call.text,
+        action: call.action,
+        target: call.target,
+      });
       return { ok: true, output: redactSecrets(reply) };
     } catch (e) {
       return { ok: false, output: errorText(e) };
@@ -161,7 +203,11 @@ export class AgentHarness {
     if (!provider) return { ok: false, output: `ไม่พบ tool "${call.tool}"` };
     try {
       const result = await provider.call(call);
-      return { ok: result.ok, output: redactSecrets(result.output) };
+      return {
+        ok: result.ok,
+        output: redactSecrets(result.output),
+        ...(result.needsConfirmation && { needsConfirmation: true }),
+      };
     } catch (e) {
       return { ok: false, output: errorText(e) };
     }
@@ -185,7 +231,10 @@ export class AgentHarness {
       const facts = (await Promise.all(targets.map((t) => this.memory?.list(t) ?? []))).flat();
       if (!facts.length) return undefined;
       const recent = facts.sort((a, b) => b.updatedAt - a.updatedAt).slice(0, AGENT_MEMORY_FACTS);
-      return ['สิ่งที่จำได้เกี่ยวกับบอส:', ...recent.map((f) => `- ${toPromptLine(f.key, 64)}: ${toPromptLine(f.value)}`)].join('\n');
+      return [
+        'สิ่งที่จำได้เกี่ยวกับบอส:',
+        ...recent.map((f) => `- ${toPromptLine(f.key, 64)}: ${toPromptLine(f.value)}`),
+      ].join('\n');
     } catch (e) {
       console.error('[agent] อ่าน shared memory ไม่ได้ — ทำงานต่อโดยไม่ใช้ความจำ', e);
       return undefined;
@@ -196,7 +245,10 @@ export class AgentHarness {
     const tools = this.availableTools();
     const list = tools.length
       ? tools
-          .map((t) => `- ${t.id}: ${toPromptLine(t.name, 80)}${t.description ? ` — ${toPromptLine(t.description)}` : ''}`)
+          .map(
+            (t) =>
+              `- ${t.id}: ${toPromptLine(t.name, 80)}${t.description ? ` — ${toPromptLine(t.description)}` : ''}`,
+          )
           .join('\n')
       : '- (ไม่มี tool ที่เปิดใช้งาน)';
     const protocol = [
@@ -208,12 +260,18 @@ export class AgentHarness {
       ...(memory ? [memory] : []),
     ].join('\n');
     return [
-      { role: 'system', content: input.systemPrompt ? `${input.systemPrompt}\n\n${protocol}` : protocol },
+      {
+        role: 'system',
+        content: input.systemPrompt ? `${input.systemPrompt}\n\n${protocol}` : protocol,
+      },
       { role: 'user', content: input.text },
     ];
   }
 
-  private async emit<K extends keyof AgentHooks>(name: K, ...args: Parameters<NonNullable<AgentHooks[K]>>) {
+  private async emit<K extends keyof AgentHooks>(
+    name: K,
+    ...args: Parameters<NonNullable<AgentHooks[K]>>
+  ) {
     const hook = this.hooks[name] as ((...a: typeof args) => void | Promise<void>) | undefined; // generic tuple ของ hook นั้น
     if (!hook) return;
     try {
