@@ -86,26 +86,40 @@ export class SettingsHealth {
     return { status: entry.guard(parsed) ? 'ok' : 'schema_fail', raw };
   }
 
-  /** ตรวจ+กู้ทุก blob (เรียกครั้งเดียวตอน boot) · ไม่ throw — blob หนึ่งพังไม่ลาม */
+  /**
+   * ตรวจ+กู้ทุก blob (เรียกครั้งเดียวตอน boot) · ไม่ throw — blob หนึ่งพังไม่ลาม
+   * อ่านสถานะทุก blob พร้อมกัน (เร็ว · ไม่เขียน) แล้วค่อยซ่อมทีละตัวตามลำดับ (กัน log/snapshot เขียนชนกัน)
+   */
   async check(entries: HealthEntry[]): Promise<HealthResult[]> {
+    const classified = await Promise.all(
+      entries.map(async (entry) => ({ entry, ...(await this.classify(entry)) })),
+    );
     const results: HealthResult[] = [];
-    for (const entry of entries) {
+    for (const c of classified) {
+      if (c.status === 'ok') {
+        results.push({ key: c.entry.key, status: 'ok', action: 'none', snapshotFailed: false });
+        continue;
+      }
       try {
-        results.push(await this.heal(entry));
+        results.push(await this.heal(c.entry, c.status, c.raw));
       } catch {
         // ล้มกลางคัน (เช่น setItem สำเร็จ removeItem พัง) — รายงานเป็น error ไม่กลบว่า "ปกติ"
-        results.push({ key: entry.key, status: 'ok', action: 'error', snapshotFailed: false });
+        results.push({
+          key: c.entry.key,
+          status: c.status,
+          action: 'error',
+          snapshotFailed: false,
+        });
       }
     }
     return results;
   }
 
-  private async heal(entry: HealthEntry): Promise<HealthResult> {
-    const { status, raw } = await this.classify(entry);
-    if (status === 'ok') {
-      return { key: entry.key, status, action: 'none', snapshotFailed: false };
-    }
-
+  private async heal(
+    entry: HealthEntry,
+    status: Exclude<HealthStatus, 'ok'>,
+    raw: string | null,
+  ): Promise<HealthResult> {
     // (2) snapshot บังคับก่อนแตะต้อง — ล้มก็ซ่อมต่อ แต่จดไว้
     const snapshotFailed = await this.snapshot(entry);
     const at = this.now();

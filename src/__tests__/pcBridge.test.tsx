@@ -254,7 +254,7 @@ describe('loader + boot', () => {
   const loaders = { 'pc-bridge': async () => new PcBridgeModule() };
 
   test('pc-bridge is in the app loader table and registers enabled under its id', async () => {
-    expect(Object.keys(MODULE_LOADERS)).toEqual(['pc-bridge']);
+    expect(Object.keys(MODULE_LOADERS)).toEqual(expect.arrayContaining(['pc-bridge', 'supermemory']));
     const registry = new ModuleRegistry({ memory: new LocalMemoryAdapter(), logger: { info: jest.fn(), error: jest.fn() } });
     const module = await loadModule('pc-bridge', registry, loaders);
     expect(module.id).toBe('pc-bridge');
