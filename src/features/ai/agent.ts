@@ -11,10 +11,15 @@ import type { AgentHarnessOptions, AgentHooks, AgentLLM } from '../../core/agent
 import { localMemory } from '../../core/memory/LocalMemoryAdapter';
 import { moduleRegistry } from '../../core/modules/ModuleRegistry';
 import { aiOrchestrator, type Orchestrator } from './core/Orchestrator';
+import { createDiscoveryTool } from './discoveryTool';
 
 /** LLM ของ agent: temperature 0 เพื่อให้ตอบ JSON คงที่ */
-export function orchestratorLLM(orchestrator: Pick<Orchestrator, 'chat'> = aiOrchestrator): AgentLLM {
-  return { chat: async (messages) => (await orchestrator.chat({ messages, temperature: 0 })).content };
+export function orchestratorLLM(
+  orchestrator: Pick<Orchestrator, 'chat'> = aiOrchestrator,
+): AgentLLM {
+  return {
+    chat: async (messages) => (await orchestrator.chat({ messages, temperature: 0 })).content,
+  };
 }
 
 /** รวม hooks หลายชุดเป็นชุดเดียว (เรียกตามลำดับ) */
@@ -44,13 +49,14 @@ export function combineHooks(...sets: (AgentHooks | undefined)[]): AgentHooks {
  * `learn: true` = ให้ SkillEngine สังเคราะห์ทักษะใหม่หลังงานสำเร็จ (ปิดไว้ รอบอสอนุมัติ)
  */
 export async function createAppAgent(
-  options: AgentHarnessOptions & { learn?: boolean | undefined } = {}
+  options: AgentHarnessOptions & { learn?: boolean | undefined } = {},
 ): Promise<AgentHarness> {
   const { learn, hooks, ...rest } = options;
   await Promise.all([skillEngine.load(), deviceControl.load(), mcpBridge.connectAll()]);
   const llm = orchestratorLLM();
   return new AgentHarness(llm, moduleRegistry, {
-    providers: [skillEngine, mcpBridge, deviceControl],
+    // discovery = ค้นหาความสามารถ (ทักษะ/MCP) ก่อน แล้วจึงเป็นแหล่ง tool จริง — ค้นอย่างเดียว ไม่ติดตั้ง
+    providers: [createDiscoveryTool(), skillEngine, mcpBridge, deviceControl],
     memory: localMemory,
     ...rest,
     hooks: combineHooks(skillEngine.hooks(learn ? llm : undefined), hooks),

@@ -799,7 +799,8 @@ describe('AgentHarness with MCP / Skills / Device / Memory', () => {
 
     const agent = await createAppAgent({ learn: true, maxSteps: 2 });
     expect(agent.maxSteps).toBe(2);
-    expect(agent.availableTools()).toEqual([]); // nothing installed / enabled yet
+    // ยังไม่ติดตั้ง module/skill/MCP → เหลือเฉพาะเครื่องมือค้นหาความสามารถ (read-only) ที่ติดมาเสมอ
+    expect(agent.availableTools().map((t) => t.id)).toEqual(['find_capability']);
   });
 });
 

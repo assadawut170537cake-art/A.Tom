@@ -161,7 +161,8 @@ export class AgentHarness {
           return result;
         }
         const toolResult = await this.dispatch(call);
-        if (call.tool.startsWith(EXTERNAL_TOOL_PREFIX)) externalSeen = true;
+        // เห็นของนอก = tool id ขึ้นต้น mcp. หรือ tool ที่ประกาศว่าผลมีเนื้อหาภายนอก (เช่น ค้นคลัง MCP)
+        if (toolResult.external || call.tool.startsWith(EXTERNAL_TOOL_PREFIX)) externalSeen = true;
         step.toolCall = call;
         step.toolResult = toolResult;
         await this.emit('onToolCall', call, toolResult);
@@ -226,6 +227,7 @@ export class AgentHarness {
         ok: result.ok,
         output: redactSecrets(result.output),
         ...(result.needsConfirmation && { needsConfirmation: true }),
+        ...(result.external && { external: true }),
       };
     } catch (e) {
       return { ok: false, output: errorText(e) };

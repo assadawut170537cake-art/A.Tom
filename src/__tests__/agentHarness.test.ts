@@ -214,9 +214,10 @@ describe('app wiring (aiOrchestrator + moduleRegistry)', () => {
     expect(body.contents).toEqual([{ role: 'user', parts: [{ text: 'สวัสดี' }] }]);
   });
 
-  test('createAppAgent uses the app registry (no modules yet → no tools)', async () => {
+  test('createAppAgent uses the app registry (no modules yet → มีแค่ find_capability)', async () => {
     const agent = await createAppAgent({ maxSteps: 3 });
     expect(agent.maxSteps).toBe(3);
-    expect(agent.availableTools()).toEqual([]);
+    // ยังไม่มี module/skill/MCP → เหลือเฉพาะเครื่องมือค้นหาความสามารถ (read-only) ที่ติดมาเสมอ
+    expect(agent.availableTools().map((t) => t.id)).toEqual(['find_capability']);
   });
 });
