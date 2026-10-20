@@ -17,6 +17,8 @@
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { localMemory } from './core/memory/LocalMemoryAdapter';
 import { memorySync, type MemorySync } from './core/memory/MemorySync';
 import { secretSync, type SecretSync } from './core/memory/SecretSync';
@@ -24,10 +26,15 @@ import { superMemorySync, type SuperMemorySyncService } from './core/memory/Supe
 import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
 import { moduleManager, type ModuleManager } from './core/modules/ModuleManager';
 import type { InitReport } from './core/modules/types';
+import { recordRepair } from './core/selfRepair/SelfRepair';
+import { SettingsHealth } from './core/selfRepair/SettingsHealth';
+import { SnapshotStore } from './core/selfRepair/SnapshotStore';
 import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerCustomProviders } from './features/ai/customProviders';
+import { useAtomStore } from './features/jarvis/stores/useAtomStore';
+import { settingsHealthEntries } from './features/settings/settingsHealthEntries';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
@@ -63,6 +70,8 @@ interface BootDeps {
   startChat?: () => void;
   /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
   loadModules?: () => Promise<void>;
+  /** ตรวจ+กู้การตั้งค่าที่เสีย (ครั้งเดียวต่อ boot) · ไม่ส่ง = ข้าม (test เดิม) */
+  checkSettings?: () => Promise<void>;
 }
 
 const DEFAULT_DEPS: BootDeps = {
@@ -74,6 +83,7 @@ const DEFAULT_DEPS: BootDeps = {
   inbox: pcInbox,
   startChat: () => void startChatSync(),
   loadModules: () => loadBootModules(),
+  checkSettings: () => runSettingsHealth(),
   dev: __DEV__,
   installDevTools: (memory) => {
     installMemoryDevTools(memory);
@@ -96,8 +106,26 @@ export function bootApp(): Promise<BootReport> {
   return (started ??= startServices());
 }
 
+/** ตรวจ+กู้การตั้งค่าที่เสีย 1 รอบ · แจ้งบอสในแชทเมื่อซ่อมของจริง (ข้อความระบบถาวร) */
+async function runSettingsHealth(): Promise<void> {
+  const health = new SettingsHealth({
+    snapshots: new SnapshotStore(),
+    kv: AsyncStorage,
+    notify: (content) => void useAtomStore.getState().pushMessage({ role: 'system', content }),
+    log: recordRepair,
+  });
+  await health.check(settingsHealthEntries());
+}
+
 /** ไม่ reject เด็ดขาด — ทุกขั้นที่ล้มถูก log แล้วข้ามไป */
 export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<BootReport> {
+  // ตรวจ+กู้การตั้งค่าที่เสีย "ก่อน" module/consumer อ่าน blob → ซ่อมมีผลในรอบ boot นี้เลย (ครั้งเดียว · ไม่ reject)
+  try {
+    await deps.checkSettings?.();
+  } catch (e) {
+    console.error('[boot] ตรวจ/ซ่อมการตั้งค่าไม่สำเร็จ — แอปทำงานต่อได้', e);
+  }
+
   let modules: InitReport | null = null;
   try {
     await deps.loadModules?.(); // loadBootModules() ไม่ reject อยู่แล้ว — กันไว้อีกชั้น

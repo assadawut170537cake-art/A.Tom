@@ -10,7 +10,7 @@
 | 1 | คุยลื่น (Voice A: สตรีมเสียง/พูดทีละประโยค/end-of-speech ไว) | ✅ เสร็จ + ผ่านรีวิว | SILENCE 900ms · splitSentences · fallback ครบทุกประโยค · Voice B (Gemini Live) = งานใหญ่รอบหลัง |
 | 2 | ส่งงานต่อให้แอปอื่น (เสียง → เรียก tool/agent) | ✅ เสร็จ (ตรวจแล้ว) | router→agent (agentRouter.test) + sendMessage พูด reply ทุก intent (persona.test) ครอบคลุมแล้ว · ไม่ต้องเพิ่มโค้ด |
 | 3 | หาความสามารถเอง | ✅ เสร็จ | `find_capability` (ค้นคลัง MCP, read-only) · "เขียนทักษะเอง" = **Boss อนุมัติแล้ว 2026-10-20** → `learn` เปิดเป็นค่าเริ่มต้น (`SkillEngine.isLearnEnabled`) · ทักษะที่ AI เขียนยัง `enabled:false` รอบอสเปิดใน Marketplace (เนื้อหาผ่าน toPromptLine redact) |
-| 4 | ซ่อมตัวเอง + เรียนรู้ | 🔄 กำลังทำ | ✅ engine (`SnapshotStore`/`SelfRepair`) · ✅ **PR-4a** `SettingsHealth` (DeepSeek Q1: แยก parse/schema-fail · schema=quarantine ไม่ reset · snapshot บังคับ · ตรวจซ้ำ · แจ้งบอส) · ⏳ **PR-4b** ลงทะเบียน blob จริง + ต่อ boot + notify · แก้โค้ด/OTA = **ด่านอนุมัติ** |
+| 4 | ซ่อมตัวเอง + เรียนรู้ | ✅ เสร็จ (ตั้งค่า/ข้อมูล) | engine (`SnapshotStore`/`SelfRepair`) + `SettingsHealth` (Q1 ครบ) + **ต่อ boot แล้ว** (ตรวจ 5 blob ก่อน module start → ซ่อมมีผลรอบนี้เลย · แจ้งบอสในแชท) · เหลือ nice-to-have: UI ดู quarantine/learn-toggle · แก้โค้ด/OTA = **ด่านอนุมัติ** |
 | 5 | ย้ายของเสริมออกจากแกน (CORE_AUDIT) | ⬜ ยังไม่เริ่ม | ทีละโมดูล มี test คุม |
 
 ## ด่านที่ต้องรอบอสอนุมัติ (ไม่เปิดใช้เอง — สร้างโครงปิดไว้ได้)

@@ -30,6 +30,9 @@ const isDef = (v: unknown): v is CustomProviderDef =>
   isString(v.baseURL) &&
   isString(v.defaultModel);
 
+/** guard ของ blob ที่เก็บจริง — ใช้ร่วมกับ SettingsHealth เพื่อตรวจ element-level corruption ให้ตรงกับที่โมดูลยอมรับ */
+export const isCustomProviderList = (v: unknown): v is CustomProviderDef[] => isArrayOf(v, isDef);
+
 /** http ได้เฉพาะในบ้าน/เครื่องตัวเอง (key วิ่งผ่าน header) — ที่อยู่สาธารณะต้อง https */
 const PRIVATE_HTTP =
   /^http:\/\/(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|[^/]+\.local)/i;
@@ -74,10 +77,7 @@ export function toConfig(def: CustomProviderDef): AIProviderConfig {
 }
 
 export async function loadCustomProviders(): Promise<CustomProviderDef[]> {
-  return (
-    (await readJSON(CUSTOM_PROVIDERS_KEY, (v): v is CustomProviderDef[] => isArrayOf(v, isDef))) ??
-    []
-  );
+  return (await readJSON(CUSTOM_PROVIDERS_KEY, isCustomProviderList)) ?? [];
 }
 
 /** ลงทะเบียนทุกตัวที่บันทึกไว้ (boot) · ไม่ reject — อ่านไม่ได้แค่ log */

@@ -18,6 +18,12 @@ export const REPAIR_LOG_KEY = 'atom.repair.log.v1';
 /** เก็บประวัติการซ่อมล่าสุดกี่รายการ */
 export const MAX_REPAIR_LOG = 50;
 
+/** ต่อท้ายบันทึกการซ่อม (ตัดให้เหลือ {@link MAX_REPAIR_LOG}) — ใช้ร่วมได้ทั้ง SelfRepair และ SettingsHealth */
+export async function recordRepair(attempt: RepairAttempt): Promise<void> {
+  const all = [...((await readJSON(REPAIR_LOG_KEY, isRepairLog)) ?? []), attempt];
+  await writeJSON(REPAIR_LOG_KEY, all.slice(Math.max(0, all.length - MAX_REPAIR_LOG)));
+}
+
 /** วิธีซ่อมหนึ่งวิธี — `run()` คืน true = แก้สำเร็จ · ไม่ควร throw (throw = ถือว่าล้ม) */
 export interface RepairMethod {
   name: string;
@@ -126,7 +132,6 @@ export class SelfRepair {
   }
 
   private async log(attempt: RepairAttempt): Promise<void> {
-    const all = [...(await this.history()), attempt];
-    await writeJSON(REPAIR_LOG_KEY, all.slice(Math.max(0, all.length - MAX_REPAIR_LOG)));
+    await recordRepair(attempt);
   }
 }

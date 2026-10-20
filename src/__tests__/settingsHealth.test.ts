@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   quarantineKey,
   SettingsHealth,
@@ -7,6 +8,7 @@ import {
 } from '../core/selfRepair/SettingsHealth';
 import type { RepairAttempt } from '../core/selfRepair/types';
 import { isArray, isString } from '../core/types/guards';
+import { settingsHealthEntries } from '../features/settings/settingsHealthEntries';
 
 const KEY = 'atom.test.blob';
 const isStringArray = (v: unknown): v is string[] => isArray(v) && v.every(isString);
@@ -86,7 +88,7 @@ describe('SettingsHealth — ตรวจ+กู้การตั้งค่�
     expect(res).toMatchObject({ status: 'schema_fail', action: 'quarantine' });
     expect(reset).not.toHaveBeenCalled(); // ห้าม auto-reset
     expect(kv.map.get(KEY)).toBeUndefined(); // key จริงถูกเคลียร์
-    expect(kv.map.get(quarantineKey(KEY, 777))).toBe('{"wrong":"shape"}'); // raw ถูกเก็บไว้กู้ได้
+    expect(kv.map.get(quarantineKey(KEY))).toBe('{"wrong":"shape"}'); // raw ถูกเก็บไว้กู้ได้
     expect(logs[0]).toMatchObject({ outcome: 'fail', note: 'schema_fail quarantined' });
     expect(notifications[0]).toContain('เก็บสำรอง');
   });
@@ -110,5 +112,28 @@ describe('SettingsHealth — ตรวจ+กู้การตั้งค่�
     expect(reset).toHaveBeenCalledTimes(1); // ลองครั้งเดียว ไม่ retry
     expect(logs[0]).toMatchObject({ outcome: 'fail', note: 'still invalid after reset' });
     expect(notifications[0]).toContain('ไม่สำเร็จ');
+  });
+});
+
+describe('settingsHealthEntries — รายการ blob จริง (PR-4b)', () => {
+  test('มี key ครบ ไม่ซ้ำ + reset ลบ key ออกจาก storage', async () => {
+    const entries = settingsHealthEntries();
+    const keys = entries.map((e) => e.key);
+    expect(new Set(keys).size).toBe(keys.length); // ไม่ซ้ำ
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        'atom.modules.v1.enabled',
+        'atom.ai.v1.customProviders',
+        'atom.mcp.v1.servers',
+        'atom.skills.v1',
+        'atom.voice.v1.standby',
+      ]),
+    );
+    // reset = ลบ key → ตกไปใช้ default ของโมดูล
+    const first = entries[0];
+    if (!first) throw new Error('no entries');
+    await AsyncStorage.setItem(first.key, '{"x":1}');
+    await first.reset();
+    expect(await AsyncStorage.getItem(first.key)).toBeNull();
   });
 });

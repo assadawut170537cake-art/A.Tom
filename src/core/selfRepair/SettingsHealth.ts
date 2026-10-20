@@ -28,7 +28,7 @@ export interface HealthResult {
   key: string;
   status: HealthStatus;
   /** 'none' = ปกติ · 'reset' = กู้เป็น default · 'quarantine' = กักกัน raw ไว้ · 'reset-failed' = กู้ไม่สำเร็จ */
-  action: 'none' | 'reset' | 'quarantine' | 'reset-failed';
+  action: 'none' | 'reset' | 'quarantine' | 'reset-failed' | 'error';
   snapshotFailed: boolean;
 }
 
@@ -53,9 +53,9 @@ export interface SettingsHealthDeps {
   log?: (attempt: import('./types').RepairAttempt) => Promise<void>;
 }
 
-/** key ที่กักกัน raw เสียไว้ให้บอสตรวจ/กู้เอง */
-export function quarantineKey(key: string, at: number): string {
-  return `atom.quarantine.${key}.${at}`;
+/** key ที่กักกัน raw เสียไว้ให้บอสตรวจ/กู้เอง — 1 key ต่อ blob (ของใหม่ทับของเก่า ไม่กองสะสม) */
+export function quarantineKey(key: string): string {
+  return `atom.quarantine.${key}`;
 }
 
 export class SettingsHealth {
@@ -93,8 +93,8 @@ export class SettingsHealth {
       try {
         results.push(await this.heal(entry));
       } catch {
-        // กันพลาดสุดขอบ — ถือว่าไม่ได้ทำอะไรกับ blob นี้
-        results.push({ key: entry.key, status: 'ok', action: 'none', snapshotFailed: false });
+        // ล้มกลางคัน (เช่น setItem สำเร็จ removeItem พัง) — รายงานเป็น error ไม่กลบว่า "ปกติ"
+        results.push({ key: entry.key, status: 'ok', action: 'error', snapshotFailed: false });
       }
     }
     return results;
@@ -112,7 +112,7 @@ export class SettingsHealth {
 
     // (1) schema_fail → กักกัน ไม่ reset อัตโนมัติ (กันลบของที่อาจกู้ได้)
     if (status === 'schema_fail') {
-      if (raw != null) await this.kv.setItem(quarantineKey(entry.key, at), raw);
+      if (raw != null) await this.kv.setItem(quarantineKey(entry.key), raw);
       await this.kv.removeItem(entry.key); // เคลียร์ของเสียออกจาก key จริง → แอปใช้ default สะอาด ๆ (raw ยังอยู่ใน quarantine)
       await this.logAttempt({
         problem: entry.key,
@@ -140,7 +140,9 @@ export class SettingsHealth {
         snapshotFailed,
       });
       this.notify(
-        `⚠️ การตั้งค่า "${entry.label}" เสียหาย — กู้เป็นค่าเริ่มต้นให้แล้ว (สำรองของเดิมไว้)`,
+        snapshotFailed
+          ? `⚠️ การตั้งค่า "${entry.label}" เสียหาย — กู้เป็นค่าเริ่มต้นให้แล้ว (สำรองของเดิมไม่สำเร็จ ของเดิมหาย)`
+          : `⚠️ การตั้งค่า "${entry.label}" เสียหาย — กู้เป็นค่าเริ่มต้นให้แล้ว (สำรองของเดิมไว้)`,
       );
       return { key: entry.key, status, action: 'reset', snapshotFailed };
     }
