@@ -74,9 +74,10 @@ describe('AgentHarness: ผล MCP ภายนอกห้ามพาไปส
 
 test('redactSecrets: ซ่อนคีย์ xAI / Dahl / Groq / Bearer token', () => {
   const text =
-    'xai-ABCDEFGHIJKLMNOPQRST dahl_2pQRvhUe54scoLdiS2 gsk_abcdefghijklmnopqrst Authorization: Bearer abcdefghijklmnop.qrst';
+    // ประกอบค่าปลอมตอนรัน — ตัวสแกน secret (GitGuardian) ไม่ทักว่าเป็นคีย์จริง
+    ['xai-', 'dahl_', 'gsk_', 'Authorization: Bearer '].map((p) => p + 'x'.repeat(20)).join(' ');
   const out = redactSecrets(text);
-  expect(out).not.toMatch(/xai-A|dahl_2|gsk_a|Bearer abc/);
+  expect(out).not.toMatch(/xai-x|dahl_x|gsk_x|Bearer x/);
   expect(out.match(/\[REDACTED\]/g)).toHaveLength(4);
   expect(redactSecrets('Bearer short')).toBe('Bearer short'); // สั้นเกินไม่ใช่ token
 });
