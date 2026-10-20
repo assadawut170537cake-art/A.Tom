@@ -29,7 +29,7 @@ import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
 
 const GREETING_TOP = LAYOUT.dropdown.top + 58;
-/** แถว ActionBar สูงเท่าปุ่มกลาง (คอมพิวเตอร์ 60px) */
+/** แถว ActionBar สูงเท่าปุ่มกลาง (กดคุย 60px) */
 const ACTION_BAR_HEIGHT = 60;
 const GAP = 8;
 /** ช่องพิมพ์วางเหนือ ActionBar ตอนคีย์บอร์ดปิด (ไม่แก้ค่า LAYOUT ที่ lock ไว้) */
@@ -117,7 +117,12 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
       {isIdle && <IdleGreeting top={GREETING_TOP} />}
       {/* โหมดไลฟ์ใช้ mood listening ด้วย แต่แสดงสถานะเองใน LiveVoiceStatus */}
       {!live.active && <ListeningIndicator />}
-      <ActionBar onComputer={onOrbPress} onKeyboard={focusInput} />
+      <ActionBar
+        onTalk={toggleLive}
+        talking={live.active}
+        talkDisabled={busy}
+        onKeyboard={focusInput}
+      />
       <View
         className="absolute left-4 right-4"
         style={{ bottom: composerBottom, zIndex: 13 }}

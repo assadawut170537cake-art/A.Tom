@@ -177,6 +177,15 @@ describe('MainScreen — live voice (คุยด้วยเสียง)', () 
     expect(micButton()).toBeTruthy();
   });
 
+  test('ปุ่มกลางด้านล่าง (เดิมรูปคอม) = กดคุย / เลิกคุย', async () => {
+    await renderMain();
+    await fireEvent.press(screen.getByLabelText('กดคุย'));
+    expect(await screen.findByText('กำลังฟัง…')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('เลิกคุย'));
+    expect(screen.queryByText('กำลังฟัง…')).toBeNull();
+    expect(screen.getByLabelText('กดคุย')).toBeTruthy();
+  });
+
   test('mic button → speak → transcript shows as Boss\'s message → reply → listening again', async () => {
     mockFetch([[GEMINI, (c) => (isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":0.9}') : geminiText('สวัสดีครับบอส'))]]);
     const listen = jest.spyOn(voiceOrchestrator, 'listen').mockResolvedValue('สวัสดีอะตอม');

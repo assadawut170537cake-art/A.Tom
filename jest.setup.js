@@ -69,6 +69,7 @@ jest.mock('expo-audio', () => ({
   }),
   getRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
   requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+  requestNotificationPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
 }));
 
 jest.mock('expo-brightness', () => ({

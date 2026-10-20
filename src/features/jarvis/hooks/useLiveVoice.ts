@@ -1,5 +1,6 @@
 import {
   RecordingPresets,
+  requestNotificationPermissionsAsync,
   setAudioModeAsync,
   useAudioRecorder,
   type AudioRecorder,
@@ -7,7 +8,7 @@ import {
 } from 'expo-audio';
 import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import {
@@ -30,6 +31,21 @@ export const LIVE_RECORDING_OPTIONS: RecordingOptions = {
   isMeteringEnabled: true,
 };
 
+/**
+ * ฟังเบื้องหลังได้ไหม — Android ใช้ Foreground Service ซึ่งต้องมีสิทธิ์แจ้งเตือน (POST_NOTIFICATIONS, Android 13+)
+ * ⚠️ ไม่มีสิทธิ์แล้วยังเปิด background → expo-audio โยน NotificationPermissionsException ตอน prepare
+ * = ไมค์ไม่ทำงานเลย (Boss เจอบนเครื่องจริง 2026-10-20) → ถามสิทธิ์ก่อน ไม่ได้ = อัดแบบหน้าแอปอย่างเดียว
+ */
+async function canRecordInBackground(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    return (await requestNotificationPermissionsAsync()).granted;
+  } catch (e) {
+    console.error('[voice] ขอสิทธิ์แจ้งเตือนไม่สำเร็จ — ฟังเฉพาะตอนอยู่ในแอป', e);
+    return false;
+  }
+}
+
 /** ห่อ expo-audio AudioRecorder ให้เป็น LiveRecorder */
 export function createRecorderAdapter(recorder: AudioRecorder): LiveRecorder {
   return {
@@ -40,7 +56,7 @@ export function createRecorderAdapter(recorder: AudioRecorder): LiveRecorder {
       await setAudioModeAsync({
         allowsRecording: true,
         playsInSilentMode: true,
-        allowsBackgroundRecording: true,
+        allowsBackgroundRecording: await canRecordInBackground(),
       });
       await recorder.prepareToRecordAsync();
       recorder.record();
