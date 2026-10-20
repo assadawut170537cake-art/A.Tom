@@ -2,6 +2,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
   Main: undefined;
+  /** ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบนของหน้าหลัก) */
+  History: undefined;
   Settings: undefined;
   AISettings: undefined;
   Modules: undefined;

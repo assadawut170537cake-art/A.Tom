@@ -2,6 +2,7 @@ import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/na
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { AgentScreen } from '../features/agents/screens/AgentScreen';
+import { HistoryScreen } from '../features/jarvis/screens/HistoryScreen';
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
 import { PluginMarketplaceScreen } from '../features/marketplace/screens/PluginMarketplaceScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
@@ -46,6 +47,11 @@ export function RootNavigator() {
         }}
       >
         <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="History"
+          component={HistoryScreen}
+          options={{ title: 'ประวัติการสนทนา' }}
+        />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'ตั้งค่า' }} />
         <Stack.Screen
           name="AISettings"

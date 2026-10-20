@@ -107,7 +107,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const panelBottom = composerBottom + composerHeight + GAP;
   const chatBottom = Math.max(
     LAYOUT.chat.bottomPadding,
-    panelBottom + (agentId ? panelHeight + GAP : 0)
+    panelBottom + (agentId ? panelHeight + GAP : 0),
   );
 
   return (
@@ -188,7 +188,10 @@ export function MainScreen() {
         onLayout={onContainerLayout}
         style={[StyleSheet.absoluteFill, { top: insets.top, bottom: insets.bottom }]}
       >
-        <Header onSettings={() => navigation.navigate('Settings')} />
+        <Header
+          onHistory={() => navigation.navigate('History')}
+          onSettings={() => navigation.navigate('Settings')}
+        />
         <OfflineBanner />
         {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
         {activeTab === 'today' && <ComingSoon label="Today" />}
