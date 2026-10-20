@@ -11,11 +11,13 @@ import argparse
 import logging
 import signal
 import sys
+from pathlib import Path
 from types import FrameType
 
 try:
     from . import config
     from .handlers import make_ultron_handlers, register_all_handlers
+    from .notebooklm import NotebookLM, NotebookLMError, make_notebooklm_handlers
     from .memory_bus import MemoryWatcher
     from .mobile_outbox import notify_mobile
     from .supabase_gateway import SupabaseGateway
@@ -23,6 +25,7 @@ try:
 except ImportError:  # รันเป็นสคริปต์ — โฟลเดอร์ของไฟล์นี้อยู่ใน sys.path อยู่แล้ว
     import config
     from handlers import make_ultron_handlers, register_all_handlers
+    from notebooklm import NotebookLM, NotebookLMError, make_notebooklm_handlers
     from memory_bus import MemoryWatcher
     from mobile_outbox import notify_mobile
     from supabase_gateway import SupabaseGateway
@@ -65,6 +68,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _notebooklm() -> "NotebookLM | None":
+    """ตั้ง NOTEBOOKLM_PROJECT ไว้ = เปิด · ค่าผิด (location) = log แล้วปิด ไม่ทำให้ Mark 55 ล้มทั้งตัว"""
+    if not config.NOTEBOOKLM_PROJECT:
+        return None
+    try:
+        return NotebookLM(
+            config.NOTEBOOKLM_PROJECT,
+            config.NOTEBOOKLM_LOCATION,
+            config.NOTEBOOKLM_NOTEBOOK_ID,
+            Path(config.NOTEBOOKLM_STATE),
+        )
+    except NotebookLMError as ex:
+        logger.error("ปิด NotebookLM: %s", ex)
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     """เริ่ม watcher แล้ว block จนกว่าจะได้สัญญาณปิด · คืน exit code"""
     args = parse_args(argv)
@@ -100,7 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         watcher = MemoryWatcher(gateway, args.node_id, poll_interval=args.poll_interval)
         sandbox = UltronSandbox(config.ULTRON_ROOT, image=config.ULTRON_IMAGE, timeout=config.ULTRON_TIMEOUT)
         ultron = make_ultron_handlers(sandbox, lambda device, text: notify_mobile(gateway, text, device))
-        register_all_handlers(watcher, ultron)
+        register_all_handlers(watcher, {**ultron, **make_notebooklm_handlers(_notebooklm())})
     except Exception:
         logger.exception("เริ่มระบบไม่สำเร็จ")
         return 1

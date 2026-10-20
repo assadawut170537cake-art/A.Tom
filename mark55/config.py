@@ -68,6 +68,14 @@ ULTRON_ROOT: str = os.getenv("MARK55_ULTRON_ROOT", str(Path.home() / ".mark55" /
 ULTRON_IMAGE: str = os.getenv("MARK55_ULTRON_IMAGE", "python:3.12-slim")
 ULTRON_TIMEOUT: int = int(_env_float("MARK55_ULTRON_TIMEOUT", 120))
 
+# NotebookLM Enterprise (mark55/notebooklm.py) — ไม่ตั้ง PROJECT = ปิด (มือถือได้ข้อความว่ายังไม่ได้ตั้งค่า)
+NOTEBOOKLM_PROJECT: str = os.getenv("NOTEBOOKLM_PROJECT", "").strip()
+NOTEBOOKLM_LOCATION: str = os.getenv("NOTEBOOKLM_LOCATION", "global").strip().lower() or "global"
+NOTEBOOKLM_NOTEBOOK_ID: str = os.getenv("NOTEBOOKLM_NOTEBOOK_ID", "").strip()
+NOTEBOOKLM_STATE: str = os.getenv(
+    "NOTEBOOKLM_STATE", str(Path.home() / ".mark55" / "notebooklm.json")
+)
+
 # Supabase — Mark 55 ใช้ service_role key (ข้าม RLS) · ห้ามใส่ใน git / แชท / แอปมือถือ
 SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "").strip()
