@@ -222,6 +222,7 @@
 - pattern ของ agent ต้องแคบ (ขึ้นต้นประโยค + คำเชื่อมเช่น "ว่า"/":") เพราะมาก่อน LLM · Rule มาก่อน → คำสั่งที่มี "เปิด/ปิด…คอม/เครื่อง" โดน `pc_command` แย่ง
 - agent ล้ม → AgentHandler ตอบข้อความไทย (ไม่ throw) · UI ครอบ `AgentErrorBoundary` ผ่าน `AgentHost` · โหลด UI ล้มไม่ cache (ลองใหม่ได้)
 - ลงทะเบียน agent ตอน boot (`registerSampleAgents()` ใน `bootApp()`) · test ใช้ `new AgentRegistry()` แยก
+- **agent "แกะแอป"** (`src/modules/agents/rea-agent.ts`, `registerReaAgent()` · ADR-016): "แกะแอป …" / "หาทางเข้าแอป …" / "แอป … มี deep link อะไรบ้าง" → submit `REVERSE_ENGINEER` เข้า Bus (เหมือนอัลตรอน ไม่ใช้ `PC_COMMANDS`) → Mark 55 แกะด้วย REA คืน "ทางเข้า" (exported/deep link/intent) · REA ลงบน PC เท่านั้น (stdio MCP + ต้องมี Java/JADX) · pattern ขึ้นต้น "แกะ/หาทางเข้า/วิเคราะห์แอป" เลี่ยงคำ "เครื่อง/คอม" (pc_command แย่ง) · ต่อผลเข้า prompt persona ต้อง redact/`toPromptLine()` ก่อน (ยังไม่ทำ — ตอนนี้ตอบเป็นข้อความแชท)
 - **agent "อุปกรณ์"** (`src/modules/agents/device-agent.ts`, `registerDeviceAgent()`): "ปรับเสียง 30" / "ความสว่าง 50%" / "เปิด/ปิดไฟฉาย" / "คัดลอกว่า …" / "เปิดแอป LINE แล้วกด แชท" / "ย้อนกลับ" / "กดปุ่ม …" / "พิมพ์ว่า …" / "อ่านหน้าจอ" / "ยืนยัน" → `deviceControl.call()` ตรง ๆ (regex ไม่ผ่าน LLM) · ต้องมีตัวเลขหรือเปิด/ปิดเสมอ (กันแย่งประโยคคุย) · เลขเป็นคำไทย ("สามสิบ", "ครึ่ง", "เต็ม") แปลงด้วย `parseThaiNumber()` (`thaiNumber.ts`, 0–100 เท่านั้น)
 
 ### Sync กับ Mark 55 (4.5.4.2–4.5.4.3) — สเปกเต็ม `docs/SYNC_PROTOCOL.md`
@@ -259,6 +260,7 @@
 - แอปเรียกได้แค่ RPC `mobile_submit_task` / `mobile_get_task` ด้วย anon/publishable key + **token เครื่อง** (`atm_…`, Supabase เก็บแค่ sha256) · ตารางทั้งหมดปิดสำหรับ anon — **ห้ามเปิด policy ให้ anon** (anon key ดึงจาก APK ได้)
 - ออก token: `select public.mobile_register_device('<device>', '<label>')` ใน SQL Editor (service_role เท่านั้น) · ยกเลิก: `update mobile_devices set revoked = true`
 - เพิ่มคำสั่ง: handler ใน `mark55/handlers.py` → INSERT `mobile_instructions` → แถวใน `PC_COMMANDS` (features/pc-bridge/commands.ts)
+- instruction ที่รองรับ: `RUN_DIAGNOSTICS` · `EXECUTE_BUILD` · `ULTRON_RUN/RELEASE/DESTROY` · **`REVERSE_ENGINEER`** (REA แกะ APK — `mark55/reverse_engineer.py` + SQL `005` · agent "แกะแอป" ส่งตรง ไม่ผ่าน `PC_COMMANDS`)
 - module ตอบข้อความไทยเองทุกกรณี (ไม่ throw) — ถ้า throw ProviderError แชทจะแนะนำ "ตั้งค่า › AI" ซึ่งผิดที่ · รอผล 8s แล้วตอบว่า "ส่งแล้ว" (งานรอในคิวจนกว่า Mark 55 จะเปิด)
 - ⚠️ "เช็กเครื่อง" เฉย ๆ ไม่ผ่าน RuleClassifier (ต้องมี เปิด/ปิด/สั่ง + คอม/เครื่อง) → ขึ้นกับ LLM classifier · พิมพ์ "สั่งคอมเช็กสถานะ" ชัวร์กว่า · "ปิดคอม" = ยังไม่รองรับ (ไม่มี handler)
 - **PC → มือถือ** (`sql/003_mobile_inbox.sql` · `mark55/mobile_outbox.py`): Mark 55 INSERT งาน `target = MOBILE:<device>` / `MOBILE_ALL` · instruction `NOTIFY` (`{text, speak}`) / `DEVICE_TOOL` (`{tool: "device.*", text, args}`) · แอปดึงด้วย `mobile_claim_inbox` (SKIP LOCKED · ค้างเกิน 1 วัน = FAILED expired) แล้วส่งผล `mobile_finish_task`
@@ -370,7 +372,8 @@
 - Mark 55 Bus: `src/features/pc-bridge/` · UI `src/features/settings/screens/PcBridgeScreen.tsx` · SQL `mark55/sql/002_mobile_rpc.sql`
 - Supermemory: `src/core/memory/SuperMemorySync.ts`
 - Sync: `src/core/memory/MemorySync.ts` · `SyncQueue.ts` · `RemoteMemoryAdapter.ts` · UI `src/features/settings/screens/SyncScreen.tsx`
-- Agents (intent): `src/core/agents/AgentRegistry.ts` · `src/features/router/classifiers/AgentClassifier.ts` · `handlers/AgentHandler.ts` · `src/features/agents/` · sample `src/modules/agents/sample-agent.ts`
+- Agents (intent): `src/core/agents/AgentRegistry.ts` · `src/features/router/classifiers/AgentClassifier.ts` · `handlers/AgentHandler.ts` · `src/features/agents/` · sample `src/modules/agents/sample-agent.ts` · แกะแอป `src/modules/agents/rea-agent.ts` (ADR-016 · PC: `mark55/reverse_engineer.py`)
+- REA แกะแอป: แผน `docs/REA_INTEGRATION.md` · สกิล `docs/rea-skills/` · agent `src/modules/agents/rea-agent.ts` · PC handler `mark55/reverse_engineer.py` · SQL `mark55/sql/005_reverse_engineer.sql`
 - Agent: `src/core/agent/` · app wiring `src/features/ai/agent.ts` · Marketplace: `src/features/marketplace/screens/PluginMarketplaceScreen.tsx`
 - Shared types: `src/core/types/`
 - Boot: `src/boot.ts` · App router (มี memory): `src/features/router/appRouter.ts`

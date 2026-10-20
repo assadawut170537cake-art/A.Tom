@@ -184,13 +184,18 @@ def handle_reverse_engineer(task):
 
 ---
 
-## 7. ลำดับทำ (เสนอ)
+## 7. ลำดับทำ
 
-1. **(เอกสารนี้)** ✅ ติดตั้ง + พิสูจน์ REA แกะ APK ได้จริง + วางแผน — รออนุมัติ
-2. PC: ติดตั้ง REA + JADX + apktool บนเครื่อง Mark 55 ให้ `rea doctor` เขียว (ข้อ §3)
-3. PC: handler `handle_reverse_engineer` + SQL instruction + test (`mark55/`)
-4. มือถือ: `PC_COMMANDS` + agent "แกะแอป" + describeResult แสดง "ประตู" ที่เจอ
-5. ต่อยอด: ให้ agent "งาน" (AgentHarness) เรียกผลนี้ไปวางแผนคำสั่งระดับ B อัตโนมัติ
+1. **(เอกสารนี้)** ✅ ติดตั้ง + พิสูจน์ REA แกะ APK ได้จริง + วางแผน
+2. PC: ติดตั้ง REA + JADX + apktool บนเครื่อง Mark 55 ให้ `rea doctor` เขียว (ข้อ §3) — ทำตอนลงจริง
+3. ✅ PC: handler `make_rea_handler` (`mark55/reverse_engineer.py`) + SQL `005_reverse_engineer.sql` + test (`mark55/test_reverse_engineer.py`, 8 เคสผ่าน)
+4. ✅ มือถือ: agent "แกะแอป" (`src/modules/agents/rea-agent.ts`, `REA_AGENT_ID='rea'`) + ลงทะเบียนใน `bootApp()` + test (`src/__tests__/reaAgent.test.ts`, 15 เคสผ่าน) — ตอบ "ประตู" ที่เจอเป็นข้อความไทย
+5. ต่อยอด (ยังไม่ทำ): ให้ agent "งาน" (AgentHarness) เรียกผลนี้ไปวางแผนคำสั่งระดับ B อัตโนมัติ
+
+> หมายเหตุ: ใช้แนวทาง **agent เฉพาะ** (เหมือนอัลตรอน) ไม่ได้เพิ่มใน `PC_COMMANDS`/`PcBridgeModule`
+> เพราะ "แกะแอป" เป็น intent `agent` (submit `REVERSE_ENGINEER` เข้า Bus ตรง ๆ) ไม่ใช่ `pc_command`.
+> handler ปัจจุบันเติม `doors` จาก manifest; การ redact/บีบก่อนเข้า prompt ยังเป็นงานต่อเมื่อผล REA
+> ถูกแนบเข้า system prompt ของ persona (ตอนนี้ตอบเป็นข้อความแชทเฉย ๆ ยังไม่เข้า prompt).
 
 ---
 
