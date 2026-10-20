@@ -82,10 +82,52 @@ export class Orchestrator {
   constructor(
     private readonly registry: ProviderRegistry = aiRegistry,
     private readonly settings: ProviderSettingsStore = ProviderSettings,
-    private readonly quota: QuotaGuard = new QuotaGuard()
+    private readonly quota: QuotaGuard = new QuotaGuard(),
   ) {}
 
   async chat(input: OrchestratorChatInput): Promise<ChatResponse> {
+    return this.run(input, (provider, req) => provider.chat(req));
+  }
+
+  /**
+   * เหมือน chat แต่ส่งข้อความทีละท่อนให้ `onDelta` ระหว่างที่โมเดลยังพิมพ์ (เจ้าที่ไม่มี chatStream = ส่งทั้งก้อนครั้งเดียว)
+   * retry / fallback / สลับรุ่นได้ **เฉพาะก่อนเริ่มส่งข้อความ** — ส่งไปแล้ว (บอสเริ่มได้ยินแล้ว) ถ้าสายหลุด
+   * = คืนเท่าที่ได้ ไม่เริ่มใหม่ (ไม่งั้นพูดซ้ำ/ปนสองเจ้า)
+   */
+  async chatStream(
+    input: OrchestratorChatInput,
+    onDelta: (text: string) => void,
+  ): Promise<ChatResponse> {
+    let emitted = '';
+    const emit = (text: string) => {
+      emitted += text;
+      onDelta(text);
+    };
+    return this.run(input, async (provider, req) => {
+      if (!provider.chatStream) {
+        const res = await provider.chat(req);
+        emit(res.content);
+        return res;
+      }
+      try {
+        return await provider.chatStream(req, emit);
+      } catch (e) {
+        if (!emitted.trim()) throw e; // ยังไม่ได้ส่งอะไร → ให้ retry/fallback ตามปกติ
+        console.error('[ai] คำตอบขาดกลางคัน — ใช้เท่าที่ได้', e);
+        // บอกบอสว่าคำตอบนี้ไม่ครบ (ไม่งั้นดูเหมือนตอบจบปกติ)
+        const kind = toProviderError(provider.config.id, e).kind;
+        this.notices.add(
+          `${provider.config.name}: คำตอบขาดกลางคัน (${kind}) — ข้อความที่ได้อาจไม่ครบ ลองถามใหม่ได้`,
+        );
+        return { content: emitted.trim(), model: req.model, providerId: provider.config.id };
+      }
+    });
+  }
+
+  private async run(
+    input: OrchestratorChatInput,
+    call: (provider: AIProvider, req: ChatRequest) => Promise<ChatResponse>,
+  ): Promise<ChatResponse> {
     const { providerId: pinned, model: pinnedModel, ...rest } = input;
     const chain = await this.providerChain(pinned);
     if (!chain.length) {
@@ -104,12 +146,19 @@ export class Orchestrator {
     }
     // ทุกตัวพักอยู่ = ลองตามปกติ (ดีกว่าตอบล้มโดยไม่ได้ลองสักตัว)
     const ignoreCooldown = plans.every(({ provider, models }) =>
-      models.every((m) => this.quota.isCooling(provider.config.id, m))
+      models.every((m) => this.quota.isCooling(provider.config.id, m)),
     );
 
     const failures: ProviderError[] = [];
     for (const plan of plans) {
-      const res = await this.tryProvider(plan, { timeoutMs, ...rest }, retries, ignoreCooldown, failures);
+      const res = await this.tryProvider(
+        plan,
+        { timeoutMs, ...rest },
+        retries,
+        ignoreCooldown,
+        failures,
+        call,
+      );
       if (res) {
         // ตัวที่ถูกระบุ (เช่นโมเดลประจำ persona) ไม่นับเป็น lastGood — ไม่งั้น persona ที่ตั้ง "อัตโนมัติ" ลากไปใช้ตาม
         if (plan.provider.config.id !== pinned) this.lastGood = plan.provider.config.id;
@@ -120,7 +169,7 @@ export class Orchestrator {
     throw new ProviderError(
       'orchestrator',
       commonKind(failures),
-      `ผู้ให้บริการทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
+      `ผู้ให้บริการทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`,
     );
   }
 
@@ -136,7 +185,8 @@ export class Orchestrator {
     req: Omit<ChatRequest, 'model'>,
     retries: number,
     ignoreCooldown: boolean,
-    failures: ProviderError[]
+    failures: ProviderError[],
+    call: (provider: AIProvider, req: ChatRequest) => Promise<ChatResponse>,
   ): Promise<ChatResponse | null> {
     const id = provider.config.id;
     const preferred = models[0] ?? provider.config.defaultModel;
@@ -147,11 +197,11 @@ export class Orchestrator {
       tried = true;
       for (let attempt = 0; ; attempt++) {
         try {
-          const res = await provider.chat({ ...req, model });
+          const res = await call(provider, { ...req, model });
           this.quota.clear(id, model);
           if (ranOut && index > 0) {
             this.notices.add(
-              `${provider.config.name}: โควต้าของ ${preferred} หมดชั่วคราว — สลับไปใช้ ${model} ให้เองแล้ว`
+              `${provider.config.name}: โควต้าของ ${preferred} หมดชั่วคราว — สลับไปใช้ ${model} ให้เองแล้ว`,
             );
           }
           return res;
@@ -177,7 +227,7 @@ export class Orchestrator {
     if (this.lastGood === id) this.lastGood = null;
     if (!tried) {
       failures.push(
-        new ProviderError(id, 'rate_limit', 'โควต้าหมด — พักไว้ชั่วคราว จะลองใหม่เองเมื่อครบเวลา')
+        new ProviderError(id, 'rate_limit', 'โควต้าหมด — พักไว้ชั่วคราว จะลองใหม่เองเมื่อครบเวลา'),
       );
     }
     return null;

@@ -24,6 +24,11 @@ export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
+  /**
+   * มี = ขอให้ส่งคำตอบทีละท่อนระหว่างที่ AI ยังพิมพ์ (ChatHandler สตรีม · handler อื่นไม่เรียก)
+   * ใช้ให้แอปเริ่มพูด/แสดงข้อความก่อนตอบจบ — ไม่เปลี่ยนการ route (เสียงกับพิมพ์ route ทางเดียวกัน)
+   */
+  onDelta?: ((text: string) => void) | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];
@@ -68,6 +73,8 @@ export interface HandlerResult {
   persona: Persona;
   /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
   agentScreen?: { agentId: string } | undefined;
+  /** true = ข้อความถูกส่งผ่าน `onDelta` ครบแล้ว (ผู้เรียกพูด/แสดงไประหว่างทางแล้ว ไม่ต้องพูดซ้ำทั้งก้อน) */
+  streamed?: boolean | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

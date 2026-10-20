@@ -5,6 +5,9 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+// expo/fetch = native · ในเทสต์ชี้ไปที่ global fetch (เทสต์เดิม mock ตัวนี้อยู่แล้ว) → สตรีม LLM ใช้ mock เดียวกัน
+jest.mock('expo/fetch', () => ({ fetch: (...args) => globalThis.fetch(...args) }));
+
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 

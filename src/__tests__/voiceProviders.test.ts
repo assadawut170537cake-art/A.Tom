@@ -263,7 +263,7 @@ describe.each(TTS_CASES)('TTS $id', ({ id, route, probe, speak, voices }) => {
     const { calls } = mockFetch([route]);
     await tts(id).speak('สวัสดี', { voiceId: 'nova', speed: 1.1 });
     speak(calls.at(-1)!);
-    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^file:///cache/tts-${id}-\\d+\\.mp3$`)));
+    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^file:///cache/tts-${id}-\\d+-\\d+\\.mp3$`)));
   });
 
   if (voices) {

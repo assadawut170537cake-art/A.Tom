@@ -46,6 +46,11 @@ export interface ChatResponse {
 export interface AIProvider {
   config: AIProviderConfig;
   chat(req: ChatRequest): Promise<ChatResponse>;
+  /**
+   * เหมือน chat แต่ส่งข้อความทีละท่อนให้ `onDelta` ระหว่างที่โมเดลยังพิมพ์ (ให้แอปเริ่มพูด/แสดงก่อนตอบจบ)
+   * คืนคำตอบเต็มเมื่อจบ · ไม่มี = Orchestrator เรียก chat() แล้วส่งทั้งก้อนเป็นท่อนเดียว
+   */
+  chatStream?(req: ChatRequest, onDelta: (text: string) => void): Promise<ChatResponse>;
   testConnection(): Promise<{ ok: boolean; error?: string }>;
   /** รายชื่อโมเดลสำหรับแสดง — ถ้าดึงสดไม่ได้ provider บางตัวคืนรายการใน config แทน */
   getModels(): Promise<string[]>;

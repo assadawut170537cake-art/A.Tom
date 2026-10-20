@@ -33,7 +33,7 @@ export class ChatHandler implements IntentHandler<'chat'> {
     private readonly orchestrator: Orchestrator = aiOrchestrator,
     private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt,
     private readonly memoryStore?: MemoryStore,
-    private readonly llmFor: LLMFor = ProviderSettings.getLLMFor
+    private readonly llmFor: LLMFor = ProviderSettings.getLLMFor,
   ) {}
 
   async handle(input: RouterInput): Promise<HandlerResult> {
@@ -48,8 +48,12 @@ export class ChatHandler implements IntentHandler<'chat'> {
     ];
     // persona ที่ผูกโมเดลไว้ = ลองตัวนั้นก่อน (ล้มยัง fallback ตามลำดับ) · ไม่ผูก = อัตโนมัติเหมือนเดิม
     const providerId = await this.preferredLLM(persona);
-    const res = await this.orchestrator.chat(providerId ? { messages, providerId } : { messages });
-    return { reply: res.content.trim(), persona };
+    const req = providerId ? { messages, providerId } : { messages };
+    // มีผู้ฟังท่อนข้อความ = สตรีม (เริ่มพูด/แสดงก่อนตอบจบ) · ไม่มี = เหมือนเดิม
+    const res = input.onDelta
+      ? await this.orchestrator.chatStream(req, input.onDelta)
+      : await this.orchestrator.chat(req);
+    return { reply: res.content.trim(), persona, ...(input.onDelta && { streamed: true }) };
   }
 
   private async preferredLLM(persona: Persona): Promise<AIProviderId | undefined> {

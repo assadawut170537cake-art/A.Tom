@@ -31,6 +31,11 @@ interface AtomState {
   /** False after a storage read/write failure: history keeps working, but only in memory. */
   historyPersisted: boolean;
   dropdownOpen: boolean;
+  /**
+   * คำตอบที่ AI กำลังพิมพ์อยู่ (สตรีม) — แสดงเป็นบับเบิลสดท้ายแชท · **ไม่บันทึก/ไม่ซิงก์**
+   * พิมพ์จบแล้ว conversation ล้างค่านี้แล้ว pushMessage คำตอบเต็มตามปกติ
+   */
+  streaming: { persona: Persona; content: string; startedAt: number } | null;
 
   setUIMode: (mode: UIMode) => void;
   setMood: (mood: OrbMood) => void;
@@ -44,6 +49,10 @@ interface AtomState {
   loadHistory: () => Promise<void>;
   toggleDropdown: () => void;
   closeDropdown: () => void;
+  appendStreaming: (persona: Persona, text: string) => void;
+  clearStreaming: () => void;
+  /** ลบประวัติแชทของ persona หนึ่ง (หน้า ประวัติ › ล้าง · บอสยืนยันก่อน) */
+  clearHistory: (persona: Persona) => void;
 }
 
 const emptyHistory = (): Record<Persona, Message[]> => ({ 1: [], 2: [], 3: [], 4: [] });
@@ -86,6 +95,7 @@ export const useAtomStore = create<AtomState>()(
       historyLoaded: false,
       historyPersisted: true,
       dropdownOpen: false,
+      streaming: null,
 
       setUIMode: (uiMode) => set({ uiMode }),
       setMood: (mood) => set({ mood }),
@@ -155,6 +165,22 @@ export const useAtomStore = create<AtomState>()(
       },
       toggleDropdown: () => set((s) => ({ dropdownOpen: !s.dropdownOpen })),
       closeDropdown: () => set({ dropdownOpen: false }),
+      appendStreaming: (persona, text) =>
+        set((s) => {
+          const same = s.streaming?.persona === persona ? s.streaming : null;
+          return {
+            streaming: {
+              persona,
+              content: (same?.content ?? '') + text,
+              startedAt: same?.startedAt ?? Date.now(),
+            },
+          };
+        }),
+      clearStreaming: () => set({ streaming: null }),
+      clearHistory: (persona) => {
+        set((s) => ({ messagesByPersona: { ...s.messagesByPersona, [persona]: [] } }));
+        if (get().historyLoaded) void saveHistory(persona);
+      },
     }),
     {
       name: 'atom-store',

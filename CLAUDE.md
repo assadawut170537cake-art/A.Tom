@@ -294,7 +294,21 @@
 - **ตอบไวขึ้น 2 ทาง:** (1) `SILENCE_END_MS` 1200→900 (จบประโยคไวขึ้นแต่ยังเผื่อพักหายใจกลางประโยค · ปรับที่เดียวถ้าเครื่องตัดเร็ว/ช้าไป) · (2) `VoiceOrchestrator.speak()` แบ่งประโยคด้วย `splitSentences()` (`voice/core/sentences.ts` — แบ่งที่ตัวจบประโยค [.!?…]/ขึ้นบรรทัด **ไม่แบ่งที่ช่องว่าง** เพราะไทยเว้นวรรคในประโยคเดียวได้ · ชิ้นแรกสั้นได้เพื่อเริ่มพูดเร็ว ชิ้นถัดไปรวมจนถึง `minChars`) พูดประโยคแรกทันที ไม่รอสังเคราะห์ทั้งก้อน
 - **fallback ครบทุกประโยค:** แต่ละประโยคลองเจ้าที่พูดประโยคก่อนหน้าสำเร็จก่อน แล้วไล่ chain ที่เหลือ (เจ้าเดิมล้มกลางคัน → ตกไป Expo Speech ไม่พูดค้างครึ่งคำตอบ) · อ่านค่าเสียงต่อเจ้าครั้งเดียวทั้งคำตอบ (memo ใน `speak()`) ไม่อ่าน AsyncStorage ซ้ำทุกประโยค · `speakRun` guard = กดหยุด/ speak ใหม่ ทิ้งประโยคที่เหลือ
 - ⚠️ **ไม่แตะ router ในโหมดเสียง** (เคยคิดทำ `fastChat` ข้าม Jev/LLM classifier แต่ถอดออก — จะทำให้สั่งงาน/สลับ persona ด้วยเสียงที่ต้องพึ่ง Jev/LLM เพี้ยนเป็นแชท ซึ่งขัดแกนข้อ 2) · เสียงกับพิมพ์ route ทางเดียวกัน
-- ยังไม่ทำ (รอบถัดไป): สตรีม token ของ LLM (RN fetch ไม่สตรีม body → ใช้ XHR onprogress/SSE) + พูดแทรก (barge-in) · แล้วค่อยทำ Voice B = Gemini Live realtime
+- ⚠️ Voice A รอบแรกไม่ได้ผลบนเครื่องจริง (Boss ทดสอบ 2026-10-20): แอปยังรอคำตอบ LLM ทั้งก้อน + ไทยไม่มีจุด splitter จึงไม่แบ่ง → แก้ด้วย **สตรีม** ด้านล่าง
+
+### สตรีมคำตอบ + พูดระหว่างพิมพ์ (Voice A2 · 2026-10-20)
+- `requestStream()` (core/http/request.ts): timeout = **ช่วงเงียบ** (รีเซ็ตทุกท่อน) ไม่ใช่เวลารวม · error/status กติกาเดียวกับ `request()` · error จาก `onText` ส่งต่อตามจริง · ออกก่อนจบ → `reader.cancel()` + abort
+- RN fetch อ่าน body เป็นสตรีมไม่ได้ → ใช้ `expo/fetch` ผ่าน `streamingFetch` (core/http/streamingFetch.ts · มากับ expo ไม่ใช่ dep ใหม่) · jest mock `expo/fetch` → `globalThis.fetch` (jest.setup.js)
+- Gemini `chatStream` = `:streamGenerateContent?alt=sse` · ข้าม part `thought` · body ไม่ใช่ SSE (JSON ก้อนเดียว) ก็อ่านได้ · provider อื่นที่ไม่มี `chatStream` → Orchestrator เรียก `chat()` แล้วส่งทั้งก้อน
+- `Orchestrator.chatStream`: retry/fallback ได้เฉพาะ**ก่อน**ส่งข้อความแรก · ล้มหลังส่งไปแล้ว = คืนเท่าที่ได้ + notice "คำตอบขาดกลางคัน" (ไม่ไปเจ้าอื่น — กันพูดซ้ำ/ปน)
+- router: `RouterInput.onDelta` → ChatHandler ใช้ chatStream แล้วคืน `streamed: true` (เฉพาะตอนสตรีม) → conversation ไม่พูดทั้งก้อนซ้ำ · handler อื่น (agent/pc/switch) ไม่สตรีม = พูดแบบเดิม
+- `takeSpeakable()` (sentences.ts): ท่อนแรกตัดที่จุดจบประโยคแรก (เริ่มพูดเร็ว) · ท่อนถัดไปรวบถึงจุดจบสุดท้าย · **ไทยไม่มีจุด → ตัดที่ช่องว่างเมื่อยาวพอ** (`FIRST_SPACE_MIN` 18 / `SPACE_MIN` 40 · แทนกฎเดิม "ไม่แบ่งที่ช่องว่าง" เฉพาะตอนสตรีม) · ไม่ถือท้าย buffer เป็นจุดจบ ("ราคา 3." + "5")
+- `VoiceOrchestrator.speakStream(persona, {onFirst})` → `{push, end, started}` · TTS ที่มี `prepare()` (BaseCloudTTS) สังเคราะห์ท่อนถัดไประหว่างเล่นท่อนปัจจุบัน · เล่นไม่ได้ → เจ้านั้นถูกพักทั้งคำตอบ ท่อนเดิมพูดด้วยเจ้าถัดไป · `stop()` ปลุก worker ให้จบ
+- store `streaming` = บับเบิลสด (ไม่บันทึก ไม่ซิงก์) · คำตอบเต็มบันทึกครั้งเดียวตอนจบ · `clearStreaming()` ทุกเริ่ม turn/ล้ม
+- ยังไม่ทำ: พูดแทรก (barge-in) · Voice B = Gemini Live realtime
+
+### ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบน)
+- route `History` (`features/jarvis/screens/HistoryScreen.tsx`) · แท็บ persona · "คุยต่อกับ…" = สลับ persona แล้วกลับหน้าหลัก · "ล้าง" ถามยืนยัน → `clearHistory(persona)` ลบเฉพาะในเครื่อง (สำเนาฝั่ง Mark 55 ยังอยู่)
 
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)

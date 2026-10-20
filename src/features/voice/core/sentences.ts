@@ -48,3 +48,46 @@ export function splitSentences(text: string, minChars = DEFAULT_MIN_CHARS): stri
 
   return chunks.length > 0 ? chunks : [trimmed];
 }
+
+/** ท่อนแรกต้องยาวอย่างน้อยเท่านี้ (กันพูดเศษคำ เช่น "อ.") */
+const FIRST_MIN_CHARS = 6;
+/** ไม่มีเครื่องหมายจบประโยค (ไทยส่วนมาก) → ตัดที่ช่องว่างได้เมื่อยาวถึงเท่านี้ (ท่อนแรก / ท่อนถัดไป) */
+const FIRST_SPACE_MIN = 18;
+const SPACE_MIN = 40;
+
+// ระหว่างสตรีม ต้องมีช่องว่าง/ขึ้นบรรทัด "ตามหลัง" ตัวจบประโยคจริง ๆ — ท้าย buffer อาจเป็นแค่จุดที่เน็ตตัดท่อน
+// (เช่น "ราคา 3." + "5 บาท" ต้องไม่ถูกตัดเป็นสองท่อน) · จบสตรีม (final) ได้ทั้งหมดอยู่แล้ว
+const BOUNDARY_G = /[.!?…。！？]+[)\]"'”’]*\s+|\n+/g;
+
+/**
+ * ระหว่างสตรีม: ตัดข้อความส่วนที่ "พูดได้แล้ว" ออกจากหัว buffer · คืน `[พูดได้, ที่เหลือ]` (พูดได้ = '' ถ้ายังไม่ควรพูด)
+ * - ตัดที่ตัวจบประโยค/ขึ้นบรรทัด: ท่อนแรก = จุดตัด **แรก** (เริ่มพูดเร็วสุด) · ท่อนต่อไป = จุดตัด **สุดท้าย** (รวบหลายประโยคเป็นก้อนเดียว = เรียก TTS น้อยครั้ง)
+ * - ไม่มีเครื่องหมาย (ไทยมักไม่ใส่จุด) → ใช้ช่องว่างสุดท้ายเป็นจุดตัดเมื่อยาวพอ — ภาษาไทยเว้นวรรคระหว่างวลี/ประโยคอยู่แล้ว
+ * - `final` (สตรีมจบแล้ว) = ทุกอย่างที่เหลือ
+ */
+export function takeSpeakable(
+  buffer: string,
+  { first, final }: { first: boolean; final: boolean },
+): [string, string] {
+  if (final) return [buffer.trim(), ''];
+  const minLen = first ? FIRST_MIN_CHARS : DEFAULT_MIN_CHARS;
+
+  let cut = -1;
+  for (const m of buffer.matchAll(BOUNDARY_G)) {
+    const end = (m.index ?? 0) + m[0].length;
+    if (buffer.slice(0, end).trim().length < minLen) continue;
+    cut = end;
+    if (first) break; // ท่อนแรก: เอาจุดตัดแรกที่ยาวพอ
+  }
+
+  if (cut === -1) {
+    const spaceMin = first ? FIRST_SPACE_MIN : SPACE_MIN;
+    if (buffer.trim().length >= spaceMin) {
+      const lastSpace = buffer.search(/\s\S*$/); // ช่องว่างตัวสุดท้ายก่อนคำที่ยังพิมพ์ไม่จบ
+      if (lastSpace > 0 && buffer.slice(0, lastSpace).trim().length >= minLen) cut = lastSpace;
+    }
+  }
+
+  if (cut === -1) return ['', buffer];
+  return [buffer.slice(0, cut).trim(), buffer.slice(cut).replace(/^\s+/, '')];
+}

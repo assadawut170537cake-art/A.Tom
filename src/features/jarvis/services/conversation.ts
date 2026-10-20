@@ -5,7 +5,7 @@ import { aiOrchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { getAppRouter } from '../../router/appRouter';
 import type { RouterOutput } from '../../router/core/types';
-import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
+import { voiceOrchestrator, type SpeechStream } from '../../voice/core/VoiceOrchestrator';
 import { useAtomStore } from '../stores/useAtomStore';
 
 /** Latest sendMessage() turn; only that turn may move the orb mood past 'thinking'. */
@@ -45,20 +45,46 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
 
   const turn = ++activeTurn;
   const isLatest = () => turn === activeTurn;
+  store.clearStreaming(); // รอบใหม่ — ล้างบับเบิลสดของรอบก่อน (ถ้ามีค้าง) ไม่ให้ข้อความต่อกัน
   store.pushMessage({ role: 'user', content, persona });
   store.setUIMode('conversation');
   store.setMood('thinking');
+
+  // สตรีม: ข้อความที่ AI กำลังพิมพ์ → บับเบิลสด + เริ่มพูดตั้งแต่ประโยคแรก (ไม่รอตอบจบทั้งก้อน)
+  const speakAllowed = opts.speak !== false;
+  // ref object: ถูกตั้งค่าใน callback ของสตรีม (TS ตามการกำหนดค่าใน closure ไม่ได้ถ้าใช้ let เปล่า)
+  const speech: { current: SpeechStream | null } = { current: null };
+  let speechRefused = false;
+  const onDelta = (delta: string) => {
+    if (!isLatest()) return; // รอบเก่าที่ยังพิมพ์ค้างต้องไม่มาแทรกรอบใหม่
+    useAtomStore.getState().appendStreaming(persona, delta);
+    if (!speakAllowed || speechRefused) return;
+    speech.current ??= voiceOrchestrator.speakStream(persona, {
+      onFirst: () => {
+        // โหมดเสียงถูกปิดระหว่างรอ AI (onSpeaking คืน false) → ไม่พูดเลย
+        if (!isLatest() || !(opts.onSpeaking?.() ?? true)) {
+          speechRefused = true;
+          return false;
+        }
+        useAtomStore.getState().setMood('speaking');
+        return true;
+      },
+    });
+    speech.current.push(delta);
+  };
 
   try {
     // router ของแอป: ChatHandler มี Shared Memory (facts ถูกแนบใน system prompt)
     const { route, result } = await getAppRouter().handle({
       text: content,
+      onDelta,
       context: {
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),
         history,
       },
     });
+    if (isLatest()) useAtomStore.getState().clearStreaming();
     // A switch moves the reply (the new persona's greeting) into the new persona's history
     useAtomStore
       .getState()
@@ -75,7 +101,10 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       });
     }
 
-    if (opts.speak !== false && result.reply && (opts.onSpeaking?.() ?? true)) {
+    if (result.streamed) {
+      // พูดไประหว่างทางแล้ว — รอพูดส่วนที่เหลือให้จบ (ไม่พูดซ้ำทั้งก้อน)
+      if (speech.current) await speech.current.end().catch(() => undefined);
+    } else if (speakAllowed && result.reply && (opts.onSpeaking?.() ?? true)) {
       if (isLatest()) useAtomStore.getState().setMood('speaking');
       await voiceOrchestrator.speak(result.reply, result.persona).catch(() => {
         // Speech is best-effort; the text reply is already on screen
@@ -85,6 +114,8 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       ? { route, reply: result.reply, agentScreen: result.agentScreen }
       : { route, reply: result.reply };
   } catch (e) {
+    if (isLatest()) useAtomStore.getState().clearStreaming();
+    if (speech.current) voiceOrchestrator.stop(); // ตอบไม่สำเร็จ → หยุดเสียงที่อาจเริ่มไปแล้ว
     aiOrchestrator.takeNotices(); // already listed in the aggregated error below
     const err = toProviderError('conversation', e);
     const error = redactSecrets(err.message);
