@@ -8,6 +8,7 @@ import {
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry } from '../../ai/core/ProviderRegistry';
 import type { AIProviderId } from '../../ai/core/types';
+import { CustomProviders } from '../components/CustomProviders';
 import { PersonaLLMMapper } from '../components/PersonaLLMMapper';
 import { PriorityList } from '../components/PriorityList';
 import { ProviderCard } from '../components/ProviderCard';
@@ -134,6 +135,9 @@ export function AISettingsScreen() {
         {dahl.map((p) => (
           <ProviderCard key={p.config.id} provider={p} subtitle={p.config.defaultModel} />
         ))}
+      </Section>
+      <Section title="เพิ่มเอง" hint="ต่อ AI เจ้าไหนก็ได้ที่เป็นแบบ OpenAI-compatible — ใส่ URL + key + โมเดล ไม่ต้องรออัปเดตแอป">
+        <CustomProviders />
       </Section>
       <Section title="สมอง + เสียง ต่อ Persona" hint="สมอง = โมเดลที่คิดคำตอบ (อัตโนมัติ = สลับเองตาม Priority) · เสียง = ตัวที่พูดออกเสียง แยกกันได้ — เสียงบนเครื่อง (Expo) ไม่กินโควต้า">
         <PersonaLLMMapper />

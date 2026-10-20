@@ -13,4 +13,6 @@ export type AIProviderId =
   | 'dahl-deepseek'
   | 'dahl-glm'
   // xAI Grok — key เดียวใช้ได้ทั้งสมอง/เสียงพูด/ฟังเสียง (Boss ขอ 2026-10-20)
-  | 'xai';
+  | 'xai'
+  // บอสเพิ่มเองจากในแอป (OpenAI-compatible · ADR-020) — features/ai/customProviders.ts
+  | `custom-${string}`;

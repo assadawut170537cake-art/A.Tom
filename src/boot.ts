@@ -27,6 +27,7 @@ import type { InitReport } from './core/modules/types';
 import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
+import { registerCustomProviders } from './features/ai/customProviders';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
@@ -84,6 +85,7 @@ let started: Promise<BootReport> | null = null;
 
 export function bootApp(): Promise<BootReport> {
   registerAIProviders();
+  void registerCustomProviders(); // ไม่ reject · โหลดเสร็จก่อนบอสพิมพ์ข้อความแรกแทบเสมอ
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();

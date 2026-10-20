@@ -89,18 +89,17 @@
 
 ---
 
-## 4. LOCK DECISIONS (Phase 3 — ห้ามแก้)
+## 4. LOCK DECISIONS — ล็อก "โครงสร้าง" ไม่ล็อก "ชื่อเจ้า" (Boss อนุมัติ 2026-10-20 · ADR-020 · แผน `docs/CORE_AUDIT.md`)
 
-1. LLM: Gemini + OpenRouter + Dahl (MiniMax / DeepSeek / GLM — Boss เพิ่ม 2026-10-19 · ADR-016) + xAI Grok (2026-10-20 · ADR-018)
-2. Jev: **default เปิด = ตัวตัดสินใจหลัก** (Boss เปลี่ยน 2026-10-20 · ADR-019) · ไม่มี key/ล่ม = สลับไปตัวกรองคำ + LLM classifier เอง · ใช้ classifier เท่านั้น
-3. Voice: 19 providers (TTS 10 + STT 9), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15 · xAI TTS/STT 2026-10-20)
-4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
-5. Auto-Switch: Priority + Fallback + sticky lastGood + สลับรุ่นเมื่อโควต้าหมด (ADR-017)
-6. Storage: SecureStore (secrets) + AsyncStorage (data)
-7. Settings: 3 หน้า (Hub + AI + Voice) + Persona Voice Map
-8. Chat History: แยกต่อ persona (key: `atom.history.v1.<1-4>`)
-9. Voice per Persona: Boss กำหนดเอง
-10. Shared Memory: Phase 4.5 (scaffold แล้ว)
+คอนเซ็ปต์ของบอส: **แกนหลักต้องต่อ API ได้ทุกรูปแบบ และเพิ่มได้ในอนาคต** — สิ่งที่ล็อก (ห้ามแก้โดยไม่ขอ):
+1. ผู้ให้บริการทุกประเภท (AI / TTS / STT) เข้าทาง **registry + interface กลาง** เท่านั้น — รายชื่อเจ้าไม่ใช่ lock (ตอนนี้: Gemini · OpenRouter · Dahl ×3 · xAI · TTS 10 · STT 9 = ชุดสำเร็จรูป)
+2. **เพิ่มเจ้าใหม่ได้จากในแอปโดยไม่แก้โค้ด** (OpenAI-compatible — AI: `customProviders.ts` หลายตัว · TTS/STT: การ์ด Custom)
+3. ความสามารถเสริม = module / agent / MCP — ปิดแล้วแกนยังคุย/ฟัง/พูด/จำ/สลับ persona ได้
+4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` · ลำดับ Rule → Agent → **Jev (ตัดสินใจหลัก default on · ADR-019)** → LLM → chat · Jev/LLM ตอบได้แค่ 3 ตัวแรก
+5. Auto-Switch: Priority → Fallback → sticky lastGood → สลับรุ่นเมื่อโควต้าหมด (ADR-017) · Expo Speech = เสียงตัวสุดท้าย
+6. Storage: SecureStore (secrets) + AsyncStorage (data) · Chat History แยกต่อ persona (`atom.history.v1.<1-4>`)
+7. Settings: Hub + AI + Voice + Persona Voice Map · สมอง/เสียงต่อ persona บอสกำหนดเอง
+8. Shared Memory: core = ในเครื่อง · sync ภายนอก (Mark 55 / Supermemory) = module
 ---
 
 ## 5. CONVENTIONS
@@ -327,6 +326,12 @@
 - สมอง `xai` (OpenAI-compatible `https://api.x.ai/v1`, models dynamic, default `grok-4.20-0309-non-reasoning` = ตอบเร็ว · ปิดไว้ก่อน) · เสียงพูด `XaiTTS` (`POST /v1/tts` → MP3 ดิบ, เสียง `GET /v1/tts/voices`, ค่าเริ่มต้น `eve`, speed บีบ 0.7–1.5) · ฟังเสียง `XaiSTT` (`POST /v1/stt` multipart, `grok-voice-transcribe-2.0`, `language=th` — ไทยรองรับทางการ, `file` ต้องเป็น field สุดท้าย)
 - key: `xaiKey()` (`features/voice/xaiKey.ts`) = key ของการ์ดนั้น (`tts.xai`/`stt.xai`) → ไม่มีก็ใช้ `ai.xai` (บอสใส่ที่การ์ด Grok ที่เดียวพอ)
 - ⚠️ TTS ไทยไม่อยู่ในรายการภาษาทางการของ xAI → ส่ง `language: auto` (ใส่ `th` เสี่ยง 400) · คุณภาพเสียงไทยต้องฟังเองบนเครื่อง
+
+### เพิ่มผู้ให้บริการ AI เอง (ADR-020)
+- `features/ai/customProviders.ts`: AsyncStorage `atom.ai.v1.customProviders` (ชื่อ/URL/โมเดล — ไม่มี key) · key = SecureStore `ai.<id>` · id = `custom-<slug>` (ชื่อซ้ำ → `-2`) · `AIProviderId` รับ `` `custom-${string}` ``
+- boot: `void registerCustomProviders()` (ไม่ reject) · เพิ่ม = `registry.register` ทันที · ลบ = `registry.unregister` + ลบ key
+- Base URL: https เท่านั้น ยกเว้น http ในบ้าน (localhost/10./192.168./172.16–31/100.64/.local) · UI `CustomProviders` (ตั้งค่า › AI › เพิ่มเอง)
+- รายการ Priority ในหน้า AI คำนวณตอนเปิดหน้า → เพิ่มเจ้าใหม่แล้วเห็นใน Priority เมื่อเปิดหน้าใหม่
 
 ### Network
 - `isOffline()` fail-open
