@@ -34,13 +34,7 @@ import { AgentHandler } from '../handlers/AgentHandler';
 import { ChatHandler } from '../handlers/ChatHandler';
 import { PCCommandHandler } from '../handlers/PCCommandHandler';
 import { SwitchAssistantHandler } from '../handlers/SwitchAssistantHandler';
-import type {
-  Classifier,
-  HandlerResult,
-  IntentHandlers,
-  RouterInput,
-  RouterOutput,
-} from './types';
+import type { Classifier, HandlerResult, IntentHandlers, RouterInput, RouterOutput } from './types';
 
 /** Jev answers below this confidence defer to the LLM classifier (0.7 itself is accepted). */
 export const JEV_MIN_CONFIDENCE = 0.7;
@@ -91,6 +85,9 @@ export class IntentRouter {
     // ก่อน Jev/LLM: pattern ของ agent ฟรีและแม่นกว่าให้ model เดา — และ model บอกไม่ได้ว่า agent ตัวไหน
     const byAgent = await this.agent.classify(input).catch(() => null);
     if (byAgent) return byAgent;
+
+    // โหมดเสียง: ไม่ยิงโมเดลเพื่อจัดหมวด — คุยต่อเป็นแชทเลย (ตอบไวขึ้น)
+    if (input.fastChat) return DEFAULT_ROUTE;
 
     const byJev = await this.jev.classify(input).catch(() => null);
     if (byJev && byJev.confidence >= JEV_MIN_CONFIDENCE) return byJev;

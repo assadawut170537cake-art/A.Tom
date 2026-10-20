@@ -21,8 +21,8 @@ import { stripWakeWord } from './wakeWord';
 
 /** ดังกว่านี้ (dBFS) = มีคนพูด — Android ได้ค่า peak (maxAmplitude), iOS ได้ค่าเฉลี่ย จึงเลือกค่ากลาง ๆ */
 export const SPEECH_THRESHOLD_DB = -40;
-/** เงียบต่อเนื่องนานเท่านี้หลังพูด = จบประโยค */
-export const SILENCE_END_MS = 1200;
+/** เงียบต่อเนื่องนานเท่านี้หลังพูด = จบประโยค (สั้นลงจาก 1200 → ตอบไวขึ้น · ปรับที่นี่ถ้าเครื่องตัดเร็วไป) */
+export const SILENCE_END_MS = 800;
 /** เสียงที่ดังสั้นกว่านี้ถือเป็นเสียงรบกวน (เคาะโต๊ะ, ไอ) */
 export const MIN_SPEECH_MS = 400;
 /** ตัดประโยคที่ยาวเกินนี้ส่งถอดเสียงเลย (ไฟล์ใหญ่ = อัปโหลดช้า + เสียเงิน STT) */
@@ -34,7 +34,8 @@ export const PRE_SPEECH_RESET_MS = 8_000;
 /** ถี่แค่ไหนในการอ่านระดับเสียง */
 export const METER_INTERVAL_MS = 100;
 
-export type LiveVoiceState = 'idle' | 'starting' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
+export type LiveVoiceState =
+  'idle' | 'starting' | 'listening' | 'transcribing' | 'thinking' | 'speaking';
 
 /** ข้อความสถานะที่แสดงบนหน้าหลัก (idle = ไม่แสดง) */
 export const LIVE_STATE_LABEL: Record<Exclude<LiveVoiceState, 'idle'>, string> = {
@@ -306,7 +307,8 @@ export class LiveVoiceSession {
     } catch (e) {
       // sendMessage จับ error เองอยู่แล้ว — มาถึงนี่ = bug ฝั่งเรียก; log แล้วออกจากโหมดไลฟ์
       console.error('[voice] ส่งข้อความจากเสียงไม่สำเร็จ', e);
-      if (this.isCurrent(run)) await this.fail(`⚠️ ${userAdvice(toProviderError('voice', e).kind)}`);
+      if (this.isCurrent(run))
+        await this.fail(`⚠️ ${userAdvice(toProviderError('voice', e).kind)}`);
       return;
     }
     if (this.isCurrent(run)) await this.listen(run);

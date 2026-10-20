@@ -290,6 +290,11 @@
 - ⚠️ ชื่อ field wire อิง spec (ไม่มีโค้ด server) — Mark 55 ใช้ชื่ออื่นแก้ที่ `RemoteChatAdapter`/`chatSyncTypes` ที่เดียว · เรียงข้อความตาม `createdAt` (นาฬิกาเครื่องที่พิมพ์) เท่ากัน = ตาม id
 - PC→มือถือ (NOTIFY/DEVICE_TOOL ใน pc-inbox) ยังอยู่ = ใช้เป็น "แจ้งเตือน" ต่างหากจากห้องแชท
 
+### คุยเสียงให้ลื่น (Voice A · ลดดีเลย์ + ไม่เป็นทอด ๆ · 2026-10-20)
+- **ตอบไวขึ้น 3 ทาง:** (1) `SILENCE_END_MS` 1200→800 (จบประโยคไว) · (2) โหมดเสียงส่ง `fastChat:true` → router ข้าม Jev/LLM classifier (Rule+Agent ยังทำงาน) ตัด network หนึ่งรอบ/ประโยค — `RouterInput.fastChat` · `sendMessage(text,{fastChat})` · useLiveVoice ส่งให้อัตโนมัติ · (3) `VoiceOrchestrator.speak()` แบ่งประโยคด้วย `splitSentences()` (`voice/core/sentences.ts` — แบ่งที่ตัวจบประโยค/ขึ้นบรรทัด ไม่แบ่งที่ช่องว่าง) พูดประโยคแรกทันที ที่เหลือใช้เจ้าเดิมพูดต่อ (fallback เฉพาะประโยคแรก) → เสียงเริ่มเร็ว ไม่รอสังเคราะห์ทั้งก้อน
+- ยังไม่ทำ (รอบถัดไป): สตรีม token ของ LLM (RN fetch ไม่สตรีม body → ใช้ XHR onprogress/SSE) + พูดแทรก (barge-in) · แล้วค่อยทำ Voice B = Gemini Live realtime
+- ⚠️ `fastChat` ใช้เฉพาะโหมดเสียง — แชทพิมพ์ยังผ่าน classifier ครบ (สั่งคอม/สลับ persona ด้วยการพิมพ์ยังแม่น)
+
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)

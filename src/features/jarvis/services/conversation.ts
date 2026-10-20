@@ -26,6 +26,8 @@ interface SendResult {
 interface SendOptions {
   /** false = ไม่พูดคำตอบ (ค่าเริ่มต้นพูด) */
   speak?: boolean;
+  /** true = โหมดเสียง: ข้าม classifier ที่ยิงโมเดล แล้วตอบแชททันที (ดู RouterInput.fastChat) */
+  fastChat?: boolean;
   /**
    * เรียกก่อนเริ่มพูด — คืน false = ไม่ต้องพูดแล้ว (โหมดคุยด้วยเสียงถูกปิดระหว่างรอ AI ตอบ)
    * ใช้ให้โหมดไลฟ์รู้ว่าเข้าช่วง "กำลังพูด" แล้วด้วย
@@ -53,6 +55,7 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     // router ของแอป: ChatHandler มี Shared Memory (facts ถูกแนบใน system prompt)
     const { route, result } = await getAppRouter().handle({
       text: content,
+      fastChat: opts.fastChat,
       context: {
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),
@@ -60,12 +63,21 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       },
     });
     // A switch moves the reply (the new persona's greeting) into the new persona's history
-    useAtomStore.getState().pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    useAtomStore
+      .getState()
+      .pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
-    if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);
+    if (result.agentScreen && isLatest())
+      useAgentPanelStore.getState().open(result.agentScreen.agentId);
     // Keys rejected along the way (e.g. Gemini 401 while OpenRouter answered) still need fixing
     for (const notice of aiOrchestrator.takeNotices()) {
-      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${redactSecrets(notice)}`, persona: result.persona });
+      useAtomStore
+        .getState()
+        .pushMessage({
+          role: 'system',
+          content: `⚠️ ${redactSecrets(notice)}`,
+          persona: result.persona,
+        });
     }
 
     if (opts.speak !== false && result.reply && (opts.onSpeaking?.() ?? true)) {
@@ -84,7 +96,9 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     // A dead connection shows up as network errors or timeouts; say "offline" rather than blame providers
     const offline = err.kind === 'network' || (await isOffline());
     const advice = userAdvice(offline ? 'network' : err.kind);
-    useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${advice}\n${error}`, persona });
+    useAtomStore
+      .getState()
+      .pushMessage({ role: 'system', content: `⚠️ ${advice}\n${error}`, persona });
     return { route: null, reply: '', error };
   } finally {
     // An older turn finishing must not reset the mood of a newer one still in flight

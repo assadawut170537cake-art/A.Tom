@@ -13,7 +13,12 @@
  * @see ../../../../docs/DECISIONS.md — ADR-008 Expo Speech เป็น TTS สำรองสุดท้ายเสมอ
  */
 
-import { ProviderError, commonKind, toProviderError, type ProviderErrorKind } from '../../../core/http/errors';
+import {
+  ProviderError,
+  commonKind,
+  toProviderError,
+  type ProviderErrorKind,
+} from '../../../core/http/errors';
 import {
   ProviderSettings,
   type PersonaVoice,
@@ -21,6 +26,7 @@ import {
 } from '../../../core/storage/ProviderSettings';
 import type { Persona } from '../../../core/types/persona';
 import { ensureMicPermission } from './permissions';
+import { splitSentences } from './sentences';
 import { voiceRegistry, type VoiceRegistry } from './VoiceRegistry';
 import type { SpeakOptions, STTProvider, TTSProvider, TTSProviderId } from './types';
 
@@ -34,14 +40,54 @@ const LAST_RESORT_TTS: TTSProviderId = 'expo';
  */
 export class VoiceOrchestrator {
   private speaking: TTSProvider | null = null;
+  /** เพิ่มทุกครั้งที่ speak()/stop() — ลูปพูดทีละประโยคของรอบเก่าเช็กแล้วหยุดเอง */
+  private speakRun = 0;
 
   constructor(
     private readonly registry: VoiceRegistry = voiceRegistry,
-    private readonly settings: ProviderSettingsStore = ProviderSettings
+    private readonly settings: ProviderSettingsStore = ProviderSettings,
   ) {}
 
+  /**
+   * พูดคำตอบ — แบ่งเป็นประโยคย่อยแล้วพูดทีละประโยค เพื่อให้ได้ยินเสียงประโยคแรกเร็ว
+   * (ไม่ต้องรอสังเคราะห์ทั้งก้อน) · ประโยคแรกเลือกเจ้าที่ใช้ได้ผ่าน fallback chain แล้วใช้เจ้าเดิมพูดที่เหลือ
+   */
   async speak(text: string, personaId: Persona): Promise<void> {
     const voice = await this.settings.resolveVoiceFor(personaId);
+    const chain = await this.ttsChainFor(voice);
+    this.stop(); // ตัดเสียงรอบก่อนที่ค้างอยู่ (stop() เพิ่ม speakRun ให้ด้วย)
+    const run = this.speakRun;
+
+    const sentences = splitSentences(text);
+    if (sentences.length <= 1) {
+      await this.speakOnChain(chain, text, voice, run);
+      return;
+    }
+
+    // ประโยคแรก: เลือกเจ้าที่ใช้ได้ (fallback) · ที่เหลือใช้เจ้าเดิม = พูดต่อเนื่องไม่สะดุด
+    const provider = await this.speakOnChain(chain, sentences[0] ?? text, voice, run);
+    for (let i = 1; i < sentences.length && provider; i++) {
+      if (run !== this.speakRun) return; // บอสกดหยุด / มี speak ใหม่ → ทิ้งที่เหลือ
+      this.speaking = provider;
+      try {
+        await provider.speak(sentences[i] ?? '', await this.optionsFor(provider.id, voice));
+      } catch {
+        // เจ้าเดิมล้มกลางคัน — คำตอบอยู่บนจอแล้ว หยุดเงียบ ๆ (ไม่ไล่ fallback รายประโยค)
+        return;
+      } finally {
+        if (this.speaking === provider) this.speaking = null;
+      }
+    }
+  }
+
+  stop(): void {
+    this.speakRun++;
+    this.speaking?.stop();
+    this.speaking = null;
+  }
+
+  /** ลำดับเจ้า TTS ที่จะลอง: เสียงของ persona → priority → ที่ลงทะเบียน → Expo Speech (ท้ายสุดเสมอ) */
+  private async ttsChainFor(voice?: PersonaVoice): Promise<TTSProvider[]> {
     const ids = unique([
       ...(voice ? [voice.providerId] : []),
       ...(await this.settings.getVoicePriority('tts')),
@@ -54,21 +100,40 @@ export class VoiceOrchestrator {
     }
     const lastResort = this.registry.getTTS(LAST_RESORT_TTS);
     if (lastResort && !chain.includes(lastResort)) chain.push(lastResort);
+    return chain;
+  }
 
-    await this.runChain(chain, async (tts) => {
-      this.stop();
+  /** พูดข้อความหนึ่งก้อนผ่าน chain · คืนเจ้าที่พูดสำเร็จ (ให้ประโยคถัดไปใช้ซ้ำ) · ล้มทุกตัว = throw */
+  private async speakOnChain(
+    chain: TTSProvider[],
+    text: string,
+    voice: PersonaVoice | undefined,
+    run: number,
+  ): Promise<TTSProvider | null> {
+    if (!chain.length) {
+      throw new ProviderError('voice', 'unsupported', 'ไม่มีผู้ให้บริการเสียงที่เปิดใช้งาน');
+    }
+    const failures: ProviderError[] = [];
+    for (const tts of chain) {
+      if (run !== this.speakRun) return null; // ถูกหยุด/แทนที่ระหว่างไล่ chain
       this.speaking = tts;
       try {
         await tts.speak(text, await this.optionsFor(tts.id, voice));
-      } finally {
         if (this.speaking === tts) this.speaking = null;
+        return tts;
+      } catch (e) {
+        if (this.speaking === tts) this.speaking = null;
+        const err = toProviderError(tts.id, e);
+        if (!err.shouldFallback) throw err;
+        failures.push(err);
       }
-    });
-  }
-
-  stop(): void {
-    this.speaking?.stop();
-    this.speaking = null;
+    }
+    if (run !== this.speakRun) return null;
+    throw new ProviderError(
+      'voice',
+      chainKind(failures),
+      `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`,
+    );
   }
 
   /** Call before recording: rejects with a Thai `permission` error when the mic is denied. */
@@ -103,7 +168,7 @@ export class VoiceOrchestrator {
 
   private async runChain<P extends { id: string }, R>(
     chain: P[],
-    run: (provider: P) => Promise<R>
+    run: (provider: P) => Promise<R>,
   ): Promise<R> {
     if (!chain.length) {
       throw new ProviderError('voice', 'unsupported', 'ไม่มีผู้ให้บริการเสียงที่เปิดใช้งาน');
@@ -121,7 +186,7 @@ export class VoiceOrchestrator {
     throw new ProviderError(
       'voice',
       chainKind(failures),
-      `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`
+      `ผู้ให้บริการเสียงทุกรายล้มเหลว:\n${failures.map((f) => f.message).join('\n')}`,
     );
   }
 }
