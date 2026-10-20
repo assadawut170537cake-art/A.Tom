@@ -3,8 +3,9 @@
  *
  * ที่มาของ skill:
  * - `catalog`: ทักษะแนะนำในตัวแอป ({@link SKILL_CATALOG}) — บอสกดติดตั้งเอง
- * - `learned`: AI สังเคราะห์ขึ้นเองจากงานที่ทำสำเร็จหลายขั้น ({@link SkillEngine.learnFrom}) — **ปิดไว้ก่อนเสมอ**
- *   บอสต้องตรวจแล้วเปิดเองในหน้า Marketplace เพราะเนื้อหาของ skill จะเข้า prompt ของ agent (ADR-011 / Parking Lot ข้อ 2)
+ * - `learned`: AI สังเคราะห์ขึ้นเองจากงานที่ทำสำเร็จหลายขั้น ({@link SkillEngine.learnFrom}) — Boss อนุมัติให้เขียนเอง
+ *   แล้ว (2026-10-20, ค่าเริ่มต้น {@link LEARN_KEY} = เปิด) แต่ทักษะที่เขียนขึ้น **ยัง `enabled:false`** บอสต้องตรวจแล้วเปิด
+ *   เองใน Marketplace ก่อนใช้จริง (เนื้อหาเข้า prompt ของ agent · ผ่าน {@link toPromptLine} redact แล้ว · ADR-011 / Parking Lot ข้อ 2)
  *
  * การเรียก skill **ไม่รันโค้ดใด ๆ** — คืนคำแนะนำ (instructions) ให้ agent ทำตามด้วย tool ที่มีอยู่
  * สถิติ uses / failures ใช้วิเคราะห์ข้อผิดพลาด ({@link SkillEngine.analyzeFailures})
@@ -13,7 +14,15 @@
 
 import { toPromptLine } from '../memory/promptLine';
 import { readJSON, writeJSON } from '../storage/jsonStorage';
-import { isArray, isBoolean, isNumber, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
+import {
+  isArray,
+  isBoolean,
+  isNumber,
+  isOneOf,
+  isRecord,
+  isString,
+  parseJSON,
+} from '../types/guards';
 import type {
   AgentHooks,
   AgentLLM,
@@ -25,6 +34,8 @@ import type {
 } from './types';
 
 export const SKILLS_KEY = 'atom.skills.v1';
+/** เปิด/ปิดให้ AI สังเคราะห์ทักษะเองหลังงานสำเร็จ — Boss อนุมัติ 2026-10-20 → ค่าเริ่มต้น "เปิด" */
+export const LEARN_KEY = 'atom.skills.v1.learn';
 export const SKILL_ORIGINS = ['catalog', 'learned'] as const;
 export type SkillOrigin = (typeof SKILL_ORIGINS)[number];
 /** งานต้องใช้ tool อย่างน้อยเท่านี้ถึงคุ้มที่จะสรุปเป็น skill */
@@ -52,19 +63,22 @@ export const SKILL_CATALOG: readonly CatalogSkill[] = [
     id: 'daily-plan',
     name: 'วางแผนวัน',
     description: 'จัดลำดับงานของบอสเป็นตารางเวลาสั้น ๆ',
-    instructions: 'ถามหรือสรุปงานที่บอสต้องทำ เรียงตามความสำคัญและเวลา แล้วตอบเป็นรายการ 3-7 ข้อ พร้อมช่วงเวลาโดยประมาณ',
+    instructions:
+      'ถามหรือสรุปงานที่บอสต้องทำ เรียงตามความสำคัญและเวลา แล้วตอบเป็นรายการ 3-7 ข้อ พร้อมช่วงเวลาโดยประมาณ',
   },
   {
     id: 'summarize',
     name: 'สรุปข้อความ',
     description: 'สรุปเนื้อหายาวให้เหลือประเด็นหลัก',
-    instructions: 'อ่านข้อความที่บอสให้มา สรุปเป็นประเด็นหลักไม่เกิน 5 ข้อ ภาษาไทยกระชับ ปิดท้ายด้วยสิ่งที่ต้องทำต่อ (ถ้ามี)',
+    instructions:
+      'อ่านข้อความที่บอสให้มา สรุปเป็นประเด็นหลักไม่เกิน 5 ข้อ ภาษาไทยกระชับ ปิดท้ายด้วยสิ่งที่ต้องทำต่อ (ถ้ามี)',
   },
   {
     id: 'translate-th-en',
     name: 'แปลไทย ↔ อังกฤษ',
     description: 'แปลข้อความระหว่างภาษาไทยกับอังกฤษ',
-    instructions: 'ตรวจว่าข้อความเป็นภาษาไหน แล้วแปลเป็นอีกภาษาให้เป็นธรรมชาติ ถ้ามีศัพท์เทคนิคให้วงเล็บคำเดิมไว้',
+    instructions:
+      'ตรวจว่าข้อความเป็นภาษาไหน แล้วแปลเป็นอีกภาษาให้เป็นธรรมชาติ ถ้ามีศัพท์เทคนิคให้วงเล็บคำเดิมไว้',
   },
 ];
 
@@ -126,6 +140,15 @@ export class SkillEngine implements AgentToolProvider {
     return this.skills.map((s) => ({ ...s }));
   }
 
+  /** AI เขียนทักษะเองอัตโนมัติไหม — Boss อนุมัติแล้ว (ค่าเริ่มต้นเปิด) · ปิดได้ที่ Marketplace › ทักษะ */
+  async isLearnEnabled(): Promise<boolean> {
+    return (await readJSON(LEARN_KEY, isBoolean)) ?? true;
+  }
+
+  async setLearnEnabled(on: boolean): Promise<void> {
+    await writeJSON(LEARN_KEY, on);
+  }
+
   /** ทักษะแนะนำที่ยังไม่ได้ติดตั้ง */
   async catalog(): Promise<CatalogSkill[]> {
     await this.load();
@@ -138,7 +161,14 @@ export class SkillEngine implements AgentToolProvider {
     if (!item) return undefined;
     const existing = this.skills.find((s) => s.id === id);
     if (existing) return { ...existing };
-    const skill: Skill = { ...item, origin: 'catalog', enabled: true, createdAt: this.now(), uses: 0, failures: 0 };
+    const skill: Skill = {
+      ...item,
+      origin: 'catalog',
+      enabled: true,
+      createdAt: this.now(),
+      uses: 0,
+      failures: 0,
+    };
     this.skills = [...this.skills, skill];
     await this.persist();
     return { ...skill };
@@ -171,14 +201,18 @@ export class SkillEngine implements AgentToolProvider {
   async learnFrom(run: AgentRunResult, llm: AgentLLM): Promise<Skill | undefined> {
     const toolSteps = run.steps.filter((s) => s.toolCall);
     if (run.stopReason !== 'final' || toolSteps.length < MIN_TOOL_STEPS_TO_LEARN) return undefined;
-    if (toolSteps.some((s) => s.toolResult && !s.toolResult.ok) && !toolSteps.at(-1)?.toolResult?.ok) return undefined;
+    if (
+      toolSteps.some((s) => s.toolResult && !s.toolResult.ok) &&
+      !toolSteps.at(-1)?.toolResult?.ok
+    )
+      return undefined;
     await this.load();
     const transcript = [
       `คำสั่ง: ${toPromptLine(run.input.text)}`,
       ...toolSteps.map(
         (s, i) =>
           `${i + 1}. ${s.toolCall?.tool ?? ''} ${toPromptLine(JSON.stringify({ action: s.toolCall?.action, target: s.toolCall?.target }))}` +
-          ` → ${s.toolResult?.ok ? 'สำเร็จ' : 'ล้ม'}`
+          ` → ${s.toolResult?.ok ? 'สำเร็จ' : 'ล้ม'}`,
       ),
       `คำตอบ: ${toPromptLine(run.reply)}`,
     ].join('\n');
@@ -188,12 +222,19 @@ export class SkillEngine implements AgentToolProvider {
         { role: 'user', content: transcript },
       ]);
       const obj = parseJSON(raw.match(/\{[\s\S]*\}/)?.[0], isRecord);
-      if (!obj || !isString(obj.name) || !isString(obj.instructions) || !obj.name.trim() || !obj.instructions.trim()) {
+      if (
+        !obj ||
+        !isString(obj.name) ||
+        !isString(obj.instructions) ||
+        !obj.name.trim() ||
+        !obj.instructions.trim()
+      ) {
         return undefined;
       }
       const now = this.now();
       let id = slug(obj.name, now);
-      if (this.skills.some((s) => s.id === id)) id = `${id.slice(0, 40)}-${now.toString(36).slice(-6)}`;
+      if (this.skills.some((s) => s.id === id))
+        id = `${id.slice(0, 40)}-${now.toString(36).slice(-6)}`;
       const skill: Skill = {
         id,
         name: toPromptLine(obj.name, 60),
@@ -228,7 +269,8 @@ export class SkillEngine implements AgentToolProvider {
   hooks(learnWith?: AgentLLM): AgentHooks {
     return {
       onToolCall: (call, result) => {
-        if (!result.ok) this.toolFailures.set(call.tool, (this.toolFailures.get(call.tool) ?? 0) + 1);
+        if (!result.ok)
+          this.toolFailures.set(call.tool, (this.toolFailures.get(call.tool) ?? 0) + 1);
       },
       onComplete: async (run) => {
         if (learnWith) await this.learnFrom(run, learnWith);
@@ -241,7 +283,12 @@ export class SkillEngine implements AgentToolProvider {
   listTools(): AgentToolSpec[] {
     return this.skills
       .filter((s) => s.enabled)
-      .map((s) => ({ id: skillToolId(s.id), name: `ทักษะ: ${s.name}`, description: s.description, source: 'skill' as const }));
+      .map((s) => ({
+        id: skillToolId(s.id),
+        name: `ทักษะ: ${s.name}`,
+        description: s.description,
+        source: 'skill' as const,
+      }));
   }
 
   async call(call: AgentToolCall): Promise<AgentToolResult> {
@@ -250,7 +297,10 @@ export class SkillEngine implements AgentToolProvider {
     if (!skill) return { ok: false, output: `ไม่พบทักษะ "${call.tool}" (หรือถูกปิดอยู่)` };
     skill.uses += 1;
     await this.persist();
-    return { ok: true, output: `ทำตามขั้นตอนของทักษะ "${skill.name}": ${toPromptLine(skill.instructions, MAX_SKILL_INSTRUCTIONS)}` };
+    return {
+      ok: true,
+      output: `ทำตามขั้นตอนของทักษะ "${skill.name}": ${toPromptLine(skill.instructions, MAX_SKILL_INSTRUCTIONS)}`,
+    };
   }
 
   private async persist(): Promise<void> {

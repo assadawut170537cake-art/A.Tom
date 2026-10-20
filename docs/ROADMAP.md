@@ -9,7 +9,7 @@
 |---|-----|-------|---------|
 | 1 | คุยลื่น (Voice A: สตรีมเสียง/พูดทีละประโยค/end-of-speech ไว) | ✅ เสร็จ + ผ่านรีวิว | SILENCE 900ms · splitSentences · fallback ครบทุกประโยค · Voice B (Gemini Live) = งานใหญ่รอบหลัง |
 | 2 | ส่งงานต่อให้แอปอื่น (เสียง → เรียก tool/agent) | ✅ เสร็จ (ตรวจแล้ว) | router→agent (agentRouter.test) + sendMessage พูด reply ทุก intent (persona.test) ครอบคลุมแล้ว · ไม่ต้องเพิ่มโค้ด |
-| 3 | หาความสามารถเอง | 🔄 กำลังทำ | ✅ `find_capability` (ค้นคลัง MCP, read-only, ผล external กันคำสั่งแฝง) · ⏳ "เขียนทักษะเอง" = **ด่านอนุมัติ** (เนื้อหาเข้า prompt) |
+| 3 | หาความสามารถเอง | ✅ เสร็จ | `find_capability` (ค้นคลัง MCP, read-only) · "เขียนทักษะเอง" = **Boss อนุมัติแล้ว 2026-10-20** → `learn` เปิดเป็นค่าเริ่มต้น (`SkillEngine.isLearnEnabled`) · ทักษะที่ AI เขียนยัง `enabled:false` รอบอสเปิดใน Marketplace (เนื้อหาผ่าน toPromptLine redact) |
 | 4 | ซ่อมตัวเอง + เรียนรู้ | 🔄 กำลังทำ | ✅ core/selfRepair: `SnapshotStore` (≤5 ชุด, serialize write) + `SelfRepair` (snapshot→ลองวิธี→สำเร็จจด+ลบ / ล้มย้อน→วิธีถัดไป · จัดลำดับตามผลล่าสุด) · ⏳ ต่อเข้า flow จริง (ซ่อมตั้งค่า/ข้อมูลอัตโนมัติ) + UI · แก้โค้ด/OTA = **ด่านอนุมัติ** |
 | 5 | ย้ายของเสริมออกจากแกน (CORE_AUDIT) | ⬜ ยังไม่เริ่ม | ทีละโมดูล มี test คุม |
 

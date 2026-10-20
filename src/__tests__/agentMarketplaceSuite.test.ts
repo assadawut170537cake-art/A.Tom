@@ -367,6 +367,15 @@ describe('SkillEngine', () => {
     expect(await engine.remove('daily-plan')).toBe(false);
   });
 
+  test('isLearnEnabled: ค่าเริ่มต้นเปิด (Boss อนุมัติ) · สลับปิด/เปิดได้', async () => {
+    const engine = new SkillEngine(() => 1);
+    expect(await engine.isLearnEnabled()).toBe(true); // ค่าเริ่มต้น
+    await engine.setLearnEnabled(false);
+    expect(await engine.isLearnEnabled()).toBe(false);
+    await engine.setLearnEnabled(true);
+    expect(await engine.isLearnEnabled()).toBe(true);
+  });
+
   test('learnFrom: a multi-tool success becomes a DISABLED learned skill, flattened to one line', async () => {
     const engine = new SkillEngine(() => 5_000);
     const llm = scriptedLLM(

@@ -46,7 +46,8 @@ export function combineHooks(...sets: (AgentHooks | undefined)[]): AgentHooks {
 
 /**
  * agent ของแอป — โหลดรายการ skill / device / MCP ก่อน (listTools ของแต่ละตัวอ่านจาก cache)
- * `learn: true` = ให้ SkillEngine สังเคราะห์ทักษะใหม่หลังงานสำเร็จ (ปิดไว้ รอบอสอนุมัติ)
+ * `learn` = ให้ SkillEngine สังเคราะห์ทักษะใหม่หลังงานสำเร็จ · ไม่ส่งมา = ตามค่าที่บอสตั้ง
+ * (Boss อนุมัติ 2026-10-20 → ค่าเริ่มต้นเปิด) · ทักษะที่เขียนขึ้นยัง `enabled:false` รอบอสเปิดใช้เอง
  */
 export async function createAppAgent(
   options: AgentHarnessOptions & { learn?: boolean | undefined } = {},
@@ -54,11 +55,12 @@ export async function createAppAgent(
   const { learn, hooks, ...rest } = options;
   await Promise.all([skillEngine.load(), deviceControl.load(), mcpBridge.connectAll()]);
   const llm = orchestratorLLM();
+  const learnOn = learn ?? (await skillEngine.isLearnEnabled());
   return new AgentHarness(llm, moduleRegistry, {
     // discovery = ค้นหาความสามารถ (ทักษะ/MCP) ก่อน แล้วจึงเป็นแหล่ง tool จริง — ค้นอย่างเดียว ไม่ติดตั้ง
     providers: [createDiscoveryTool(), skillEngine, mcpBridge, deviceControl],
     memory: localMemory,
     ...rest,
-    hooks: combineHooks(skillEngine.hooks(learn ? llm : undefined), hooks),
+    hooks: combineHooks(skillEngine.hooks(learnOn ? llm : undefined), hooks),
   });
 }
