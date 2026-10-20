@@ -698,9 +698,10 @@ describe('AgentHarness with MCP / Skills / Device / Memory', () => {
       call: jest.fn(),
     };
     const llm = scriptedLLM(
+      // device ก่อน MCP — หลังผล MCP ภายนอก tool ที่แตะเครื่องต้องรอบอสยืนยัน (มี test แยก)
+      '{"tool":"device.volume","args":{"level":20}}',
       '{"tool":"mcp.demo.search","args":{"q":"งาน"}}',
       '{"tool":"skill.summarize"}',
-      '{"tool":"device.volume","args":{"level":20}}',
       '{"tool":"pc"}',
       '{"final":"ครบแล้วครับ"}',
     );
@@ -718,7 +719,7 @@ describe('AgentHarness with MCP / Skills / Device / Memory', () => {
     const result = await harness.run({ text: 'จัดการให้หน่อย' });
     expect(result.reply).toBe('ครบแล้วครับ');
     expect(result.steps.slice(0, 4).map((s) => s.toolResult?.ok)).toEqual([true, true, true, true]);
-    expect(nth(result.steps, 0).toolResult?.output).toContain('{"q":"งาน"}');
+    expect(nth(result.steps, 1).toolResult?.output).toContain('{"q":"งาน"}');
     expect(shadow.call).not.toHaveBeenCalled();
     expect(pc.execute).toHaveBeenCalledTimes(1);
   });
@@ -881,7 +882,9 @@ describe('marketplace model', () => {
 });
 
 const renderMarket = async (deps: MarketplaceDeps, registrySearch?: RegistrySearch) => {
-  await render(createElement(PluginMarketplaceScreen, { deps, ...(registrySearch && { registrySearch }) }));
+  await render(
+    createElement(PluginMarketplaceScreen, { deps, ...(registrySearch && { registrySearch }) }),
+  );
   // รอรายการแรก (แท็บเริ่มต้น = ทักษะ › ของคุณ มี "สรุปข้อความ") หรือข้อความโหลดไม่ได้ — ไม่พึ่งเวลาตายตัว
   await waitFor(() =>
     expect(
@@ -906,14 +909,17 @@ describe('PluginMarketplaceScreen', () => {
     await goTab('ตัวเชื่อมต่อ');
     expect(screen.getByRole('button', { name: 'Demo' })).toBeTruthy();
     await goTab('ปลั๊กอิน');
-    for (const title of ['PC Bridge', 'ควบคุมอุปกรณ์']) expect(screen.getByRole('button', { name: title })).toBeTruthy();
+    for (const title of ['PC Bridge', 'ควบคุมอุปกรณ์'])
+      expect(screen.getByRole('button', { name: title })).toBeTruthy();
 
     await goTab('ทักษะ');
     await goTab('สำรวจ');
     expect(screen.getByText('หมวดหมู่')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /^หมวด / }).length).toBeGreaterThan(0);
     await fireEvent.press(screen.getByRole('button', { name: 'แสดงทั้งหมด' }));
-    expect(within(screen.getByRole('button', { name: 'วางแผนวัน' })).getByText('แนะนำ')).toBeTruthy();
+    expect(
+      within(screen.getByRole('button', { name: 'วางแผนวัน' })).getByText('แนะนำ'),
+    ).toBeTruthy();
     expect(screen.getByLabelText('ติดตั้ง วางแผนวัน')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'สรุปข้อความ' })).toBeNull(); // ติดตั้งแล้ว = อยู่ "ของคุณ"
 
@@ -1033,8 +1039,20 @@ describe('PluginMarketplaceScreen', () => {
       if (q === 'boom') throw new Error('offline');
       return {
         servers: [
-          { name: 'io.example/notes', title: 'Notes Cloud', description: 'จดโน้ต', url: 'https://notes.cloud/mcp', needsToken: false },
-          { name: 'io.example/gh', title: 'GH', description: 'code', url: 'https://gh.example/mcp', needsToken: true },
+          {
+            name: 'io.example/notes',
+            title: 'Notes Cloud',
+            description: 'จดโน้ต',
+            url: 'https://notes.cloud/mcp',
+            needsToken: false,
+          },
+          {
+            name: 'io.example/gh',
+            title: 'GH',
+            description: 'code',
+            url: 'https://gh.example/mcp',
+            needsToken: true,
+          },
         ],
         nextCursor: null,
       };
@@ -1048,13 +1066,19 @@ describe('PluginMarketplaceScreen', () => {
 
     await fireEvent.press(screen.getByLabelText('เพิ่ม Notes Cloud'));
     await settle();
-    expect(screen.getByText('เพิ่ม "Notes Cloud" แล้ว — เปิดสวิตช์ในแท็บ ของคุณ เพื่อเชื่อมต่อ')).toBeTruthy();
+    expect(
+      screen.getByText('เพิ่ม "Notes Cloud" แล้ว — เปิดสวิตช์ในแท็บ ของคุณ เพื่อเชื่อมต่อ'),
+    ).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('เพิ่ม GH'));
     await fireEvent.changeText(screen.getByLabelText('Token ของ GH'), 'ghp_x');
     await fireEvent.press(screen.getByRole('button', { name: 'บันทึก' }));
     await settle();
-    const servers = (await deps.mcp.listServers()).map((x) => [x.config.id, x.config.url, x.config.enabled]);
+    const servers = (await deps.mcp.listServers()).map((x) => [
+      x.config.id,
+      x.config.url,
+      x.config.enabled,
+    ]);
     expect(servers).toEqual(
       expect.arrayContaining([
         ['notes', 'https://notes.cloud/mcp', false],

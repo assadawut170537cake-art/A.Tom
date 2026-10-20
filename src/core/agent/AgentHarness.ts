@@ -47,6 +47,11 @@ type ToolHost = Pick<ModuleRegistry, 'get' | 'isEnabled' | 'ensureReady' | 'list
 const errorText = (e: unknown) => redactSecrets(e instanceof Error ? e.message : String(e));
 const optString = (v: unknown) => (isString(v) && v.trim() !== '' ? v.trim() : undefined);
 
+/** tool จาก MCP server ภายนอก (`mcp.<server>.<tool>`) */
+const EXTERNAL_TOOL_PREFIX = 'mcp.';
+/** tool ที่แตะเครื่องจริง (มือถือ / PC / sandbox) — หลังผล MCP ภายนอกต้องให้บอสยืนยัน */
+export const SENSITIVE_TOOL = /^(?:device\.|pc-bridge|ultron)/;
+
 /** `args` ที่ไม่มี `confirmed` (undefined ถ้าไม่เหลืออะไร) — สิทธิ์ยืนยันเป็นของบอส ไม่ใช่ของ LLM */
 function withoutConfirmation(
   args: Record<string, unknown> | undefined,
@@ -116,6 +121,7 @@ export class AgentHarness {
     try {
       await this.emit('onStart', input);
       const messages = this.initialMessages(input, await this.memoryContext(input));
+      let externalSeen = false;
       for (let index = 0; index < this.maxSteps; index++) {
         const decision = parseDecision(await this.llm.chat(messages));
         messages.push({ role: 'assistant', content: JSON.stringify(decision) });
@@ -142,7 +148,20 @@ export class AgentHarness {
           text: decision.text ?? input.text,
           ...(args && { args }),
         };
+        // ผลจาก MCP ภายนอกอาจมีคำสั่งแฝง (prompt injection) → หลังจากนั้นทุก tool ที่แตะเครื่องจริง ต้องให้บอสยืนยันก่อน
+        if (externalSeen && SENSITIVE_TOOL.test(call.tool)) {
+          const result: AgentRunResult = {
+            input,
+            reply: `งานนี้มีข้อมูลจาก MCP ภายนอกปนอยู่ — จะสั่ง "${call.tool}" ต้องให้บอสยืนยันก่อน (พิมพ์ "ยืนยัน" หรือ "ยกเลิก")`,
+            steps,
+            stopReason: 'needs_confirmation',
+            pending: call,
+          };
+          await this.emit('onComplete', result);
+          return result;
+        }
         const toolResult = await this.dispatch(call);
+        if (call.tool.startsWith(EXTERNAL_TOOL_PREFIX)) externalSeen = true;
         step.toolCall = call;
         step.toolResult = toolResult;
         await this.emit('onToolCall', call, toolResult);
