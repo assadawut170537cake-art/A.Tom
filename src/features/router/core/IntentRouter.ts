@@ -86,9 +86,6 @@ export class IntentRouter {
     const byAgent = await this.agent.classify(input).catch(() => null);
     if (byAgent) return byAgent;
 
-    // โหมดเสียง: ไม่ยิงโมเดลเพื่อจัดหมวด — คุยต่อเป็นแชทเลย (ตอบไวขึ้น)
-    if (input.fastChat) return DEFAULT_ROUTE;
-
     const byJev = await this.jev.classify(input).catch(() => null);
     if (byJev && byJev.confidence >= JEV_MIN_CONFIDENCE) return byJev;
 

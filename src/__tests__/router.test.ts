@@ -269,22 +269,6 @@ describe('IntentRouter pipeline', () => {
     expect(jev.calls + llm.calls).toBe(0);
   });
 
-  test('fastChat (โหมดเสียง): ข้าม Jev/LLM แล้วตอบแชท แต่ยังปล่อยให้ rule จับคำสั่งได้', async () => {
-    const jev = stubClassifier(chatOut('jev', 0.99));
-    const llm = stubClassifier(chatOut('llm', 0.99));
-    // ประโยคคุยทั่วไป → chat ทันที ไม่ยิงโมเดล
-    const chat = await new IntentRouter({ jev, llm }).route({
-      text: 'วันนี้อากาศดีนะ',
-      fastChat: true,
-    });
-    expect(chat.intent).toBe('chat');
-    expect(jev.calls + llm.calls).toBe(0);
-    // คำสั่งที่ RuleClassifier จับได้ยังทำงาน แม้อยู่ในโหมดเสียง
-    const cmd = await new IntentRouter({ jev, llm }).route({ text: 'เปิดคอม', fastChat: true });
-    expect(cmd.intent).toBe('pc_command');
-    expect(jev.calls + llm.calls).toBe(0);
-  });
-
   test(`Jev wins when confidence ≥ ${JEV_MIN_CONFIDENCE}, otherwise the LLM decides`, async () => {
     const llm = stubClassifier(chatOut('llm', 0.6));
     let router = new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.71)), llm });

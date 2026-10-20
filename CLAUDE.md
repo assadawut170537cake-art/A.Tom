@@ -291,9 +291,10 @@
 - PC→มือถือ (NOTIFY/DEVICE_TOOL ใน pc-inbox) ยังอยู่ = ใช้เป็น "แจ้งเตือน" ต่างหากจากห้องแชท
 
 ### คุยเสียงให้ลื่น (Voice A · ลดดีเลย์ + ไม่เป็นทอด ๆ · 2026-10-20)
-- **ตอบไวขึ้น 3 ทาง:** (1) `SILENCE_END_MS` 1200→800 (จบประโยคไว) · (2) โหมดเสียงส่ง `fastChat:true` → router ข้าม Jev/LLM classifier (Rule+Agent ยังทำงาน) ตัด network หนึ่งรอบ/ประโยค — `RouterInput.fastChat` · `sendMessage(text,{fastChat})` · useLiveVoice ส่งให้อัตโนมัติ · (3) `VoiceOrchestrator.speak()` แบ่งประโยคด้วย `splitSentences()` (`voice/core/sentences.ts` — แบ่งที่ตัวจบประโยค/ขึ้นบรรทัด ไม่แบ่งที่ช่องว่าง) พูดประโยคแรกทันที ที่เหลือใช้เจ้าเดิมพูดต่อ (fallback เฉพาะประโยคแรก) → เสียงเริ่มเร็ว ไม่รอสังเคราะห์ทั้งก้อน
+- **ตอบไวขึ้น 2 ทาง:** (1) `SILENCE_END_MS` 1200→900 (จบประโยคไวขึ้นแต่ยังเผื่อพักหายใจกลางประโยค · ปรับที่เดียวถ้าเครื่องตัดเร็ว/ช้าไป) · (2) `VoiceOrchestrator.speak()` แบ่งประโยคด้วย `splitSentences()` (`voice/core/sentences.ts` — แบ่งที่ตัวจบประโยค [.!?…]/ขึ้นบรรทัด **ไม่แบ่งที่ช่องว่าง** เพราะไทยเว้นวรรคในประโยคเดียวได้ · ชิ้นแรกสั้นได้เพื่อเริ่มพูดเร็ว ชิ้นถัดไปรวมจนถึง `minChars`) พูดประโยคแรกทันที ไม่รอสังเคราะห์ทั้งก้อน
+- **fallback ครบทุกประโยค:** แต่ละประโยคลองเจ้าที่พูดประโยคก่อนหน้าสำเร็จก่อน แล้วไล่ chain ที่เหลือ (เจ้าเดิมล้มกลางคัน → ตกไป Expo Speech ไม่พูดค้างครึ่งคำตอบ) · อ่านค่าเสียงต่อเจ้าครั้งเดียวทั้งคำตอบ (memo ใน `speak()`) ไม่อ่าน AsyncStorage ซ้ำทุกประโยค · `speakRun` guard = กดหยุด/ speak ใหม่ ทิ้งประโยคที่เหลือ
+- ⚠️ **ไม่แตะ router ในโหมดเสียง** (เคยคิดทำ `fastChat` ข้าม Jev/LLM classifier แต่ถอดออก — จะทำให้สั่งงาน/สลับ persona ด้วยเสียงที่ต้องพึ่ง Jev/LLM เพี้ยนเป็นแชท ซึ่งขัดแกนข้อ 2) · เสียงกับพิมพ์ route ทางเดียวกัน
 - ยังไม่ทำ (รอบถัดไป): สตรีม token ของ LLM (RN fetch ไม่สตรีม body → ใช้ XHR onprogress/SSE) + พูดแทรก (barge-in) · แล้วค่อยทำ Voice B = Gemini Live realtime
-- ⚠️ `fastChat` ใช้เฉพาะโหมดเสียง — แชทพิมพ์ยังผ่าน classifier ครบ (สั่งคอม/สลับ persona ด้วยการพิมพ์ยังแม่น)
 
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)

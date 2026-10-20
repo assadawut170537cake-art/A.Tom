@@ -107,7 +107,7 @@ export function useLiveVoice(): LiveVoiceControls {
       transcribe: (uri) => voiceOrchestrator.listen(uri),
       respond: async (text, hooks) => {
         // ข้อความที่ถอดได้ขึ้นเป็นข้อความของบอสในแชทตามปกติ (sendMessage push ให้)
-        await sendMessage(text, { onSpeaking: hooks.onSpeaking, fastChat: true });
+        await sendMessage(text, { onSpeaking: hooks.onSpeaking });
       },
       stopSpeech: () => voiceOrchestrator.stop(),
       keepAlive: () => useStandbyStore.getState().enabled,

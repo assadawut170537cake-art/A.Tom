@@ -24,12 +24,6 @@ export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
-  /**
-   * true = โหมดคุยด้วยเสียง: ข้าม classifier ที่ยิงโมเดล (Jev / LLM) → Rule + Agent (ฟรี ในเครื่อง) แล้วตอบแชททันที
-   * ตัด network round-trip หนึ่งรอบต่อประโยค ให้เสียงตอบไวขึ้น · คำสั่ง (ปรับเสียง/สลับ persona) ที่ RuleClassifier
-   * จับได้ยังทำงานปกติ
-   */
-  fastChat?: boolean | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];

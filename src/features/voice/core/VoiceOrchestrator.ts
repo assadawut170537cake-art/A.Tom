@@ -49,8 +49,10 @@ export class VoiceOrchestrator {
   ) {}
 
   /**
-   * พูดคำตอบ — แบ่งเป็นประโยคย่อยแล้วพูดทีละประโยค เพื่อให้ได้ยินเสียงประโยคแรกเร็ว
-   * (ไม่ต้องรอสังเคราะห์ทั้งก้อน) · ประโยคแรกเลือกเจ้าที่ใช้ได้ผ่าน fallback chain แล้วใช้เจ้าเดิมพูดที่เหลือ
+   * พูดคำตอบ — แบ่งเป็นประโยคย่อยแล้วพูดทีละประโยค เพื่อให้ได้ยินเสียงประโยคแรกเร็ว (ไม่ต้องรอสังเคราะห์ทั้งก้อน)
+   * - แต่ละประโยคมี fallback ครบ: ลองเจ้าที่พูดประโยคก่อนหน้าสำเร็จก่อน แล้วค่อยไล่ chain ที่เหลือ
+   *   (เจ้าเดิมล้มกลางคัน → ตกไป Expo Speech ให้เสียงไม่ขาด ไม่ใช่พูดค้างครึ่งคำตอบ)
+   * - อ่านค่าเสียง (voiceId) ของแต่ละเจ้าครั้งเดียวทั้งคำตอบ (memo) ไม่อ่าน AsyncStorage ซ้ำทุกประโยค
    */
   async speak(text: string, personaId: Persona): Promise<void> {
     const voice = await this.settings.resolveVoiceFor(personaId);
@@ -58,25 +60,23 @@ export class VoiceOrchestrator {
     this.stop(); // ตัดเสียงรอบก่อนที่ค้างอยู่ (stop() เพิ่ม speakRun ให้ด้วย)
     const run = this.speakRun;
 
-    const sentences = splitSentences(text);
-    if (sentences.length <= 1) {
-      await this.speakOnChain(chain, text, voice, run);
-      return;
-    }
+    const optsCache = new Map<TTSProviderId, SpeakOptions>();
+    const optionsFor = async (id: TTSProviderId): Promise<SpeakOptions> => {
+      const cached = optsCache.get(id);
+      if (cached) return cached;
+      const opts = await this.resolveOptions(id, voice);
+      optsCache.set(id, opts);
+      return opts;
+    };
 
-    // ประโยคแรก: เลือกเจ้าที่ใช้ได้ (fallback) · ที่เหลือใช้เจ้าเดิม = พูดต่อเนื่องไม่สะดุด
-    const provider = await this.speakOnChain(chain, sentences[0] ?? text, voice, run);
-    for (let i = 1; i < sentences.length && provider; i++) {
-      if (run !== this.speakRun) return; // บอสกดหยุด / มี speak ใหม่ → ทิ้งที่เหลือ
-      this.speaking = provider;
-      try {
-        await provider.speak(sentences[i] ?? '', await this.optionsFor(provider.id, voice));
-      } catch {
-        // เจ้าเดิมล้มกลางคัน — คำตอบอยู่บนจอแล้ว หยุดเงียบ ๆ (ไม่ไล่ fallback รายประโยค)
-        return;
-      } finally {
-        if (this.speaking === provider) this.speaking = null;
-      }
+    const sentences = splitSentences(text);
+    // ประโยคแรก: ไล่ chain ตามปกติ (ล้มทุกตัว = throw ให้ผู้เรียกจัดการ) · คืนเจ้าที่พูดสำเร็จ
+    let spoke = await this.speakOnChain(chain, sentences[0] ?? text, optionsFor, run, true);
+    // ที่เหลือ: เอาเจ้าที่เพิ่งสำเร็จขึ้นก่อน แล้วตามด้วย chain เดิม (ยังมี fallback) · ล้มหมด = หยุดเงียบ ๆ
+    for (let i = 1; i < sentences.length; i++) {
+      if (run !== this.speakRun || !spoke) return; // บอสกดหยุด / speak ใหม่ / พูดไม่ได้แล้ว
+      const ordered = [spoke, ...chain.filter((p) => p !== spoke)];
+      spoke = await this.speakOnChain(ordered, sentences[i] ?? '', optionsFor, run, false);
     }
   }
 
@@ -103,14 +103,19 @@ export class VoiceOrchestrator {
     return chain;
   }
 
-  /** พูดข้อความหนึ่งก้อนผ่าน chain · คืนเจ้าที่พูดสำเร็จ (ให้ประโยคถัดไปใช้ซ้ำ) · ล้มทุกตัว = throw */
+  /**
+   * พูดข้อความหนึ่งก้อนผ่าน chain · คืนเจ้าที่พูดสำเร็จ (ให้ประโยคถัดไปใช้ซ้ำก่อน)
+   * `throwIfAllFail` true (ประโยคแรก) = ล้มทุกตัวโยน error · false (ประโยคถัด ๆ) = คืน null เงียบ ๆ (คำตอบอยู่บนจอแล้ว)
+   */
   private async speakOnChain(
     chain: TTSProvider[],
     text: string,
-    voice: PersonaVoice | undefined,
+    optionsFor: (id: TTSProviderId) => Promise<SpeakOptions>,
     run: number,
+    throwIfAllFail: boolean,
   ): Promise<TTSProvider | null> {
     if (!chain.length) {
+      if (!throwIfAllFail) return null;
       throw new ProviderError('voice', 'unsupported', 'ไม่มีผู้ให้บริการเสียงที่เปิดใช้งาน');
     }
     const failures: ProviderError[] = [];
@@ -118,17 +123,20 @@ export class VoiceOrchestrator {
       if (run !== this.speakRun) return null; // ถูกหยุด/แทนที่ระหว่างไล่ chain
       this.speaking = tts;
       try {
-        await tts.speak(text, await this.optionsFor(tts.id, voice));
+        await tts.speak(text, await optionsFor(tts.id));
         if (this.speaking === tts) this.speaking = null;
         return tts;
       } catch (e) {
         if (this.speaking === tts) this.speaking = null;
         const err = toProviderError(tts.id, e);
-        if (!err.shouldFallback) throw err;
+        if (!err.shouldFallback) {
+          if (!throwIfAllFail) return null;
+          throw err;
+        }
         failures.push(err);
       }
     }
-    if (run !== this.speakRun) return null;
+    if (run !== this.speakRun || !throwIfAllFail) return null;
     throw new ProviderError(
       'voice',
       chainKind(failures),
@@ -158,7 +166,7 @@ export class VoiceOrchestrator {
   }
 
   /** The persona's voice settings apply to its own provider; fallbacks use their default voice. */
-  private async optionsFor(id: TTSProviderId, voice?: PersonaVoice): Promise<SpeakOptions> {
+  private async resolveOptions(id: TTSProviderId, voice?: PersonaVoice): Promise<SpeakOptions> {
     const voiceId =
       voice?.providerId === id
         ? voice.voiceId

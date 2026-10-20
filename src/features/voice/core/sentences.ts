@@ -29,11 +29,14 @@ export function splitSentences(text: string, minChars = DEFAULT_MIN_CHARS): stri
   }
 
   // รวมประโยคที่สั้นเกินเข้าด้วยกันจนถึง minChars (เศษท้ายไปรวมกับชิ้นก่อนหน้า)
+  // ชิ้นแรกปล่อยสั้นได้ (threshold = 1) เพื่อให้เริ่มพูดเร็วสุด แม้ขึ้นต้นด้วยคำสั้น ๆ ("ครับ" / "โอเค")
+  // ชิ้นถัด ๆ ไปถึงใช้ minChars เต็ม (กันพูดกระท่อนกระแท่น)
   const chunks: string[] = [];
   let buffer = '';
   for (const piece of pieces) {
     buffer = buffer ? `${buffer} ${piece}` : piece;
-    if (buffer.length >= minChars) {
+    const threshold = chunks.length === 0 ? 1 : minChars;
+    if (buffer.length >= threshold) {
       chunks.push(buffer);
       buffer = '';
     }
