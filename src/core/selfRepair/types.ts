@@ -3,7 +3,15 @@
  * (ยังไม่แตะโค้ดแอป/OTA ซึ่งเป็นด่านรอบอสอนุมัติ)
  */
 
-import { isArray, isNumber, isOneOf, isRecord, isString, type Guard } from '../types/guards';
+import {
+  isArray,
+  isBoolean,
+  isNumber,
+  isOneOf,
+  isRecord,
+  isString,
+  type Guard,
+} from '../types/guards';
 
 /** สำเนาค่าของ key ชุดหนึ่งไว้ย้อนกลับ — `data[key] = null` = ตอน snapshot key นั้นไม่มีอยู่ (ย้อน = ลบ key) */
 export interface Snapshot {
@@ -23,6 +31,10 @@ export interface RepairAttempt {
   method: string;
   outcome: 'success' | 'fail';
   at: number;
+  /** รายละเอียดเพิ่ม (เช่น "schema_fail quarantined", "still invalid after reset") */
+  note?: string | undefined;
+  /** true = ถ่าย snapshot ก่อนซ่อมไม่สำเร็จ (ยังซ่อมต่อ แต่ย้อนกลับไม่ได้) */
+  snapshotFailed?: boolean | undefined;
 }
 
 const isStringOrNull = (v: unknown): v is string | null => v === null || isString(v);
@@ -45,7 +57,9 @@ export const isRepairAttempt: Guard<RepairAttempt> = (v): v is RepairAttempt =>
   isString(v.problem) &&
   isString(v.method) &&
   isOneOf(['success', 'fail'] as const, v.outcome) &&
-  isNumber(v.at);
+  isNumber(v.at) &&
+  (v.note === undefined || isString(v.note)) &&
+  (v.snapshotFailed === undefined || isBoolean(v.snapshotFailed));
 
 export const isRepairLog: Guard<RepairAttempt[]> = (v): v is RepairAttempt[] =>
   isArray(v) && v.every(isRepairAttempt);
