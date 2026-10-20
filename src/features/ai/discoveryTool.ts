@@ -5,8 +5,10 @@
  * (ทักษะที่ติดตั้งแล้วไม่ต้องค้น — มันอยู่ในรายการ tool ของ agent อยู่แล้ว) · **ค้นอย่างเดียว ไม่ติดตั้ง/ไม่เปิดใช้**
  * การเพิ่ม MCP หรือเขียนทักษะใหม่ยังต้องให้บอสอนุมัติเองตามกรอบความปลอดภัย (CONCEPT ข้อ 3)
  *
- * ⚠️ ผลที่คืนมีเนื้อหาจากคลังสาธารณะ (ไม่น่าเชื่อถือ) → ตั้ง `external: true` ให้ harness รู้ว่า "เห็นของนอก"
- * คำสั่งที่แตะเครื่อง/PC/อัลตรอนหลังจากนี้จะต้องให้บอสยืนยัน (กันคำสั่งแฝงใน description ของ server)
+ * ⚠️ ผลมีเนื้อหาจากคลังสาธารณะ (ไม่น่าเชื่อถือ) → กันคำสั่งแฝง 2 ชั้น (ไม่ใช่กันครบ):
+ *   1. ชื่อ/คำอธิบายของ server ผ่าน `toPromptLine()` (บีบบรรทัดเดียว + redact รูปแบบ injection ที่รู้จัก)
+ *   2. ตั้ง `external: true` → harness ถือว่า "เห็นของนอก" → คำสั่งที่แตะเครื่อง/PC/อัลตรอนหลังจากนี้ต้องให้บอสยืนยัน
+ *   (ยังกันคำสั่งแฝงที่ชักจูงคำตอบสุดท้าย/เครื่องมือไม่เสี่ยงไม่ได้ทั้งหมด — เป็น blacklist แคบ)
  *
  * อยู่ใน features/ เพราะ core import features ไม่ได้ (ใช้ mcpRegistry)
  */
@@ -17,6 +19,7 @@ import type {
   AgentToolResult,
   AgentToolSpec,
 } from '../../core/agent/types';
+import { toPromptLine } from '../../core/memory/promptLine';
 import { searchMcpRegistry, type RegistrySearch } from '../marketplace/mcpRegistry';
 
 export const FIND_CAPABILITY_TOOL = 'find_capability';
@@ -94,7 +97,10 @@ export function createDiscoveryTool(deps: DiscoveryDeps = {}): AgentToolProvider
       const lines = ['MCP ในคลัง (ยังไม่ติดตั้ง — บอสต้องอนุมัติก่อนใช้):'];
       for (const s of servers) {
         const token = s.needsToken ? ' (ต้องใส่ token)' : '';
-        lines.push(`- ${s.title || s.name}: ${s.description}${token}`);
+        // ชื่อ/คำอธิบายมาจากคลังสาธารณะ → บีบ + redact ผ่าน guard ก่อนเข้า prompt ของ agent
+        const title = toPromptLine(s.title || s.name);
+        const desc = toPromptLine(s.description);
+        lines.push(`- ${title}: ${desc}${token}`);
       }
       return { ok: true, external: true, output: lines.join('\n') };
     },
