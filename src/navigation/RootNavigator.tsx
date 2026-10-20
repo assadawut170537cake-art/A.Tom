@@ -11,7 +11,7 @@ import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
 import { PcBridgeScreen } from '../features/settings/screens/PcBridgeScreen';
 import { SyncScreen } from '../features/settings/screens/SyncScreen';
 import { VoiceSettingsScreen } from '../features/settings/screens/VoiceSettingsScreen';
-import type { RootStackParamList } from './types';
+import type { RootScreenProps, RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -19,8 +19,19 @@ const BG = '#05060a';
 
 const THEME: Theme = {
   ...DarkTheme,
-  colors: { ...DarkTheme.colors, background: BG, card: BG, primary: '#38bdf8', border: '#ffffff1a' },
+  colors: {
+    ...DarkTheme.colors,
+    background: BG,
+    card: BG,
+    primary: '#38bdf8',
+    border: '#ffffff1a',
+  },
 };
+
+/** Marketplace อยู่ใต้ Modules — ส่งทางเข้าให้หน้า Modules (หน้าเองไม่ผูก navigation เพื่อให้ test render เดี่ยวได้) */
+function ModulesRoute({ navigation }: RootScreenProps<'Modules'>) {
+  return <ModulesScreen onOpenMarketplace={() => navigation.navigate('Marketplace')} />;
+}
 
 export function RootNavigator() {
   return (
@@ -36,11 +47,23 @@ export function RootNavigator() {
       >
         <Stack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'ตั้งค่า' }} />
-        <Stack.Screen name="AISettings" component={AISettingsScreen} options={{ title: 'AI Providers' }} />
-        <Stack.Screen name="Modules" component={ModulesScreen} options={{ title: 'Modules' }} />
+        <Stack.Screen
+          name="AISettings"
+          component={AISettingsScreen}
+          options={{ title: 'AI Providers' }}
+        />
+        <Stack.Screen name="Modules" component={ModulesRoute} options={{ title: 'Modules' }} />
         <Stack.Screen name="Sync" component={SyncScreen} options={{ title: 'Sync' }} />
-        <Stack.Screen name="PcBridge" component={PcBridgeScreen} options={{ title: 'Mark 55 Bus' }} />
-        <Stack.Screen name="Marketplace" component={PluginMarketplaceScreen} options={{ title: 'Marketplace' }} />
+        <Stack.Screen
+          name="PcBridge"
+          component={PcBridgeScreen}
+          options={{ title: 'Mark 55 Bus' }}
+        />
+        <Stack.Screen
+          name="Marketplace"
+          component={PluginMarketplaceScreen}
+          options={{ title: 'Marketplace' }}
+        />
         <Stack.Screen
           name="VoiceSettings"
           component={VoiceSettingsScreen}

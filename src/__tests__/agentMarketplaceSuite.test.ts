@@ -477,7 +477,7 @@ describe('DeviceControlBridge', () => {
     expect(device.listTools()).toEqual([]);
     await expect(device.call({ tool: 'device.volume', text: '50' })).resolves.toEqual({
       ok: false,
-      output: 'การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Marketplace',
+      output: 'การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Modules › Marketplace',
     });
     expect(driver.setVolume).not.toHaveBeenCalled();
   });
@@ -1115,7 +1115,7 @@ describe('PluginMarketplaceScreen', () => {
     expect(error).toHaveBeenCalledWith('[marketplace] ทำรายการไม่สำเร็จ', expect.any(Error));
   });
 
-  test('Settings hub → Marketplace (after Modules) opens the screen', async () => {
+  test('Settings hub → Modules → Marketplace opens the screen', async () => {
     await render(
       createElement(
         SafeAreaProvider,
@@ -1130,9 +1130,10 @@ describe('PluginMarketplaceScreen', () => {
     );
     await fireEvent.press(await screen.findByLabelText('ตั้งค่า'));
     await screen.findByText('Persona Voice Map');
-    const labels = screen.getAllByRole('button').map((b) => String(b.props.accessibilityLabel));
-    expect(labels.indexOf('Marketplace')).toBe(labels.indexOf('Modules') + 1);
-    await fireEvent.press(screen.getByRole('button', { name: 'Marketplace' }));
+    // Marketplace ย้ายไปอยู่ใต้ Modules — หน้า hub ไม่มีทางเข้าตรงแล้ว
+    expect(screen.queryByRole('button', { name: 'Marketplace' })).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: 'Modules' }));
+    await fireEvent.press(await screen.findByRole('button', { name: 'Marketplace' }));
     expect(await screen.findByLabelText('ค้นหา')).toBeTruthy();
     expect(await screen.findByRole('tab', { name: 'ตัวเชื่อมต่อ' })).toBeTruthy();
     await settle();

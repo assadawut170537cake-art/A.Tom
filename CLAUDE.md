@@ -29,7 +29,7 @@
 **Owner:** คุณเค้ก — พูดไทย
 **ผู้ใช้:** บอสใช้คนเดียว **ไม่เผยแพร่** (Boss ยืนยัน 2026-10-20) — ไม่ต้องออกแบบเผื่อหลายผู้ใช้ / Play Store · ติดตั้ง APK เอง · ผู้ให้บริการเสียงหลัก = Gemini (xAI เพิ่มไว้สำรอง)
 **แกนหลัก:** `docs/CONCEPT.md` (คุยลื่น · ส่งงานต่อ · หาความสามารถเอง · ซ่อมตัวเอง) — งานใหม่ต้องเช็กกับไฟล์นี้ก่อน
-**Workflow:** DeepSeek (architect) → Claude Code (coder) → Argon/Gemini (reviewer)
+**Workflow:** DeepSeek (architect) → Claude Code (coder) → Argon/Gemini (reviewer) · พรอมต์ดึงทีม = `docs/TEAM_PROMPTS.md`
 
 ---
 
@@ -72,7 +72,7 @@
         ├── voice/      ← 19 providers (10 TTS + 9 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
-        ├── marketplace/← ตั้งค่า › Marketplace แบบหน้า "ปรับแต่ง" ของ Claude: แท็บ ทักษะ/ตัวเชื่อมต่อ/ปลั๊กอิน · ของคุณ/สำรวจ · หมวดหมู่ · คลัง MCP ทางการ (ADR-021)
+        ├── marketplace/← ตั้งค่า › Modules › Marketplace แบบหน้า "ปรับแต่ง" ของ Claude: แท็บ ทักษะ/ตัวเชื่อมต่อ/ปลั๊กอิน · ของคุณ/สำรวจ · หมวดหมู่ · คลัง MCP ทางการ (ADR-021)
         ├── agents/     ← AgentScreen (route `Agent`) · AgentPanel (inline บนหน้าหลัก) · AgentHost · useAgentPanelStore
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
         └── settings/   ← screens (Hub, AI, Modules, Sync, Voice, Persona Voice), components
