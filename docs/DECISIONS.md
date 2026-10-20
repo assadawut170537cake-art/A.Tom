@@ -218,3 +218,14 @@ ADR-001 – 010: การตัดสินใจที่ **lock** ไว้�
 **ลำดับงาน:** (1) ADR นี้ · (2) ระดับ A · (3) ระดับ B AccessibilityService · (4) อัลตรอน + sandbox + ปุ่มอนุมัติ/ทำลาย
 
 **สถานะ (2026-10-19):** (1) ✅ · (2) ✅ ทดสอบบนเครื่องแล้ว · (3) ✅ โค้ด + compile ผ่าน — สั่งจากแชทได้ผ่าน agent "อุปกรณ์" · ข้อจำกัด: ทำกับแอปหน้าสุด จึงใช้ "เปิดแอป X แล้วกด Y" ไปก่อน จนกว่าจะมีตัวฟังคำสั่งเบื้องหลัง (Foreground Service ของอัลตรอน) · งานหลายขั้นให้ AI เลือก tool ต่อกันเอง = agent "งาน" (AgentHarness) · (4) ✅ โค้ด: โหมดเฝ้า (ฟังตลอด + คำปลุก ผ่าน background recording ของ expo-audio) · PC → มือถือ (inbox) · sandbox อัลตรอนบน PC (Docker + ปลด/ทำลาย — LLM บนมือถือเขียนโค้ด, PC แค่รัน) · ยังไม่มี Foreground Service ของเราเอง (ใช้ของ expo-audio)
+
+---
+
+## ADR-016 — นำเข้า REA ("แกะแอป") ให้อะตอมหาช่องควบคุมแอปอื่น
+
+| | |
+|---|---|
+| **Decision** | ใช้ **REA** (`rea-agents`, MIT) เป็นเครื่องมือแกะแอป static เพื่อหา "ทางเข้า" ของแอปเป้าหมาย (exported activity, deep link / URL scheme, intent-filter, service) แล้วให้อะตอมเอาไปวางแผนคำสั่งระดับ B / ยิง intent · ติดตั้งและรัน REA **บน PC (Mark 55)** สั่งผ่าน Memory Bus เดิม (`pc-bridge`) — **ไม่** ต่อ MCP เข้ามือถือ และ **ไม่** เพิ่ม dependency ในแอป RN · แผนเต็ม: [docs/REA_INTEGRATION.md](REA_INTEGRATION.md) |
+| **Status** | 📝 Proposed (2026-10-20) — ติดตั้ง + พิสูจน์แล้วว่า REA แกะ APK ได้จริง (apktool 3.0.3 + JADX 0.7.1 กับ NewPipe) · รอ Boss อนุมัติก่อนแก้โค้ด (3 จุด: agent "แกะแอป" · `PC_COMMANDS` · Mark 55 handler) |
+| **Rationale** | • ระดับ B (AccessibilityService) ตอบได้แค่ "ทำยังไง" ไม่ตอบ "มีช่องอะไรให้สั่ง" → การไล่กดจอเดาปุ่มเปราะ<br>• REA บอก deep link/exported component ให้ยิงตรงได้ นิ่งและเร็วกว่าการไล่กดทีละจอ<br>• REA เป็น stdio MCP + ต้องมี Java/engine → มือถือ (`MCPClientBridge` รับแค่ HTTP) ต่อตรงไม่ได้ → ใช้ทางเดียวกับอัลตรอน sandbox (มือถือสั่ง → PC รัน → ผลกลับ)<br>• งาน "หาทางเข้า Android" ใช้แค่ JADX + apktool ไม่ต้องลง Hopper/Ghidra |
+| **Consequences** | ➕ อะตอมสั่งแอปอื่นได้แม่นขึ้น (รู้ช่องทางจริง) · ทุกอย่างในเครื่อง + มีหลักฐาน (evidence) · ไม่แตะ stack/lock/APK<br>➖ ต้องติดตั้ง REA + JADX + apktool บนเครื่อง Mark 55 (bring-your-own, REA ไม่ลง Java/engine ให้)<br>➖ ผลจากแอปเป้าหมายที่จะเข้า prompt ต้องผ่าน `redactSecrets()` + `toPromptLine()` กัน injection<br>➖ REA เป็นตัว "ให้ข้อมูล" ไม่ลงมือแทน · คำสั่งอันตรายยังต้อง "ยืนยัน" ตาม ADR-015<br>➖ แกะได้เฉพาะแอป/APK ที่บอสมีสิทธิ์วิเคราะห์ (ของบอสเอง/โอเพนซอร์ส/ได้รับอนุญาต) |

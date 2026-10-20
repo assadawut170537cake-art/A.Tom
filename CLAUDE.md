@@ -404,6 +404,7 @@
 - ADR: `docs/DECISIONS.md`
 - Sync protocol: `docs/SYNC_PROTOCOL.md`
 - Architecture: `docs/ARCHITECTURE.md`
+- REA (แกะแอป) integration plan: `docs/REA_INTEGRATION.md` (ADR-016)
 - Changelog: `CHANGELOG.md`
 
 ---
