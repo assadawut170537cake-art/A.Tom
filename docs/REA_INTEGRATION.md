@@ -107,6 +107,34 @@ rea doctor
 | ใครเรียกอะไร (ลากเส้น) | `trace-android-references <apk> <class/method>` | incoming references |
 | โปรเจกต์เป็นกราฟทั้งแอป | `project-android-application-graph` | inventory เป็นกราฟ |
 
+### แกะจากแอปที่ติดตั้งในมือถือโดยตรง (adb) — ไม่ต้องหาไฟล์ APK มาก่อน
+Android เก็บ APK ของทุกแอปในเครื่อง → REA ดึงออกมาแล้วแกะได้เลย (ต้องรันบน **PC ที่ต่อมือถือ** — มือถือเปิด USB debugging + กด "อนุญาต")
+
+```bash
+export REA_ADB_PATH=/absolute/path/adb          # Android platform-tools (REA ไม่ลงให้)
+rea inspect-adb-client                           # ตรวจว่า adb พร้อม
+rea list-adb-devices                             # มือถือต่ออยู่ไหม (serial/state)
+rea resolve-adb-packages line                    # หา package จากชื่อ เช่น "line"
+rea pull-adb-package com.example.app /out/dir    # ดึง APK set ออกมา (พร้อม SHA-256)
+rea inspect-android-package /out/dir/base.apk    # แกะต่อ (เหมือน §4 ด้านบน)
+```
+
+**adb ยังดูแอปที่กำลังรันจริงได้** — ตอบโจทย์อะตอมมากเพราะบอก "ตอนนี้อยู่หน้าไหนของแอปอะไร":
+
+| คำสั่ง adb | ใช้ตอน |
+|---|---|
+| `inspect-adb-window` | แอปไหนอยู่หน้าสุด + activity ปัจจุบัน → อะตอมรู้ว่ากำลังดูอะไรอยู่ |
+| `inspect-adb-package <pkg>` | เวอร์ชัน/installer/flag ของแอปที่ติดตั้ง |
+| `list-adb-packages` / `resolve-adb-packages` | แอปอะไรติดตั้งบ้าง |
+| `start-adb-activity` | ยิง intent / เปิด activity ตรง ๆ (จากทางเข้าที่ §4 หาได้) |
+| `read-adb-logcat` · `capture-adb-screen` · `list-adb-services` | ดู log / จับภาพจอ / binder services |
+
+> **แผนที่ครบของอะตอม:** `inspect-adb-window` (อยู่หน้าไหน) + `pull-adb-package` → `inspect-android-package`
+> (ทางเข้าทั้งหมด) → เลือกยิง `start-adb-activity`/deep link ตรง ๆ หรือวางแผนคำสั่งระดับ B ให้แม่น
+>
+> ข้อจำกัด adb: แอปที่ตั้ง flag ห้ามดึง หรือแอประบบบางตัว pull ไม่ได้ · ยังเป็น Android เท่านั้น (iOS ไม่มี adb)
+> · container cloud นี้ไม่มี adb + ไม่มีมือถือต่อ จึงทดสอบ adb-pull ไม่ได้ (ต้องทำบน PC ของบอส)
+
 **เอาต์พุตที่อะตอมต้องการจริง** = จาก decoded manifest ดึง:
 `<activity>/<activity-alias>/<service>/<receiver>` ที่ `exported=true` + `intent-filter`
 (`action`, `category`, `data` = scheme/host/path) → นี่คือ "ประตู" ที่สั่งผ่าน `am start` /
