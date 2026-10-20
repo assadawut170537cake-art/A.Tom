@@ -29,6 +29,7 @@ import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
+import { registerReaAgent } from './modules/agents/rea-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { registerStandbyAgent } from './modules/agents/standby-agent';
@@ -89,6 +90,7 @@ export function bootApp(): Promise<BootReport> {
   registerRouteEscortAgent();
   registerStandbyAgent();
   registerUltronAgent();
+  registerReaAgent();
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());

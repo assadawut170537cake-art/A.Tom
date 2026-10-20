@@ -13,9 +13,11 @@ from typing import Any
 
 try:
     from .memory_bus import MemoryTask, MemoryWatcher
+    from .reverse_engineer import make_rea_handler
     from .ultron_sandbox import SandboxError, UltronSandbox
 except ImportError:  # รันแบบ `python main.py` ในโฟลเดอร์ mark55
     from memory_bus import MemoryTask, MemoryWatcher
+    from reverse_engineer import make_rea_handler
     from ultron_sandbox import SandboxError, UltronSandbox
 
 logger = logging.getLogger("mark55.handlers")
@@ -44,6 +46,8 @@ def handle_run_diagnostics(task: MemoryTask) -> dict[str, Any]:
 HANDLER_REGISTRY: dict[str, Callable[[MemoryTask], dict[str, Any]]] = {
     "EXECUTE_BUILD": handle_execute_build,
     "RUN_DIAGNOSTICS": handle_run_diagnostics,
+    # REVERSE_ENGINEER (ADR-016) — แกะ APK ด้วย REA (ต้องลง rea บน Mark 55 · ดู reverse_engineer.py)
+    "REVERSE_ENGINEER": make_rea_handler(),
 }
 
 
