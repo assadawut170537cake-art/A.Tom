@@ -71,7 +71,7 @@
         ├── voice/      ← 19 providers (10 TTS + 9 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
-        ├── marketplace/← ตั้งค่า › Marketplace: MCP servers · Plugins · Skills · ควบคุมอุปกรณ์ (ค้นหา/กรอง/เปิดปิด/ติดตั้ง)
+        ├── marketplace/← ตั้งค่า › Marketplace แบบหน้า "ปรับแต่ง" ของ Claude: แท็บ ทักษะ/ตัวเชื่อมต่อ/ปลั๊กอิน · ของคุณ/สำรวจ · หมวดหมู่ · คลัง MCP ทางการ (ADR-021)
         ├── agents/     ← AgentScreen (route `Agent`) · AgentPanel (inline บนหน้าหลัก) · AgentHost · useAgentPanelStore
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
         └── settings/   ← screens (Hub, AI, Modules, Sync, Voice, Persona Voice), components
@@ -332,6 +332,11 @@
 - boot: `void registerCustomProviders()` (ไม่ reject) · เพิ่ม = `registry.register` ทันที · ลบ = `registry.unregister` + ลบ key
 - Base URL: https เท่านั้น ยกเว้น http ในบ้าน (localhost/10./192.168./172.16–31/100.64/.local) · UI `CustomProviders` (ตั้งค่า › AI › เพิ่มเอง)
 - รายการ Priority ในหน้า AI คำนวณตอนเปิดหน้า → เพิ่มเจ้าใหม่แล้วเห็นใน Priority เมื่อเปิดหน้าใหม่
+
+### Marketplace (ADR-021)
+- `marketCatalog.ts` = ตรรกะล้วน: `MARKET_TABS` (skill · connector=mcp · plugin=plugin+device) · `entriesFor(entries, tab, scope, query, sort, category)` (ของคุณ = installed · สำรวจ ทักษะ = ยังไม่ติดตั้ง · สำรวจ ปลั๊กอิน = ทั้งหมด) · หมวดเดาด้วย regex (`MARKET_CATEGORIES`, ไม่เข้า = อื่น ๆ)
+- `mcpRegistry.ts`: `GET registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest&search=` · เอาเฉพาะ remote `streamable-http` (มือถือรัน stdio ไม่ได้) · header บังคับ/Authorization → ถาม token ก่อนเพิ่ม · id = `registryServerId()` · เพิ่มแล้ว**ปิดไว้ก่อน**เหมือน MCP อื่น
+- จำนวนในหมวดของตัวเชื่อมต่อไม่แสดง (คลังไม่มี total ต่อหมวด) · หน้าจอรับ `registrySearch` (DI) → test ใช้ตัวปลอม
 
 ### Network
 - `isOffline()` fail-open

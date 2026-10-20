@@ -44,6 +44,7 @@ import {
   EMPTY_MARKET_TEXT,
   PluginMarketplaceScreen,
 } from '../features/marketplace/screens/PluginMarketplaceScreen';
+import type { RegistrySearch } from '../features/marketplace/mcpRegistry';
 import { toPromptLine as chatToPromptLine } from '../features/router/handlers/ChatHandler';
 import { RootNavigator } from '../navigation/RootNavigator';
 import { nth } from '../test-utils/nth';
@@ -879,60 +880,70 @@ describe('marketplace model', () => {
   });
 });
 
-const renderMarket = async (deps: MarketplaceDeps) => {
-  await render(createElement(PluginMarketplaceScreen, { deps }));
-  // รอรายการแรก (มีการ์ด "ควบคุมอุปกรณ์" เสมอ) หรือข้อความโหลดไม่ได้ — ไม่พึ่งเวลาตายตัว
+const renderMarket = async (deps: MarketplaceDeps, registrySearch?: RegistrySearch) => {
+  await render(createElement(PluginMarketplaceScreen, { deps, ...(registrySearch && { registrySearch }) }));
+  // รอรายการแรก (แท็บเริ่มต้น = ทักษะ › ของคุณ มี "สรุปข้อความ") หรือข้อความโหลดไม่ได้ — ไม่พึ่งเวลาตายตัว
   await waitFor(() =>
     expect(
-      screen.queryByRole('button', { name: 'ควบคุมอุปกรณ์' }) ?? screen.queryByRole('alert'),
+      screen.queryByRole('button', { name: 'สรุปข้อความ' }) ?? screen.queryByRole('alert'),
     ).toBeTruthy(),
   );
   await settle();
 };
 const switchOf = (title: string) => screen.getByLabelText(`เปิดใช้ ${title}`);
+const goTab = async (name: string) => {
+  await fireEvent.press(screen.getByRole('tab', { name }));
+  await settle();
+};
 
 describe('PluginMarketplaceScreen', () => {
-  test('renders every kind with badges; search and filter tabs narrow the list', async () => {
+  test('แท็บ ทักษะ / ตัวเชื่อมต่อ / ปลั๊กอิน · ของคุณ / สำรวจ (หมวด + จำนวน) · ค้นหา', async () => {
     const deps = await marketplaceDeps();
     await renderMarket(deps);
-    for (const title of ['Demo', 'PC Bridge', 'สรุปข้อความ', 'วางแผนวัน', 'ควบคุมอุปกรณ์']) {
-      expect(screen.getByRole('button', { name: title })).toBeTruthy();
-    }
-    expect(
-      within(screen.getByRole('button', { name: 'วางแผนวัน' })).getByText('แนะนำ'),
-    ).toBeTruthy();
-    expect(screen.getByLabelText('ติดตั้ง วางแผนวัน')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'สรุปข้อความ' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Demo' })).toBeNull();
 
-    await fireEvent.press(screen.getByRole('tab', { name: 'MCP' }));
-    expect(screen.queryByRole('button', { name: 'PC Bridge' })).toBeNull();
+    await goTab('ตัวเชื่อมต่อ');
     expect(screen.getByRole('button', { name: 'Demo' })).toBeTruthy();
+    await goTab('ปลั๊กอิน');
+    for (const title of ['PC Bridge', 'ควบคุมอุปกรณ์']) expect(screen.getByRole('button', { name: title })).toBeTruthy();
 
-    await fireEvent.press(screen.getByRole('tab', { name: 'ทั้งหมด' }));
+    await goTab('ทักษะ');
+    await goTab('สำรวจ');
+    expect(screen.getByText('หมวดหมู่')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^หมวด / }).length).toBeGreaterThan(0);
+    await fireEvent.press(screen.getByRole('button', { name: 'แสดงทั้งหมด' }));
+    expect(within(screen.getByRole('button', { name: 'วางแผนวัน' })).getByText('แนะนำ')).toBeTruthy();
+    expect(screen.getByLabelText('ติดตั้ง วางแผนวัน')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'สรุปข้อความ' })).toBeNull(); // ติดตั้งแล้ว = อยู่ "ของคุณ"
+
     await fireEvent.changeText(screen.getByLabelText('ค้นหา'), 'ไม่มีแน่นอน');
     expect(screen.getByText(EMPTY_MARKET_TEXT)).toBeTruthy();
   });
 
   test('tap → details (MCP tools / device capabilities)', async () => {
     await renderMarket(await marketplaceDeps());
+    await goTab('ตัวเชื่อมต่อ');
     await fireEvent.press(screen.getByRole('button', { name: 'Demo' }));
     expect(screen.getByText('🔧 search — ค้นหาเอกสาร')).toBeTruthy();
+    await goTab('ปลั๊กอิน');
     await fireEvent.press(screen.getByRole('button', { name: 'ควบคุมอุปกรณ์' }));
     expect(screen.getByText('✅ ปรับเสียง: ตั้งระดับเสียง 0-100 (args.level)')).toBeTruthy();
-    expect(screen.queryByText('🔧 search — ค้นหาเอกสาร')).toBeNull();
   });
 
   test('toggles reach the right engine: device, skill, plugin (with init error), MCP', async () => {
     const deps = await marketplaceDeps();
     await renderMarket(deps);
 
+    await fireEvent(switchOf('สรุปข้อความ'), 'valueChange', false);
+    await settle();
+    expect((await deps.skills.list())[0]?.enabled).toBe(false);
+
+    await goTab('ปลั๊กอิน');
     await fireEvent(switchOf('ควบคุมอุปกรณ์'), 'valueChange', true);
     await settle();
     expect(await deps.device.isEnabled()).toBe(true);
     expect(switchOf('ควบคุมอุปกรณ์').props.value).toBe(true);
-
-    await fireEvent(switchOf('สรุปข้อความ'), 'valueChange', false);
-    await settle();
-    expect((await deps.skills.list())[0]?.enabled).toBe(false);
 
     await fireEvent(switchOf('Broken'), 'valueChange', true);
     await settle();
@@ -942,6 +953,7 @@ describe('PluginMarketplaceScreen', () => {
     await settle();
     expect(deps.registry.isEnabled('pc-bridge')).toBe(false);
 
+    await goTab('ตัวเชื่อมต่อ');
     await fireEvent(switchOf('Demo'), 'valueChange', false);
     await settle();
     expect((await deps.mcp.listServers())[0]?.config.enabled).toBe(false);
@@ -952,6 +964,7 @@ describe('PluginMarketplaceScreen', () => {
     const failing = new MCPClientBridge(fakeMcpServer({ status: 503 }).fetchImpl);
     await failing.addServer({ id: 'down', name: 'Down', url: 'https://down.example' });
     await renderMarket({ ...deps, mcp: failing });
+    await goTab('ตัวเชื่อมต่อ');
     await fireEvent(switchOf('Down'), 'valueChange', true);
     // การเปิด MCP ต้องผ่าน fetch (initialize) → รอข้อความจริง ไม่ใช่รอเวลาตายตัว (เคย flaky ตอนเครื่องช้า)
     expect(
@@ -960,12 +973,15 @@ describe('PluginMarketplaceScreen', () => {
     expect((await failing.listServers())[0]?.config.enabled).toBe(true);
   });
 
-  test('install a suggested skill', async () => {
+  test('install a suggested skill (สำรวจ → ของคุณ)', async () => {
     const deps = await marketplaceDeps();
     await renderMarket(deps);
+    await goTab('สำรวจ');
+    await fireEvent.press(screen.getByRole('button', { name: 'แสดงทั้งหมด' }));
     await fireEvent.press(screen.getByLabelText('ติดตั้ง วางแผนวัน'));
     await settle();
     expect(screen.getByText('ติดตั้งทักษะ "วางแผนวัน" แล้ว')).toBeTruthy();
+    await goTab('ของคุณ');
     expect(switchOf('วางแผนวัน').props.value).toBe(true);
   });
 
@@ -973,7 +989,8 @@ describe('PluginMarketplaceScreen', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const deps = await marketplaceDeps();
     await renderMarket(deps);
-    await fireEvent.press(screen.getByRole('button', { name: '+ เพิ่ม MCP server' }));
+    await goTab('ตัวเชื่อมต่อ');
+    await fireEvent.press(screen.getByRole('button', { name: '+ เพิ่ม' }));
     await fireEvent.changeText(screen.getByLabelText('รหัส server'), 'notes');
     await fireEvent.changeText(screen.getByLabelText('URL ของ server'), 'http://insecure.example');
     await fireEvent.press(screen.getByRole('button', { name: 'บันทึก server' }));
@@ -1005,9 +1022,52 @@ describe('PluginMarketplaceScreen', () => {
     await settle();
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Notes' })).toBeNull());
 
-    await fireEvent.press(screen.getByRole('button', { name: '+ เพิ่ม MCP server' }));
+    await fireEvent.press(screen.getByRole('button', { name: '+ เพิ่ม' }));
     await fireEvent.press(screen.getByRole('button', { name: 'ยกเลิก' }));
     expect(screen.queryByLabelText('รหัส server')).toBeNull();
+  });
+
+  test('สำรวจ › ตัวเชื่อมต่อ: หมวด → คลัง MCP · เพิ่มได้ทั้งแบบไม่ใช้/ใช้ token · ค้นคลังล้ม = แจ้งไทย', async () => {
+    const deps = await marketplaceDeps();
+    const search = jest.fn<ReturnType<RegistrySearch>, Parameters<RegistrySearch>>(async (q) => {
+      if (q === 'boom') throw new Error('offline');
+      return {
+        servers: [
+          { name: 'io.example/notes', title: 'Notes Cloud', description: 'จดโน้ต', url: 'https://notes.cloud/mcp', needsToken: false },
+          { name: 'io.example/gh', title: 'GH', description: 'code', url: 'https://gh.example/mcp', needsToken: true },
+        ],
+        nextCursor: null,
+      };
+    });
+    await renderMarket(deps, search);
+    await goTab('ตัวเชื่อมต่อ');
+    await goTab('สำรวจ');
+    await fireEvent.press(screen.getByRole('button', { name: 'หมวด วิศวกรรมและโค้ด' }));
+    await settle();
+    expect(search).toHaveBeenCalledWith('code', undefined);
+
+    await fireEvent.press(screen.getByLabelText('เพิ่ม Notes Cloud'));
+    await settle();
+    expect(screen.getByText('เพิ่ม "Notes Cloud" แล้ว — เปิดสวิตช์ในแท็บ ของคุณ เพื่อเชื่อมต่อ')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('เพิ่ม GH'));
+    await fireEvent.changeText(screen.getByLabelText('Token ของ GH'), 'ghp_x');
+    await fireEvent.press(screen.getByRole('button', { name: 'บันทึก' }));
+    await settle();
+    const servers = (await deps.mcp.listServers()).map((x) => [x.config.id, x.config.url, x.config.enabled]);
+    expect(servers).toEqual(
+      expect.arrayContaining([
+        ['notes', 'https://notes.cloud/mcp', false],
+        ['gh', 'https://gh.example/mcp', false],
+      ]),
+    );
+    expect(screen.getAllByText('ติดตั้งแล้ว')).toHaveLength(2);
+
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await fireEvent.changeText(screen.getByLabelText('ค้นหา'), 'boom');
+    await fireEvent(screen.getByLabelText('ค้นหา'), 'submitEditing');
+    await settle();
+    expect(screen.getByText('ค้นคลัง MCP ไม่ได้ — เช็กอินเทอร์เน็ตแล้วลองใหม่')).toBeTruthy();
   });
 
   test('a load failure shows a Thai notice instead of crashing', async () => {
@@ -1024,6 +1084,7 @@ describe('PluginMarketplaceScreen', () => {
     const deps = await marketplaceDeps();
     jest.spyOn(deps.device, 'setEnabled').mockRejectedValue(new Error('nope sk-x1'));
     await renderMarket(deps);
+    await goTab('ปลั๊กอิน');
     await fireEvent(switchOf('ควบคุมอุปกรณ์'), 'valueChange', true);
     await settle();
     expect(screen.getByText('ทำรายการไม่สำเร็จ: nope [REDACTED]')).toBeTruthy();
@@ -1049,7 +1110,7 @@ describe('PluginMarketplaceScreen', () => {
     expect(labels.indexOf('Marketplace')).toBe(labels.indexOf('Modules') + 1);
     await fireEvent.press(screen.getByRole('button', { name: 'Marketplace' }));
     expect(await screen.findByLabelText('ค้นหา')).toBeTruthy();
-    expect(await screen.findByRole('button', { name: 'ควบคุมอุปกรณ์' })).toBeTruthy();
+    expect(await screen.findByRole('tab', { name: 'ตัวเชื่อมต่อ' })).toBeTruthy();
     await settle();
   });
 });
