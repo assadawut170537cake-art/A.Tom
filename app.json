@@ -33,6 +33,14 @@
           "enableBackgroundRecording": true
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "อนุญาตให้ $(PRODUCT_NAME) เลือกรูปเพื่อแนบส่งให้ผู้ช่วยอ่าน",
+          "cameraPermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้กล้องถ่ายรูปแนบส่งให้ผู้ช่วย",
+          "microphonePermission": false
+        }
+      ],
       "expo-asset",
       "./plugins/withCleartextTraffic",
       "./plugins/withAndroidProjectName",

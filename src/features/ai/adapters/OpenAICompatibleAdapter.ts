@@ -1,6 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
 import { requestJson } from '../../../core/http/request';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { openAIMessage } from '../core/attachmentParts';
 import { parseOpenAIModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
@@ -47,11 +48,11 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
         timeoutMs: req.timeoutMs,
         body: JSON.stringify({
           model: req.model,
-          messages: req.messages,
+          messages: req.messages.map(openAIMessage),
           temperature: req.temperature,
           max_tokens: req.maxTokens,
         }),
-      }
+      },
     );
 
     const content = data.choices?.[0]?.message?.content;
@@ -83,7 +84,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
 
   protected probe(): Promise<unknown> {
     return this.headers().then((headers) =>
-      requestJson(this.config.id, this.url('/models'), { headers })
+      requestJson(this.config.id, this.url('/models'), { headers }),
     );
   }
 }

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { Text, View } from 'react-native';
 
+import { AttachmentChips } from '../../../attachments/components/AttachmentChips';
 import { PERSONAS, USER_NAME } from '../../constants';
 import type { Message } from '../../types';
 
@@ -42,6 +43,11 @@ export const ChatBubble = memo(function ChatBubble({ message }: ChatBubbleProps)
         }
       >
         <Text className="text-[15px] leading-6 text-white">{message.content}</Text>
+        {message.attachments && (
+          <View className="mt-2">
+            <AttachmentChips files={message.attachments} />
+          </View>
+        )}
       </View>
     </View>
   );

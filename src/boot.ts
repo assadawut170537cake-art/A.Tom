@@ -33,10 +33,12 @@ import { useAtomStore } from './features/jarvis/stores/useAtomStore';
 import { settingsHealthEntries } from './features/settings/settingsHealthEntries';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
+import { registerNotebookLMAgent } from './modules/agents/notebooklm-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
+import { registerTodayAgent } from './modules/agents/today-agent';
 import { registerUltronAgent } from './modules/agents/ultron-agent';
 import { loadBootModules } from './modules/loader';
 import { startChatSync } from './features/chat/chatSyncBridge';
@@ -91,6 +93,8 @@ export function bootApp(): Promise<BootReport> {
   registerRouteEscortAgent();
   registerStandbyAgent();
   registerUltronAgent();
+  registerNotebookLMAgent();
+  registerTodayAgent();
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());

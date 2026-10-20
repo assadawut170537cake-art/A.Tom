@@ -310,6 +310,22 @@
 ### ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบน)
 - route `History` (`features/jarvis/screens/HistoryScreen.tsx`) · แท็บ persona · "คุยต่อกับ…" = สลับ persona แล้วกลับหน้าหลัก · "ล้าง" ถามยืนยัน → `clearHistory(persona)` ลบเฉพาะในเครื่อง (สำเนาฝั่ง Mark 55 ยังอยู่)
 
+### ปุ่ม + (ไฟล์แนบ · ทางลัด) — Boss อนุมัติ dep `expo-image-picker` + `expo-document-picker` 2026-10-20
+- type: `core/types/attachment.ts` — `AttachmentRef` (เก็บในแชท: ชื่อ/mime/kind/uri — **ไม่เก็บเนื้อไฟล์**) · `AttachmentData` (ตอนส่ง: base64 หรือข้อความดิบ) · `attachmentKind()` เดาจาก mime + นามสกุล (ไฟล์โค้ดที่ Android บอก octet-stream = text)
+- เลือก/อ่าน: `features/attachments/attachments.ts` (`pickImages`/`takePhoto`/`pickFiles` ไม่ throw · ≤ 10 MB/ไฟล์ · ≤ 5 ไฟล์ · ข้อความ ≤ 60k ตัว) · อ่านเนื้อใน `sendMessage({ attachments })` ตอนส่งเท่านั้น
+- ส่งให้ AI: `features/ai/core/attachmentParts.ts` — ไฟล์ข้อความ/โค้ด = code block ต่อท้ายข้อความ (ทุก provider) · Gemini = `inlineData` · OpenAI-compatible = รูปเป็น `image_url` data URL, PDF/สื่อบอกในข้อความว่าอ่านไม่ได้
+- router: มีไฟล์แนบ = `chat` เสมอ (ไม่เสีย request ให้ Jev/LLM) · ChatHistoryStorage ตัดไฟล์แนบที่เสียทิ้งเฉพาะไฟล์ · ซิงก์แชทไม่ส่งไฟล์แนบ (`toWireMessage` เลือก field เอง)
+- เมนู (`AddMenu`): รูปภาพ · ถ่ายรูป · ไฟล์/โค้ด · ค้นคว้า (`RESEARCH_PREFIX` → agent "งาน") · NotebookLM (`NOTEBOOKLM_PREFIX`) · ปลั๊กอิน & ทักษะ (Marketplace) · ข้อความตั้งต้นใส่ช่องพิมพ์ด้วย `ChatInput.prefill`
+
+### NotebookLM Enterprise (ทาง A ผ่าน Mark 55 — Boss เลือก 2026-10-20)
+- API ใช้ OAuth token (ไม่ใช่ API key) → มือถือไม่ถือ token · Mark 55 ใช้ `gcloud auth print-access-token` (`mark55/notebooklm.py`, stdlib urllib ไม่มี dep ใหม่) · SQL `mark55/sql/005_notebooklm.sql` · instruction `NOTEBOOKLM_ADD` `{sources:[{type:url|youtube|text,value,name}], title?}`
+- `.env`: `NOTEBOOKLM_PROJECT` (id หรือ number — id แปลงเป็น number ด้วย gcloud) · `NOTEBOOKLM_LOCATION` (global/us/eu → host `<loc>-discoveryengine.googleapis.com/v1alpha`) · ไม่มี notebook id = สร้างครั้งแรกแล้วจำที่ `~/.mark55/notebooklm.json` · ใส่ "ใหม่ ชื่อ X:" = สร้างใหม่ไม่ทับที่จำ
+- มือถือ: agent `src/modules/agents/notebooklm-agent.ts` ("ส่งเข้า NotebookLM: <ลิงก์/ข้อความ>") · ไฟล์แนบส่งเข้า NotebookLM ยังไม่ได้ (Bus payload ≤ 16 KB) · ⚠️ v1alpha — field เปลี่ยนแก้ที่ `notebooklm.py` ที่เดียว
+
+### แท็บ "วันนี้" (Today) — Boss ขอ 2026-10-20
+- `features/today/`: `todayStore.ts` (เช็กลิสต์ AsyncStorage `atom.today.v1.tasks` · **ไม่เขียนก่อน `load()` เสร็จ** ไม่งั้นทับของเดิม · ไม่ล้างเองข้ามวัน) · `TodayScreen` (เช็กลิสต์ · นับข้อความบอสวันนี้ต่อ persona · แจ้งเตือน PC = ข้อความ assistant ที่ขึ้นต้น `NOTIFY_PREFIX` (ย้ายไป `features/pc-bridge/PcInbox.ts`) · ช่องผลวิจัยประจำวัน รอ Daily Researcher) · วันที่ไทยเขียนเอง (`thaiDate`, ไม่พึ่ง Intl ของ Hermes)
+- agent "งานวันนี้" (`src/modules/agents/today-agent.ts`): "เพิ่มงาน …" · "ติ๊กงาน …" / "งาน … เสร็จแล้ว" · "งานวันนี้มีอะไร"
+
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)

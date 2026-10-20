@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { ChatHistoryStorage } from '../../../core/storage/ChatHistoryStorage';
 import { ProviderSettings, type PersonaVoice } from '../../../core/storage/ProviderSettings';
+import type { AttachmentRef } from '../../../core/types/attachment';
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { DEFAULT_PERSONA, PERSONA_IDS } from '../constants';
@@ -14,6 +15,7 @@ interface PushMessageInput {
   content: string;
   /** Defaults to the active persona */
   persona?: Persona;
+  attachments?: AttachmentRef[] | undefined;
 }
 
 interface AtomState {
@@ -111,7 +113,7 @@ export const useAtomStore = create<AtomState>()(
         // Ignore stale results if the persona changed while loading
         if (get().activePersona === persona) set({ voice });
       },
-      pushMessage: ({ role, content, persona }) => {
+      pushMessage: ({ role, content, persona, attachments }) => {
         const target = persona ?? get().activePersona;
         const message: Message = {
           id: createId(),
@@ -119,6 +121,7 @@ export const useAtomStore = create<AtomState>()(
           role,
           content,
           createdAt: Date.now(),
+          ...(attachments?.length && { attachments }),
         };
         set((s) => ({
           messagesByPersona: {

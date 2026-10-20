@@ -1,5 +1,7 @@
 import { redactSecrets, toProviderError, userAdvice } from '../../../core/http/errors';
 import { isOffline } from '../../../core/network/connectivity';
+import type { AttachmentData, AttachmentRef } from '../../../core/types/attachment';
+import { readAttachment } from '../../attachments/attachments';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { aiOrchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
@@ -31,10 +33,16 @@ interface SendOptions {
    * ใช้ให้โหมดไลฟ์รู้ว่าเข้าช่วง "กำลังพูด" แล้วด้วย
    */
   onSpeaking?: () => boolean;
+  /** ไฟล์ที่บอสแนบ (ปุ่ม +) — อ่านเนื้อไฟล์ตอนส่ง แล้วให้ AI อ่าน */
+  attachments?: AttachmentRef[] | undefined;
 }
 
+/** แนบไฟล์มาแต่ไม่พิมพ์อะไร */
+export const ATTACHMENT_ONLY_PROMPT = 'ช่วยดูไฟล์ที่แนบมาให้หน่อย';
+
 export async function sendMessage(text: string, opts: SendOptions = {}): Promise<SendResult> {
-  const content = text.trim();
+  const refs = opts.attachments ?? [];
+  const content = text.trim() || (refs.length ? ATTACHMENT_ONLY_PROMPT : '');
   if (!content) return { route: null, reply: '' };
 
   const store = useAtomStore.getState();
@@ -46,9 +54,17 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
   const turn = ++activeTurn;
   const isLatest = () => turn === activeTurn;
   store.clearStreaming(); // รอบใหม่ — ล้างบับเบิลสดของรอบก่อน (ถ้ามีค้าง) ไม่ให้ข้อความต่อกัน
-  store.pushMessage({ role: 'user', content, persona });
+  store.pushMessage({ role: 'user', content, persona, attachments: refs });
   store.setUIMode('conversation');
   store.setMood('thinking');
+
+  // อ่านเนื้อไฟล์ตอนส่ง (ประวัติเก็บแค่ที่อยู่) · อ่านไม่ได้ = บอกเหตุผล แล้วส่งที่เหลือต่อ
+  const attachments: AttachmentData[] = [];
+  for (const ref of refs) {
+    const { data, reason } = await readAttachment(ref);
+    if (data) attachments.push(data);
+    else if (reason) store.pushMessage({ role: 'system', content: `⚠️ ${reason}`, persona });
+  }
 
   // สตรีม: ข้อความที่ AI กำลังพิมพ์ → บับเบิลสด + เริ่มพูดตั้งแต่ประโยคแรก (ไม่รอตอบจบทั้งก้อน)
   const speakAllowed = opts.speak !== false;
@@ -78,6 +94,7 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     const { route, result } = await getAppRouter().handle({
       text: content,
       onDelta,
+      ...(attachments.length && { attachments }),
       context: {
         activePersona: persona,
         recentMessages: history.slice(-5).map((m) => m.content),

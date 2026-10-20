@@ -3,6 +3,7 @@ import { requestJson, requestStream } from '../../../core/http/request';
 import { streamingFetch } from '../../../core/http/streamingFetch';
 import { isArray, isRecord, isString } from '../../../core/types/guards';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { geminiParts } from '../core/attachmentParts';
 import { normalizeModelIds, parseGeminiModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
@@ -62,7 +63,7 @@ export class GeminiAdapter extends BaseAIProvider {
       .filter((m) => m.role !== 'system')
       .map((m) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
+        parts: geminiParts(m),
       }));
     return JSON.stringify({
       contents,

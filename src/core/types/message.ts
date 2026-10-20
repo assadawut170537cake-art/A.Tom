@@ -2,6 +2,7 @@
  * @file ข้อความแชทหนึ่งข้อความ — รูปแบบที่เก็บใน ChatHistoryStorage และแสดงใน UI
  */
 
+import type { AttachmentRef } from './attachment';
 import type { Persona } from './persona';
 
 export const MESSAGE_ROLES = ['user', 'assistant', 'system'] as const;
@@ -15,4 +16,6 @@ export interface Message {
   content: string;
   /** epoch ms */
   createdAt: number;
+  /** ไฟล์ที่บอสแนบมากับข้อความนี้ (เก็บแค่ที่อยู่ ไม่เก็บเนื้อไฟล์) */
+  attachments?: AttachmentRef[] | undefined;
 }

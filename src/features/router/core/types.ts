@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../../ai/core/types';
 import type { Persona } from '../../../core/types/persona';
+import type { AttachmentData } from '../../../core/types/attachment';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
 export type Intent = (typeof INTENTS)[number];
@@ -29,6 +30,8 @@ export interface RouterInput {
    * ใช้ให้แอปเริ่มพูด/แสดงข้อความก่อนตอบจบ — ไม่เปลี่ยนการ route (เสียงกับพิมพ์ route ทางเดียวกัน)
    */
   onDelta?: ((text: string) => void) | undefined;
+  /** ไฟล์ที่บอสแนบ (อ่านเนื้อแล้ว) — มี = ส่งเข้าแชทเสมอ เพราะมีแค่ ChatHandler ที่ส่งไฟล์ให้ AI อ่านได้ */
+  attachments?: AttachmentData[] | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];

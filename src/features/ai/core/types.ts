@@ -1,4 +1,5 @@
 import type { AIProviderId } from '../../../core/types/aiProvider';
+import type { AttachmentData } from '../../../core/types/attachment';
 
 // ย้ายไป core/types แล้ว — re-export ไว้ให้ไฟล์ใน features/ai import จากที่เดิมได้
 export type { AIProviderId } from '../../../core/types/aiProvider';
@@ -24,6 +25,8 @@ export interface AIProviderConfig {
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  /** ไฟล์แนบที่อ่านเนื้อแล้ว (เฉพาะข้อความล่าสุดของบอส — ประวัติเก่าไม่ส่งไฟล์ซ้ำ) */
+  attachments?: AttachmentData[] | undefined;
 }
 
 export interface ChatRequest {

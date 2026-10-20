@@ -15,6 +15,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { isAttachmentRef } from '../types/attachment';
 import { isArray, isOneOf, isRecord, isString, parseJSON } from '../types/guards';
 import { MESSAGE_ROLES, type Message } from '../types/message';
 import { PERSONA_IDS, isPersona, type Persona } from '../types/persona';
@@ -55,7 +56,10 @@ export const ChatHistoryStorage = {
         await AsyncStorage.setItem(historyKey(persona), snapshot);
         return true;
       } catch (e) {
-        console.error(`[history] บันทึกประวัติแชทของ persona ${persona} ไม่ได้ — เก็บไว้ในหน่วยความจำ`, e);
+        console.error(
+          `[history] บันทึกประวัติแชทของ persona ${persona} ไม่ได้ — เก็บไว้ในหน่วยความจำ`,
+          e,
+        );
         return false;
       }
     });
@@ -86,9 +90,18 @@ export const ChatHistoryStorage = {
         console.error(`[history] ${key}: ข้อมูลเสีย — ตัดทิ้งทั้งชุด`);
         continue;
       }
-      const valid = parsed.filter((m) => isMessage(m, persona));
+      // ไฟล์แนบที่เสีย ตัดทิ้งเฉพาะไฟล์นั้น (ข้อความยังอยู่) — field-level guard เหมือน ProviderSettings
+      const valid = parsed
+        .filter((m) => isMessage(m, persona))
+        .map((m) => {
+          if (m.attachments === undefined) return m;
+          const attachments = isArray(m.attachments) ? m.attachments.filter(isAttachmentRef) : [];
+          return attachments.length ? { ...m, attachments } : { ...m, attachments: undefined };
+        });
       if (valid.length < parsed.length) {
-        console.error(`[history] ${key}: ตัดข้อความที่เสียทิ้ง ${parsed.length - valid.length} รายการ`);
+        console.error(
+          `[history] ${key}: ตัดข้อความที่เสียทิ้ง ${parsed.length - valid.length} รายการ`,
+        );
       }
       histories[persona] = valid;
     }

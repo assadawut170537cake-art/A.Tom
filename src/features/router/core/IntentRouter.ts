@@ -76,6 +76,8 @@ export class IntentRouter {
   }
 
   async route(input: RouterInput): Promise<RouterOutput> {
+    // แนบไฟล์มา = ถามเกี่ยวกับไฟล์ ("สรุปไฟล์นี้") — handler อื่นอ่านไฟล์ไม่ได้ ไม่ต้องเสีย request ให้ Jev/LLM เดา
+    if (input.attachments?.length) return { intent: 'chat', confidence: 1, provider: 'rule' };
     const text = input.text.trim();
     if (!text) return DEFAULT_ROUTE;
 

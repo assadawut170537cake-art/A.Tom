@@ -1,11 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useRef, useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View, type TextInput } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, View, type TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { AttachmentRef } from '../../../core/types/attachment';
 import { AgentPanel } from '../../agents/components/AgentPanel';
+import { MAX_ATTACHMENTS, pickFiles, pickImages, takePhoto } from '../../attachments/attachments';
+import { AddMenu, type AddMenuAction } from '../../attachments/components/AddMenu';
+import { AttachmentChips } from '../../attachments/components/AttachmentChips';
+import { NOTEBOOKLM_PREFIX, RESEARCH_PREFIX } from '../../attachments/prefills';
 import { useAgentPanelStore } from '../../agents/stores/useAgentPanelStore';
 import { MemoryScreen } from '../../memory/screens/MemoryScreen';
+import { TodayScreen } from '../../today/screens/TodayScreen';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { ApiKeyNotice } from '../components/chat/ApiKeyNotice';
 import { ChatInput } from '../components/chat/ChatInput';
@@ -97,10 +103,47 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
     else startLive();
   }, [live, startLive]);
 
-  const onSend = useCallback((text: string) => {
-    // sendMessage จับ error ทุกกรณีเองแล้วแสดงเป็นข้อความ ⚠️ ในแชท — ไม่ reject
-    void sendMessage(text);
-  }, []);
+  // ปุ่ม + : ไฟล์ที่รอส่ง (แสดงเป็นชิปเหนือช่องพิมพ์) · ข้อความตั้งต้นจากเมนู
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pending, setPending] = useState<AttachmentRef[]>([]);
+  const [prefill, setPrefill] = useState<{ text: string; key: number }>();
+
+  const onSend = useCallback(
+    (text: string) => {
+      const attachments = pending;
+      setPending([]);
+      // sendMessage จับ error ทุกกรณีเองแล้วแสดงเป็นข้อความ ⚠️ ในแชท — ไม่ reject
+      void sendMessage(text, attachments.length ? { attachments } : {});
+    },
+    [pending],
+  );
+
+  const onMenu = useCallback(
+    async (action: AddMenuAction) => {
+      enterConversation();
+      const fill = (text: string) => {
+        setPrefill({ text, key: Date.now() });
+        focusInput();
+      };
+      if (action === 'research') return fill(RESEARCH_PREFIX);
+      if (action === 'notebooklm') return fill(NOTEBOOKLM_PREFIX);
+      if (action === 'marketplace') return navigation.navigate('Marketplace');
+      const picked =
+        action === 'images'
+          ? await pickImages()
+          : action === 'camera'
+            ? await takePhoto()
+            : await pickFiles();
+      if (picked.error) {
+        useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${picked.error}` });
+      }
+      if (picked.files.length) {
+        setPending((prev) => [...prev, ...picked.files].slice(0, MAX_ATTACHMENTS));
+        focusInput();
+      }
+    },
+    [enterConversation, focusInput, navigation],
+  );
 
   const composerBottom = keyboardOverlap > 0 ? keyboardOverlap + GAP : COMPOSER_BOTTOM;
   // Agent Panel อยู่เหนือช่องพิมพ์ → ดันรายการแชทขึ้นตามความสูง panel
@@ -118,6 +161,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
       {/* โหมดไลฟ์ใช้ mood listening ด้วย แต่แสดงสถานะเองใน LiveVoiceStatus */}
       {!live.active && <ListeningIndicator />}
       <ActionBar
+        onAdd={() => setMenuOpen(true)}
         onTalk={toggleLive}
         talking={live.active}
         talkDisabled={busy}
@@ -132,11 +176,21 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           <ApiKeyNotice onPress={() => navigation.navigate('AISettings')} />
         )}
         <LiveVoiceStatus state={live.state} color={persona.color} standby={live.standby} />
+        {pending.length > 0 && (
+          <View className="mb-2">
+            <AttachmentChips
+              files={pending}
+              onRemove={(i) => setPending((prev) => prev.filter((_, j) => j !== i))}
+            />
+          </View>
+        )}
         <ChatInput
           ref={inputRef}
           onSend={onSend}
           // โหมดเสียงทำงานอยู่ = ห้ามส่งข้อความพิมพ์ซ้อน (สองรอบจะแย่งกันพูด)
           disabled={busy || live.active}
+          allowEmpty={pending.length > 0}
+          prefill={prefill}
           onVoice={toggleLive}
           voiceActive={live.active}
           voiceDisabled={busy}
@@ -160,21 +214,13 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
           style={[StyleSheet.absoluteFill, { zIndex: 15 }]}
         />
       )}
+      <AddMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onSelect={(a) => void onMenu(a)}
+      />
       <TopSlot />
     </>
-  );
-}
-
-interface ComingSoonProps {
-  label: string;
-}
-
-function ComingSoon({ label }: ComingSoonProps) {
-  return (
-    <View className="absolute inset-0 items-center justify-center">
-      <Text className="text-lg font-semibold text-white/80">{label}</Text>
-      <Text className="mt-1 text-sm text-white/40">เร็วๆ นี้</Text>
-    </View>
   );
 }
 
@@ -199,7 +245,7 @@ export function MainScreen() {
         />
         <OfflineBanner />
         {activeTab === 'atom' && <AtomTab keyboardOverlap={overlap} />}
-        {activeTab === 'today' && <ComingSoon label="Today" />}
+        {activeTab === 'today' && <TodayScreen />}
         {activeTab === 'memory' && <MemoryScreen />}
         <BottomTabs />
       </View>

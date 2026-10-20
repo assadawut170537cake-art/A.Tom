@@ -44,7 +44,11 @@ export class ChatHandler implements IntentHandler<'chat'> {
     const messages: ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...(input.context?.history ?? []).filter((m) => m.role !== 'system').slice(-MAX_HISTORY),
-      { role: 'user', content: input.text },
+      {
+        role: 'user',
+        content: input.text,
+        ...(input.attachments?.length && { attachments: input.attachments }),
+      },
     ];
     // persona ที่ผูกโมเดลไว้ = ลองตัวนั้นก่อน (ล้มยัง fallback ตามลำดับ) · ไม่ผูก = อัตโนมัติเหมือนเดิม
     const providerId = await this.preferredLLM(persona);
