@@ -3,7 +3,11 @@ import { useState, useSyncExternalStore } from 'react';
 import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { redactSecrets } from '../../../core/http/errors';
-import { moduleManager, type ModuleManager, type ModuleView } from '../../../core/modules/ModuleManager';
+import {
+  moduleManager,
+  type ModuleManager,
+  type ModuleView,
+} from '../../../core/modules/ModuleManager';
 import type { ModuleStatus } from '../../../core/modules/types';
 import { PERSONAS } from '../../jarvis/constants';
 import { SmallButton } from '../components/ui';
@@ -61,7 +65,9 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
       const { changed, saved } = await manager.enable(m.id);
       const auto = changed.filter((id) => id !== m.id);
       return [
-        auto.length > 0 ? { tone: 'info', text: `เปิด ${names(auto)} ให้ด้วย เพราะ ${m.name} ต้องใช้` } : null,
+        auto.length > 0
+          ? { tone: 'info', text: `เปิด ${names(auto)} ให้ด้วย เพราะ ${m.name} ต้องใช้` }
+          : null,
         saved ? null : SAVE_FAILED,
       ];
     });
@@ -72,7 +78,9 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
         const { changed, saved } = await manager.disable(m.id);
         const auto = changed.filter((id) => id !== m.id);
         return [
-          auto.length > 0 ? { tone: 'info', text: `ปิด ${names(auto)} ไปด้วย เพราะต้องใช้ ${m.name}` } : null,
+          auto.length > 0
+            ? { tone: 'info', text: `ปิด ${names(auto)} ไปด้วย เพราะต้องใช้ ${m.name}` }
+            : null,
           saved ? null : SAVE_FAILED,
         ];
       });
@@ -87,7 +95,7 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
       [
         { text: 'ยกเลิก', style: 'cancel' },
         { text: 'ปิดทั้งหมด', style: 'destructive', onPress: () => void disable() },
-      ]
+      ],
     );
   };
 
@@ -106,7 +114,8 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
   return (
     <ScrollView className="flex-1 bg-[#05060a]" contentContainerClassName="gap-3 p-4 pb-16">
       <Text className="px-1 text-xs leading-5 text-white/50">
-        ความสามารถเสริมที่เสียบเพิ่มให้ A.T.O.M. — เปิด/ปิดได้ที่นี่ และแอปจะจำค่าไว้แม้ปิดแอป · แตะชื่อเพื่อดูรายละเอียด
+        ความสามารถเสริมที่เสียบเพิ่มให้ A.T.O.M. — เปิด/ปิดได้ที่นี่ และแอปจะจำค่าไว้แม้ปิดแอป ·
+        แตะชื่อเพื่อดูรายละเอียด
       </Text>
 
       {notices.map((n) => (
@@ -114,7 +123,9 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
           key={n.text}
           accessibilityRole={n.tone === 'error' ? 'alert' : 'text'}
           className={`rounded-xl border px-3 py-2 text-xs ${
-            n.tone === 'error' ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-white/10 bg-white/5 text-white/80'
+            n.tone === 'error'
+              ? 'border-red-400/30 bg-red-500/10 text-red-200'
+              : 'border-white/10 bg-white/5 text-white/80'
           }`}
         >
           {n.text}
@@ -125,7 +136,9 @@ export function ModulesScreen({ manager = moduleManager }: { manager?: ModuleMan
         <View className="items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-10">
           <Puzzle size={28} color="rgba(255,255,255,0.4)" />
           <Text className="text-sm font-medium text-white/80">{EMPTY_MODULES_TEXT}</Text>
-          <Text className="text-center text-xs text-white/40">module แรกที่วางแผนไว้: PC Bridge (สั่งงานคอมพิวเตอร์)</Text>
+          <Text className="text-center text-xs text-white/40">
+            module แรกที่วางแผนไว้: PC Bridge (สั่งงานคอมพิวเตอร์)
+          </Text>
         </View>
       ) : (
         modules.map((m) => (
@@ -158,7 +171,16 @@ interface ModuleRowProps {
   onRestart: () => void;
 }
 
-function ModuleRow({ module: m, expanded, busy, nameOf, statusOf, onToggleDetail, onSetEnabled, onRestart }: ModuleRowProps) {
+function ModuleRow({
+  module: m,
+  expanded,
+  busy,
+  nameOf,
+  statusOf,
+  onToggleDetail,
+  onSetEnabled,
+  onRestart,
+}: ModuleRowProps) {
   const depText = (id: string) => {
     const status = statusOf(id);
     return `${nameOf(id)} · ${status ? STATUS[status].label : 'ไม่ได้ติดตั้ง'}`;
@@ -206,8 +228,14 @@ function ModuleRow({ module: m, expanded, busy, nameOf, statusOf, onToggleDetail
         <View className="gap-2 border-t border-white/10 p-4">
           <DetailLine label="รหัส" value={m.id} />
           <DetailLine label="สถานะ" value={STATUS[m.status].label} />
-          <DetailLine label="ต้องใช้" value={m.dependencies.length > 0 ? m.dependencies.map(depText).join('\n') : '—'} />
-          <DetailLine label="ใช้โดย" value={m.usedBy.length > 0 ? m.usedBy.map(nameOf).join(', ') : '—'} />
+          <DetailLine
+            label="ต้องใช้"
+            value={m.dependencies.length > 0 ? m.dependencies.map(depText).join('\n') : '—'}
+          />
+          <DetailLine
+            label="ใช้โดย"
+            value={m.usedBy.length > 0 ? m.usedBy.map(nameOf).join(', ') : '—'}
+          />
           <View className="mt-2 flex-row gap-2">
             <SmallButton
               label={m.enabled ? 'ปิด module' : 'เปิด module'}

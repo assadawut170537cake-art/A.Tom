@@ -23,9 +23,9 @@ function useLLMPriority() {
   useEffect(
     () =>
       whileMounted(ProviderSettings.getPriority, (saved) =>
-        setOrder((current) => mergeOrder(saved, current))
+        setOrder((current) => mergeOrder(saved, current)),
       ),
-    []
+    [],
   );
 
   const change = (ids: AIProviderId[]) => {
@@ -50,7 +50,7 @@ function AdvancedSection() {
         setAdv(a);
         setTimeoutText(String(a.timeoutMs / 1000));
       }),
-    []
+    [],
   );
 
   const patch = (p: Partial<AdvancedSettings>) => {
@@ -121,13 +121,19 @@ export function AISettingsScreen() {
     >
       <Section title="LLM Providers">
         {gemini && <ProviderCard provider={gemini} />}
-        {openrouter && <ProviderCard provider={openrouter} subtitle="โมเดลจาก OpenRouter (โหลดรายการได้)" />}
+        {openrouter && (
+          <ProviderCard provider={openrouter} subtitle="โมเดลจาก OpenRouter (โหลดรายการได้)" />
+        )}
       </Section>
       <Section title="Router" hint="Jev จัดประเภทคำสั่ง (intent) ก่อนส่งให้ LLM — ไม่ได้ใช้ตอบแชท">
         {jev && <ProviderCard provider={jev} subtitle="TypeSafe System One" />}
       </Section>
       <Section title="Priority" hint="ลากที่ไอคอน ⋮⋮ หรือกด ↑↓ — ตัวบนสุดถูกเรียกก่อน">
-        <PriorityList items={priority.items} onChange={priority.change} onDragStateChange={setDragging} />
+        <PriorityList
+          items={priority.items}
+          onChange={priority.change}
+          onDragStateChange={setDragging}
+        />
       </Section>
       <Section title="Advanced">
         <AdvancedSection />

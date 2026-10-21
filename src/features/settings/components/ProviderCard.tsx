@@ -41,9 +41,9 @@ export function ProviderCard({ provider, subtitle }: ProviderCardProps) {
         ([savedEnabled, savedModel]) => {
           setEnabled(savedEnabled ?? config.enabled);
           if (savedModel) setModel(savedModel);
-        }
+        },
       ),
-    [config]
+    [config],
   );
 
   const toggle = (value: boolean) => {

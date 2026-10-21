@@ -23,6 +23,9 @@ import type { InitReport } from './core/modules/types';
 import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
+import { loadAssistantData, registerAssistantAgents } from './features/assistant';
+import { composeBriefing } from './features/assistant/agents/reminder';
+import { setupNotifications } from './features/assistant/notifications';
 import { registerVoiceProviders } from './features/voice';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
@@ -68,6 +71,18 @@ export function bootApp(): Promise<BootReport> {
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();
+  registerAssistantAgents();
+  void loadAssistantData().catch((e: unknown) =>
+    console.error('[boot] โหลดผู้ช่วยที่สร้างเองไม่สำเร็จ', e),
+  );
+  // แตะแจ้งเตือนสรุปเช้า → ให้ผู้ช่วยสรุปให้ทันที (ผลขึ้นเป็นข้อความในแชท)
+  setupNotifications(() => {
+    void import('./features/jarvis/stores/useAtomStore').then(async ({ useAtomStore }) => {
+      const store = useAtomStore.getState();
+      store.setUIMode('conversation');
+      store.pushMessage({ role: 'assistant', content: await composeBriefing() });
+    });
+  });
   return (started ??= startServices());
 }
 
@@ -108,7 +123,7 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
     // log ช่วยทดสอบด้วยมือ (เฉพาะ dev) — ปกติโปรเจกต์นี้ใช้แค่ console.error
     console.info(
       `[boot] Shared Memory: ${memoryFacts ?? '?'} facts (แนบใน system prompt ทุกครั้งที่คุย) · ` +
-        `modules พร้อม ${modules?.ready.length ?? 0} / ล้ม ${modules?.failed.length ?? 0}`
+        `modules พร้อม ${modules?.ready.length ?? 0} / ล้ม ${modules?.failed.length ?? 0}`,
     );
     try {
       deps.installDevTools(deps.memory);

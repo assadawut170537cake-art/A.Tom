@@ -11,6 +11,7 @@ import { STT_PROVIDERS, TTS_PROVIDERS, type VoiceProviderMeta } from '../../voic
 import { PriorityList } from '../components/PriorityList';
 import { STTProviderCard } from '../components/STTProviderCard';
 import { TTSProviderCard } from '../components/TTSProviderCard';
+import { SpeakerEnrollmentCard } from '../components/SpeakerEnrollmentCard';
 import { Section } from '../components/ui';
 import { mergeOrder, whileMounted } from '../utils';
 
@@ -27,9 +28,9 @@ function useVoicePriority<K extends VoiceKind>(kind: K) {
     () =>
       whileMounted(
         () => ProviderSettings.getVoicePriority(kind),
-        (saved) => setOrder((current) => mergeOrder(saved, current))
+        (saved) => setOrder((current) => mergeOrder(saved, current)),
       ),
-    [kind]
+    [kind],
   );
 
   const change = (ids: VoiceIdOf[K][]) => {
@@ -53,23 +54,38 @@ export function VoiceSettingsScreen() {
       scrollEnabled={!dragging}
       keyboardShouldPersistTaps="handled"
     >
+      <Section title="เสียงของฉัน" hint="ให้ผู้ช่วยตอบเฉพาะเสียงของคุณ (ตัวกรองเสียงบนเครื่อง)">
+        <SpeakerEnrollmentCard />
+      </Section>
       <Section title="TTS — เสียงพูด" hint="Expo Speech ทำงานบนเครื่องและเป็นตัวสำรองสุดท้ายเสมอ">
         {TTS_PROVIDERS.map((meta) => {
           const provider = voiceRegistry.getTTS(meta.id);
-          return provider ? <TTSProviderCard key={meta.id} provider={provider} meta={meta} /> : null;
+          return provider ? (
+            <TTSProviderCard key={meta.id} provider={provider} meta={meta} />
+          ) : null;
         })}
       </Section>
       <Section title="STT — ถอดเสียง">
         {STT_PROVIDERS.map((meta) => {
           const provider = voiceRegistry.getSTT(meta.id);
-          return provider ? <STTProviderCard key={meta.id} provider={provider} meta={meta} /> : null;
+          return provider ? (
+            <STTProviderCard key={meta.id} provider={provider} meta={meta} />
+          ) : null;
         })}
       </Section>
       <Section title="TTS Priority" hint="ใช้เมื่อเสียงของ persona ล้มเหลว — ตัวบนสุดถูกลองก่อน">
-        <PriorityList items={ttsPriority.items} onChange={ttsPriority.change} onDragStateChange={setDragging} />
+        <PriorityList
+          items={ttsPriority.items}
+          onChange={ttsPriority.change}
+          onDragStateChange={setDragging}
+        />
       </Section>
       <Section title="STT Priority">
-        <PriorityList items={sttPriority.items} onChange={sttPriority.change} onDragStateChange={setDragging} />
+        <PriorityList
+          items={sttPriority.items}
+          onChange={sttPriority.change}
+          onDragStateChange={setDragging}
+        />
       </Section>
     </ScrollView>
   );

@@ -21,7 +21,10 @@ export const STATUS_TEXT: Record<ConnectionStatus, { icon: string; label: string
 };
 
 /** สถานะล่าสุดจากสัญญาณที่ใหม่สุด: ผลทดสอบการเชื่อมต่อ หรือผลซิงก์รอบล่าสุด */
-export function connectionStatus(queue: SyncState, lastCheck: { ok: boolean; at: number } | null): ConnectionStatus {
+export function connectionStatus(
+  queue: SyncState,
+  lastCheck: { ok: boolean; at: number } | null,
+): ConnectionStatus {
   if (!queue.paired) return 'unpaired';
   const error = queue.lastError;
   if (error && (!lastCheck || error.at >= lastCheck.at)) return 'offline';
@@ -95,7 +98,10 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
       if (!(await commitUrl())) return;
       const device = await sync.pair(code);
       setCode('');
-      setNotice({ tone: 'info', text: `จับคู่สำเร็จ — ${device.deviceName} · กำลังส่งความจำขึ้น Mark 55` });
+      setNotice({
+        tone: 'info',
+        text: `จับคู่สำเร็จ — ${device.deviceName} · กำลังส่งความจำขึ้น Mark 55`,
+      });
     } catch (e) {
       setNotice({ tone: 'error', text: syncErrorText(e) });
     } finally {
@@ -104,16 +110,20 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
   };
 
   const unpair = () =>
-    Alert.alert('ยกเลิกการจับคู่?', 'เครื่องนี้จะหยุดซิงก์กับ Mark 55 — ความจำในเครื่องยังอยู่ครบ', [
-      { text: 'ไม่ใช่', style: 'cancel' },
-      {
-        text: 'ยกเลิก Pair',
-        style: 'destructive',
-        onPress: () => {
-          void sync.unpair().then(() => setNotice({ tone: 'info', text: 'ยกเลิกการจับคู่แล้ว' }));
+    Alert.alert(
+      'ยกเลิกการจับคู่?',
+      'เครื่องนี้จะหยุดซิงก์กับ Mark 55 — ความจำในเครื่องยังอยู่ครบ',
+      [
+        { text: 'ไม่ใช่', style: 'cancel' },
+        {
+          text: 'ยกเลิก Pair',
+          style: 'destructive',
+          onPress: () => {
+            void sync.unpair().then(() => setNotice({ tone: 'info', text: 'ยกเลิกการจับคู่แล้ว' }));
+          },
         },
-      },
-    ]);
+      ],
+    );
 
   const syncNow = async () => {
     setNotice(null);
@@ -131,16 +141,23 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
   const codeValid = /^\d{6}$/.test(code);
 
   return (
-    <ScrollView className="flex-1 bg-[#05060a]" contentContainerClassName="p-4 pb-16" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      className="flex-1 bg-[#05060a]"
+      contentContainerClassName="p-4 pb-16"
+      keyboardShouldPersistTaps="handled"
+    >
       <Text className="mb-5 px-1 text-xs leading-5 text-white/50">
-        ซิงก์ Shared Memory กับ Mark 55 บน PC — ไม่จับคู่ก็ใช้งานได้ตามปกติ (เก็บในเครื่องอย่างเดียว)
+        ซิงก์ Shared Memory กับ Mark 55 บน PC — ไม่จับคู่ก็ใช้งานได้ตามปกติ
+        (เก็บในเครื่องอย่างเดียว)
       </Text>
 
       {notice && (
         <Text
           accessibilityRole={notice.tone === 'error' ? 'alert' : 'text'}
           className={`mb-5 rounded-xl border px-3 py-2 text-xs ${
-            notice.tone === 'error' ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-white/10 bg-white/5 text-white/80'
+            notice.tone === 'error'
+              ? 'border-red-400/30 bg-red-500/10 text-red-200'
+              : 'border-white/10 bg-white/5 text-white/80'
           }`}
         >
           {notice.text}
@@ -149,7 +166,10 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
 
       <Section title="เชื่อมต่อ Server">
         <Card>
-          <View className="flex-row items-center gap-2" accessibilityLabel={`สถานะ: ${STATUS_TEXT[status].label}`}>
+          <View
+            className="flex-row items-center gap-2"
+            accessibilityLabel={`สถานะ: ${STATUS_TEXT[status].label}`}
+          >
             <Text>{STATUS_TEXT[status].icon}</Text>
             <Text className="text-sm font-semibold text-white">{STATUS_TEXT[status].label}</Text>
           </View>
@@ -171,7 +191,11 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
               accessibilityLabel="Server URL"
               className={`rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white ${paired ? 'opacity-50' : ''}`}
             />
-            {paired && <Text className="mt-1 text-[11px] text-white/40">ยกเลิกการจับคู่ก่อนถึงจะเปลี่ยน URL ได้</Text>}
+            {paired && (
+              <Text className="mt-1 text-[11px] text-white/40">
+                ยกเลิกการจับคู่ก่อนถึงจะเปลี่ยน URL ได้
+              </Text>
+            )}
           </View>
           <View className="flex-row">
             <SmallButton
@@ -183,12 +207,18 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
         </Card>
       </Section>
 
-      <Section title="จับคู่อุปกรณ์" hint={paired ? undefined : 'ขอรหัส 6 หลักจาก Mark 55 แล้วใส่ที่นี่'}>
+      <Section
+        title="จับคู่อุปกรณ์"
+        hint={paired ? undefined : 'ขอรหัส 6 หลักจาก Mark 55 แล้วใส่ที่นี่'}
+      >
         <Card>
           {paired ? (
             <>
               <Detail label="ชื่อเครื่อง" value={conn.device?.deviceName ?? '—'} />
-              <Detail label="หมดอายุ" value={conn.device ? formatTime(conn.device.expiresAt) : '—'} />
+              <Detail
+                label="หมดอายุ"
+                value={conn.device ? formatTime(conn.device.expiresAt) : '—'}
+              />
               <View className="flex-row">
                 <SmallButton label="ยกเลิก Pair" tone="danger" onPress={unpair} />
               </View>
@@ -220,7 +250,10 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
       {paired && (
         <Section title="สถานะการซิงก์">
           <Card>
-            <Detail label="ซิงก์ล่าสุด" value={queue.lastSyncAt > 0 ? formatTime(queue.lastSyncAt) : 'ยังไม่เคย'} />
+            <Detail
+              label="ซิงก์ล่าสุด"
+              value={queue.lastSyncAt > 0 ? formatTime(queue.lastSyncAt) : 'ยังไม่เคย'}
+            />
             <Detail label="รอส่ง" value={`${queue.queue.length} รายการ`} />
             <View className="flex-row">
               <SmallButton
@@ -231,7 +264,9 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
               />
             </View>
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-white">ซิงก์อัตโนมัติ ({Math.round(queue.autoSyncIntervalMs / 1000)}s)</Text>
+              <Text className="text-sm text-white">
+                ซิงก์อัตโนมัติ ({Math.round(queue.autoSyncIntervalMs / 1000)}s)
+              </Text>
               <Switch
                 value={queue.autoSyncEnabled}
                 onValueChange={(on) => void sync.queue.setAutoSync(on)}
@@ -245,7 +280,10 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
       )}
 
       {queue.conflicts.length > 0 && (
-        <Section title="ประวัติ Conflict" hint="key ที่แก้ทั้งในเครื่องนี้และที่อื่น — ใช้ฉบับที่ใหม่กว่า (การแก้ชนะการลบ)">
+        <Section
+          title="ประวัติ Conflict"
+          hint="key ที่แก้ทั้งในเครื่องนี้และที่อื่น — ใช้ฉบับที่ใหม่กว่า (การแก้ชนะการลบ)"
+        >
           {queue.conflicts.map((c) => (
             <ConflictRow key={c.id} conflict={c} />
           ))}
@@ -255,7 +293,10 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
         </Section>
       )}
 
-      <Section title="Supermemory" hint="ส่งความจำที่เพิ่ม/แก้ขึ้น space ร่วมของทีมอัตโนมัติ — ส่งไม่ผ่านก็ไม่กระทบแชท">
+      <Section
+        title="Supermemory"
+        hint="ส่งความจำที่เพิ่ม/แก้ขึ้น space ร่วมของทีมอัตโนมัติ — ส่งไม่ผ่านก็ไม่กระทบแชท"
+      >
         <Card>
           <ApiKeyInput
             storageKey={SUPERMEMORY_KEY_NAME}
@@ -273,7 +314,10 @@ function ConflictRow({ conflict: c }: { conflict: ConflictLogEntry }) {
   const scope = targetLabel(c.target);
   const shown = (v: string | null) => v ?? '(ลบแล้ว)';
   return (
-    <View className="gap-1 rounded-2xl border border-white/10 bg-white/5 p-3" accessibilityLabel={`conflict ${c.key}`}>
+    <View
+      className="gap-1 rounded-2xl border border-white/10 bg-white/5 p-3"
+      accessibilityLabel={`conflict ${c.key}`}
+    >
       <View className="flex-row items-center gap-2">
         <Text className="flex-1 text-sm font-semibold text-white">{c.key}</Text>
         <Text className="text-[11px]" style={{ color: scope.color ?? 'rgba(255,255,255,0.6)' }}>
@@ -282,7 +326,10 @@ function ConflictRow({ conflict: c }: { conflict: ConflictLogEntry }) {
       </View>
       <Detail label="เครื่องนี้" value={shown(c.localValue)} />
       <Detail label="Server" value={shown(c.serverValue)} />
-      <Detail label="ใช้ค่า" value={`${c.resolvedTo === 'server' ? 'ของ Server' : 'ของเครื่องนี้'} · ${formatTime(c.at)}`} />
+      <Detail
+        label="ใช้ค่า"
+        value={`${c.resolvedTo === 'server' ? 'ของ Server' : 'ของเครื่องนี้'} · ${formatTime(c.at)}`}
+      />
     </View>
   );
 }

@@ -21,9 +21,9 @@ export function OptionInput({ scope, name, label, placeholder }: OptionInputProp
     () =>
       whileMounted(
         () => ProviderSettings.getOption(scope, name),
-        (v) => setValue(v ?? '')
+        (v) => setValue(v ?? ''),
       ),
-    [scope, name]
+    [scope, name],
   );
 
   return (

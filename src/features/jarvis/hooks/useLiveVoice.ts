@@ -9,7 +9,11 @@ import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
-import { LiveVoiceSession, type LiveRecorder, type LiveVoiceState } from '../../voice/live/LiveVoiceSession';
+import {
+  LiveVoiceSession,
+  type LiveRecorder,
+  type LiveVoiceState,
+} from '../../voice/live/LiveVoiceSession';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 
@@ -92,7 +96,8 @@ export function useLiveVoice(): LiveVoiceControls {
           store.setMood('idle');
         }
       },
-      onMessage: (message) => useAtomStore.getState().pushMessage({ role: 'system', content: message }),
+      onMessage: (message) =>
+        useAtomStore.getState().pushMessage({ role: 'system', content: message }),
     });
     sessionRef.current = session;
     return () => {

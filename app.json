@@ -18,7 +18,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["com.android.alarm.permission.SET_ALARM"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,9 +33,67 @@
           "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
         }
       ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อคุยด้วยเสียงสด"
+        }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อคุยด้วยเสียงสด",
+          "iosBackgroundMode": false,
+          "androidPermissions": [
+            "android.permission.RECORD_AUDIO",
+            "android.permission.MODIFY_AUDIO_SETTINGS"
+          ],
+          "androidForegroundService": false,
+          "disableFFmpeg": true
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
+          "speechRecognitionPermission": "อนุญาตให้ $(PRODUCT_NAME) แปลงเสียงพูดเป็นข้อความ",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.as"
+          ]
+        }
+      ],
+      "onnxruntime-react-native",
       "expo-asset",
       "./plugins/withCleartextTraffic",
-      "./plugins/withAndroidProjectName"
+      "./plugins/withAndroidProjectName",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "อนุญาตให้ $(PRODUCT_NAME) อ่านและเพิ่มนัดหมายในปฏิทิน",
+          "remindersPermission": "อนุญาตให้ $(PRODUCT_NAME) จัดการเตือนความจำ"
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "อนุญาตให้ $(PRODUCT_NAME) ค้นหารายชื่อเพื่อโทรหรือส่งข้อความ"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ตำแหน่งเพื่อบอกอากาศและค้นหาสถานที่ใกล้ตัว"
+        }
+      ],
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้กล้องเพื่อดูและอ่านสิ่งที่คุณถ่าย",
+          "photosPermission": "อนุญาตให้ $(PRODUCT_NAME) เลือกรูปภาพ"
+        }
+      ]
     ]
   }
 }

@@ -15,4 +15,6 @@ export interface Message {
   content: string;
   /** epoch ms */
   createdAt: number;
+  /** รูปที่แนบกับข้อความ (เช่น รูปที่ผู้ช่วยวาด) — file:// ในเครื่อง */
+  imageUri?: string | undefined;
 }

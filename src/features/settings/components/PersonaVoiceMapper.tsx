@@ -100,9 +100,9 @@ export function PersonaVoiceMapper() {
           if (sv) setShared(sv);
           setByPersona(Object.fromEntries(PERSONA_IDS.map((p, i) => [p, voices[i]])));
           setLoaded(true);
-        }
+        },
       ),
-    []
+    [],
   );
 
   // The active persona's voice lives in the store; re-resolve it after every change

@@ -64,6 +64,8 @@ export interface HandlerResult {
   persona: Persona;
   /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
   agentScreen?: { agentId: string } | undefined;
+  /** รูปที่แนบกับคำตอบ — มีเฉพาะผลจาก AgentHandler */
+  imageUri?: string | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

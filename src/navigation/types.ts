@@ -9,6 +9,7 @@ export type RootStackParamList = {
   PcBridge: undefined;
   Marketplace: undefined;
   VoiceSettings: undefined;
+  AssistantSettings: undefined;
   PersonaVoice: undefined;
   /** UI ของ agent แบบเต็มจอ */
   Agent: { agentId: string };

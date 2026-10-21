@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { PERSONAS, USER_NAME } from '../../constants';
 import type { Message } from '../../types';
@@ -42,6 +42,14 @@ export const ChatBubble = memo(function ChatBubble({ message }: ChatBubbleProps)
         }
       >
         <Text className="text-[15px] leading-6 text-white">{message.content}</Text>
+        {message.imageUri ? (
+          <Image
+            source={{ uri: message.imageUri }}
+            accessibilityLabel="รูปที่ผู้ช่วยสร้างหรือแนบมา"
+            resizeMode="contain"
+            style={{ width: 240, height: 240, borderRadius: 12, marginTop: 8 }}
+          />
+        ) : null}
       </View>
     </View>
   );

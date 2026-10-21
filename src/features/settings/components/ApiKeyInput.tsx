@@ -20,19 +20,24 @@ const hostOf = (url: string) => /^https?:\/\/([^/?#]+)/i.exec(url)?.[1] ?? url;
 
 function openKeyPage(url: string) {
   // เปิดไม่ได้ (เช่น ไม่มีเบราว์เซอร์) ต้องไม่ทำให้หน้าตั้งค่าพัง
-  Linking.openURL(url).catch((e: unknown) => console.error('[settings] เปิดลิงก์สร้าง API key ไม่ได้', e));
+  Linking.openURL(url).catch((e: unknown) =>
+    console.error('[settings] เปิดลิงก์สร้าง API key ไม่ได้', e),
+  );
 }
 
 /** Write-only secret field: the saved value is never read back into the UI, only its presence. */
-export function ApiKeyInput({ storageKey, label = 'API key', placeholder, keyUrl, onChange }: ApiKeyInputProps) {
+export function ApiKeyInput({
+  storageKey,
+  label = 'API key',
+  placeholder,
+  keyUrl,
+  onChange,
+}: ApiKeyInputProps) {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
-  useEffect(
-    () => whileMounted(() => SecureKeyStore.has(storageKey), setHasKey),
-    [storageKey]
-  );
+  useEffect(() => whileMounted(() => SecureKeyStore.has(storageKey), setHasKey), [storageKey]);
 
   const save = async () => {
     const value = draft.trim();
@@ -55,7 +60,10 @@ export function ApiKeyInput({ storageKey, label = 'API key', placeholder, keyUrl
       <FieldLabel>{label}</FieldLabel>
       {hasKey && !editing ? (
         <View className="flex-row items-center gap-2">
-          <Text className="flex-1 text-sm text-emerald-300" accessibilityLabel={`${label} บันทึกแล้ว`}>
+          <Text
+            className="flex-1 text-sm text-emerald-300"
+            accessibilityLabel={`${label} บันทึกแล้ว`}
+          >
             ✓ บันทึกแล้ว ••••••
           </Text>
           <SmallButton label="แก้ไข" onPress={() => setEditing(true)} />

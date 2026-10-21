@@ -27,7 +27,7 @@ export function useAIKeyStatus(check: () => Promise<boolean> = hasConfiguredLLM)
       return () => {
         active = false;
       };
-    }, [check])
+    }, [check]),
   );
 
   return status;

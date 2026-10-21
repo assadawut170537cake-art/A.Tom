@@ -32,7 +32,10 @@ const REGISTER_SQL = "select public.mobile_register_device('boss-phone', 'มื
 const INPUT_CLASS = 'rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 text-sm text-white';
 
 /** ตั้งค่า › Mark 55 Bus: Project URL + anon key + token เครื่อง สำหรับสั่งงาน Mark 55 จากแชท */
-export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultProbe }: PcBridgeScreenProps) {
+export function PcBridgeScreen({
+  settings = pcBridgeSettings,
+  probe = defaultProbe,
+}: PcBridgeScreenProps) {
   const [saved, setSaved] = useState<PcBridgeConfig | null>(null);
   const [url, setUrl] = useState('');
   const [anonKey, setAnonKey] = useState('');
@@ -59,7 +62,8 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
     const key = anonKey.trim() || saved?.anonKey || '';
     const tok = token.trim() || saved?.token || '';
     if (!key) return 'ใส่ anon key (หรือ publishable key) จาก Supabase › Settings › API';
-    if (!DEVICE_TOKEN_PATTERN.test(tok)) return 'token เครื่องต้องขึ้นต้นด้วย atm_ ตามด้วยตัวอักษร 64 ตัว';
+    if (!DEVICE_TOKEN_PATTERN.test(tok))
+      return 'token เครื่องต้องขึ้นต้นด้วย atm_ ตามด้วยตัวอักษร 64 ตัว';
     return { url: normalized.url, anonKey: key, token: tok };
   };
 
@@ -79,7 +83,10 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
       setToken('');
       setNotice({ tone: 'info', text: 'บันทึกแล้ว — ลองพิมพ์ในแชทว่า "สั่งคอมเช็กสถานะเครื่อง"' });
     } catch (e) {
-      setNotice({ tone: 'error', text: `บันทึกไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}` });
+      setNotice({
+        tone: 'error',
+        text: `บันทึกไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`,
+      });
     } finally {
       setBusy(null);
     }
@@ -122,9 +129,14 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
     ]);
 
   return (
-    <ScrollView className="flex-1 bg-[#05060a]" contentContainerClassName="p-4 pb-16" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      className="flex-1 bg-[#05060a]"
+      contentContainerClassName="p-4 pb-16"
+      keyboardShouldPersistTaps="handled"
+    >
       <Text className="mb-5 px-1 text-xs leading-5 text-white/50">
-        สั่งงาน Mark 55 จากแชท (เช็กเครื่อง · บิลด์) ผ่าน Supabase — token เครื่องออกได้ใน Supabase SQL Editor:
+        สั่งงาน Mark 55 จากแชท (เช็กเครื่อง · บิลด์) ผ่าน Supabase — token เครื่องออกได้ใน Supabase
+        SQL Editor:
         {`\n${REGISTER_SQL}`}
       </Text>
 
@@ -132,14 +144,19 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
         <Text
           accessibilityRole={notice.tone === 'error' ? 'alert' : 'text'}
           className={`mb-5 rounded-xl border px-3 py-2 text-xs ${
-            notice.tone === 'error' ? 'border-red-400/30 bg-red-500/10 text-red-200' : 'border-white/10 bg-white/5 text-white/80'
+            notice.tone === 'error'
+              ? 'border-red-400/30 bg-red-500/10 text-red-200'
+              : 'border-white/10 bg-white/5 text-white/80'
           }`}
         >
           {notice.text}
         </Text>
       )}
 
-      <Section title="เชื่อมต่อ" hint={saved ? 'ตั้งค่าไว้แล้ว — เว้นช่อง key/token ว่างไว้เพื่อใช้ค่าเดิม' : undefined}>
+      <Section
+        title="เชื่อมต่อ"
+        hint={saved ? 'ตั้งค่าไว้แล้ว — เว้นช่อง key/token ว่างไว้เพื่อใช้ค่าเดิม' : undefined}
+      >
         <Card>
           <View>
             <FieldLabel>Project URL</FieldLabel>
@@ -182,7 +199,9 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
               accessibilityLabel="Token เครื่อง"
               className={INPUT_CLASS}
             />
-            <Text className="mt-1 text-[11px] text-white/40">ห้ามใส่ service_role key ที่นี่ — ใช้เฉพาะบน Mark 55</Text>
+            <Text className="mt-1 text-[11px] text-white/40">
+              ห้ามใส่ service_role key ที่นี่ — ใช้เฉพาะบน Mark 55
+            </Text>
           </View>
           <View className="flex-row flex-wrap gap-2">
             <SmallButton
@@ -196,7 +215,14 @@ export function PcBridgeScreen({ settings = pcBridgeSettings, probe = defaultPro
               disabled={busy !== null}
               onPress={() => void test()}
             />
-            {saved && <SmallButton label="ลบการเชื่อมต่อ" tone="danger" disabled={busy !== null} onPress={clear} />}
+            {saved && (
+              <SmallButton
+                label="ลบการเชื่อมต่อ"
+                tone="danger"
+                disabled={busy !== null}
+                onPress={clear}
+              />
+            )}
           </View>
         </Card>
       </Section>
