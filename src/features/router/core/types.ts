@@ -78,6 +78,8 @@ export interface HandlerResult {
   agentScreen?: { agentId: string } | undefined;
   /** true = ข้อความถูกส่งผ่าน `onDelta` ครบแล้ว (ผู้เรียกพูด/แสดงไประหว่างทางแล้ว ไม่ต้องพูดซ้ำทั้งก้อน) */
   streamed?: boolean | undefined;
+  /** รูปที่แนบกับคำตอบ — มีเฉพาะผลจาก AgentHandler */
+  imageUri?: string | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

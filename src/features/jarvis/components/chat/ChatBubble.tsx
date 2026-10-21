@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 
 import { AttachmentChips } from '../../../attachments/components/AttachmentChips';
 import { PERSONAS, USER_NAME } from '../../constants';
@@ -48,6 +48,14 @@ export const ChatBubble = memo(function ChatBubble({ message }: ChatBubbleProps)
             <AttachmentChips files={message.attachments} />
           </View>
         )}
+        {message.imageUri ? (
+          <Image
+            source={{ uri: message.imageUri }}
+            accessibilityLabel="รูปที่ผู้ช่วยสร้างหรือแนบมา"
+            resizeMode="contain"
+            style={{ width: 240, height: 240, borderRadius: 12, marginTop: 8 }}
+          />
+        ) : null}
       </View>
     </View>
   );

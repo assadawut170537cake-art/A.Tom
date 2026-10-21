@@ -5,6 +5,7 @@ import {
   Monitor,
   Puzzle,
   RefreshCw,
+  Sparkles,
   Users,
   type LucideIcon,
 } from 'lucide-react-native';
@@ -43,6 +44,12 @@ const ENTRIES: Entry[] = [
     title: 'Mark 55 Bus',
     subtitle: 'สั่งงาน Mark 55 จากแชท · token เครื่อง',
     icon: Monitor,
+  },
+  {
+    route: 'AssistantSettings',
+    title: 'ผู้ช่วยส่วนตัว',
+    subtitle: 'คำปลุก · Home Assistant · ความสามารถสั่งด้วยเสียง',
+    icon: Sparkles,
   },
   {
     route: 'VoiceSettings',

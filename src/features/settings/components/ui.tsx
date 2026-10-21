@@ -26,7 +26,9 @@ export function Section({ title, hint, children }: SectionProps) {
 }
 
 export function Card({ children }: ChildrenProps) {
-  return <View className="gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">{children}</View>;
+  return (
+    <View className="gap-3 rounded-2xl border border-white/10 bg-white/5 p-4">{children}</View>
+  );
 }
 
 export function FieldLabel({ children }: ChildrenProps) {
@@ -46,12 +48,7 @@ interface SmallButtonProps extends Omit<PressableProps, 'children'> {
   tone?: Tone | undefined;
 }
 
-export function SmallButton({
-  label,
-  tone = 'default',
-  disabled,
-  ...rest
-}: SmallButtonProps) {
+export function SmallButton({ label, tone = 'default', disabled, ...rest }: SmallButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"

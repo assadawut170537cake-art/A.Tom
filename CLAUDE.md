@@ -325,6 +325,25 @@
 ### แท็บ "วันนี้" (Today) — Boss ขอ 2026-10-20
 - `features/today/`: `todayStore.ts` (เช็กลิสต์ AsyncStorage `atom.today.v1.tasks` · **ไม่เขียนก่อน `load()` เสร็จ** ไม่งั้นทับของเดิม · ไม่ล้างเองข้ามวัน) · `TodayScreen` (เช็กลิสต์ · นับข้อความบอสวันนี้ต่อ persona · แจ้งเตือน PC = ข้อความ assistant ที่ขึ้นต้น `NOTIFY_PREFIX` (ย้ายไป `features/pc-bridge/PcInbox.ts`) · ช่องผลวิจัยประจำวัน รอ Daily Researcher) · วันที่ไทยเขียนเอง (`thaiDate`, ไม่พึ่ง Intl ของ Hermes)
 - agent "งานวันนี้" (`src/modules/agents/today-agent.ts`): "เพิ่มงาน …" · "ติ๊กงาน …" / "งาน … เสร็จแล้ว" · "งานวันนี้มีอะไร"
+### เสียงสด Realtime (speech-to-speech)
+- `features/voice/realtime/RealtimeVoiceSession.ts` = state machine (DI) · `OpenAIRealtimeTransport.ts` = WebRTC (lazy `require('react-native-webrtc')`) · `config.ts` = prompt สั้น + tool `ask_atom` · เลือกเครื่องยนต์ที่ `jarvis/hooks/useVoiceChat.ts` (`live.engine`)
+- หลักการ: โมเดลเสียง = ปาก/หู · สมอง (memory/agent/pc-bridge) = router เดิมผ่าน `ask_atom` → `sendMessage(text, { speak: false })` · เทิร์นที่ delegate ห้ามลงแชทซ้ำ (router ลงให้แล้ว)
+- provider: `GeminiLiveTransport` (WebSocket + `NativePcmAudio`) · `OpenAIRealtimeTransport` (WebRTC) · เลือกที่ `registry.ts` (`live.provider`, auto = Gemini ก่อน) · เพิ่มเจ้าใหม่ = implement `RealtimeTransport` + `RealtimeProvider` (`realtime/types.ts`) แล้วใส่ใน `REALTIME_PROVIDERS`
+- Android ไม่มี AEC ใน react-native-audio-api → half-duplex เมื่อออกลำโพง (ดู `NativePcmAudio.ts`) · test เสียง: `geminiLive.test.ts` (socket/audio ปลอม)
+- test: `realtimeVoice.test.ts` (transport ปลอม · ต้อง `stop()` session ทุกเทสต์ ไม่งั้นตัวจับเวลา idle ค้าง)
+
+### ผู้ช่วยส่วนตัว (features/assistant) + คำปลุก
+- 10 agent ลงทะเบียนที่ `assistant/index.ts` (`registerAssistantAgents`, เรียกใน boot) — **ลำดับสำคัญ** (ตัวแรกที่ match ชนะ: แคบ→กว้าง; place ก่อน web-search) · pattern ต้องแคบเสมอ (AgentClassifier มาก่อน LLM) — มี test ตารางประโยค "ต้อง match" และ "ต้องไม่ถูกแย่ง" ใน `assistantAgents.test.ts` เพิ่ม agent/แก้ pattern ต้องเพิ่มแถวในตารางนั้น
+- ทุก agent รับ deps ผ่าน factory (`createXAgent({ api, llm, now })`) เพื่อ test; native โหลด lazy ผ่าน `shared/errors.loadNative`; ข้อผิดพลาดที่ผู้ใช้ควรเห็น = `AssistantError` (ข้อความไทย) · LLM แปลงประโยค→JSON ผ่าน `shared/llm.extractJson` (ใส่เวลาปัจจุบันให้เสมอ)
+- ความปลอดภัย: โทร/SMS เปิดหน้าให้กดเอง ไม่ส่งเอง · Home Assistant allow-list (`ALLOWED_SERVICES`) ห้ามเพิ่ม lock/alarm_control_panel/unlock · รูปถ่ายไม่เก็บ
+- ผลมีรูป: `AgentRunResult.imageUri` → `HandlerResult.imageUri` → `pushMessage({imageUri})` → `ChatBubble`
+- คำปลุก `voice/wakeword/`: `WakeWordDetector` (พอร์ตจาก `scripts/speaker/ref_wakeword.py`) · `templates.ts` ("เฮ่ อะตอม" จับคู่เทมเพลต + `calibrate`) · `wakeConfig.ts` (โหมด atom|jarvis, เกณฑ์, โปรไฟล์เป็นไฟล์ใน documents) · `wakeSettings.ts` (เปิด/ปิด + `acquireMic` ประสานไมค์) · `useWakeWord` ใน `useVoiceChat` · UI `settings/components/WakeWordCard.tsx` · ใครใช้ไมค์ในหน้าตั้งค่าต้อง `acquireMic()` ก่อนเสมอ ไม่งั้นชนกับตัวฟังคำปลุก
+
+### เสียงของฉัน (Speaker verification) + ตัวรู้จำเสียงระบบ
+- `features/voice/speaker/`: `fbank.ts` (Kaldi fbank TS) → `OnnxSpeakerModel.ts` (WeSpeaker ONNX, lazy) → `embedding.ts` · `profile.ts` (SecureStore: ห้ามลง AsyncStorage/log) · `gate.ts` (state machine ตามจำนวนตัวอย่าง ไม่ใช้นาฬิกา) · `SpeakerService.ts` (สร้าง gate / ลงทะเบียน) · gate ต่อที่ `GeminiLiveTransport` (DI `gate`) · UI `settings/components/SpeakerEnrollmentCard.tsx`
+- ตรวจ fbank เทียบ numpy: `scripts/speaker/ref_fbank.py > src/__tests__/fixtures/fbank_golden.json` (ปัดสัญญาณเป็น float32 ให้เหมือนฝั่งแอป)
+- gate ล้มเหลว/โหลดโมเดลไม่ได้ = **ปล่อยเสียงผ่าน** (ตัวกรองคือความสะดวก ไม่ใช่ความปลอดภัย)
+- `live/SystemSpeechSession.ts` + `SystemRecognizer.ts` = ฟังด้วยตัวรู้จำเสียงของระบบ (expo-speech-recognition) · `useVoiceChat` เลือก realtime → system → classic
 
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)

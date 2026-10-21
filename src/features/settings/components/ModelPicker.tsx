@@ -18,10 +18,7 @@ import type { AIProvider } from '../../ai/core/types';
 import { modelListCache } from '../modelListCache';
 import { FieldLabel, SmallButton } from './ui';
 
-type LoadState =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error'; message: string };
+type LoadState = { state: 'idle' } | { state: 'loading' } | { state: 'error'; message: string };
 
 interface ModelPickerProps {
   provider: AIProvider;
@@ -132,7 +129,10 @@ export function ModelPicker({
         accessibilityHint="เปิดรายชื่อโมเดลให้เลือก"
         className="flex-row items-center rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 active:bg-white/10"
       >
-        <Text className={`flex-1 text-sm ${value ? 'text-white' : 'text-white/30'}`} numberOfLines={1}>
+        <Text
+          className={`flex-1 text-sm ${value ? 'text-white' : 'text-white/30'}`}
+          numberOfLines={1}
+        >
           {value || 'เลือกโมเดล…'}
         </Text>
         <ChevronDown size={16} color="rgba(255,255,255,0.6)" />
@@ -170,7 +170,10 @@ export function ModelPicker({
               </View>
             )}
             {load.state === 'error' && (
-              <Text className="px-5 text-xs leading-5 text-red-300" accessibilityLiveRegion="polite">
+              <Text
+                className="px-5 text-xs leading-5 text-red-300"
+                accessibilityLiveRegion="polite"
+              >
                 {`โหลดรายชื่อโมเดลไม่ได้ — ${load.message}\nกด "โหลดรายชื่อใหม่" เพื่อลองอีกครั้ง หรือ "พิมพ์ชื่อเอง"`}
               </Text>
             )}
@@ -189,7 +192,12 @@ export function ModelPicker({
                   onSubmitEditing={submitManual}
                   className={`flex-1 ${INPUT_CLASS}`}
                 />
-                <SmallButton label="ใช้ชื่อนี้" tone="primary" disabled={!draft.trim()} onPress={submitManual} />
+                <SmallButton
+                  label="ใช้ชื่อนี้"
+                  tone="primary"
+                  disabled={!draft.trim()}
+                  onPress={submitManual}
+                />
                 <SmallButton label="ยกเลิก" onPress={() => setManual(false)} />
               </View>
             ) : (

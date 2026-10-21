@@ -5,6 +5,7 @@ import { AgentScreen } from '../features/agents/screens/AgentScreen';
 import { HistoryScreen } from '../features/jarvis/screens/HistoryScreen';
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
 import { PluginMarketplaceScreen } from '../features/marketplace/screens/PluginMarketplaceScreen';
+import { AssistantSettingsScreen } from '../features/settings/screens/AssistantSettingsScreen';
 import { AISettingsScreen } from '../features/settings/screens/AISettingsScreen';
 import { ModulesScreen } from '../features/settings/screens/ModulesScreen';
 import { PersonaVoiceScreen } from '../features/settings/screens/PersonaVoiceScreen';
@@ -69,6 +70,11 @@ export function RootNavigator() {
           name="Marketplace"
           component={PluginMarketplaceScreen}
           options={{ title: 'Marketplace' }}
+        />
+        <Stack.Screen
+          name="AssistantSettings"
+          component={AssistantSettingsScreen}
+          options={{ title: 'ผู้ช่วยส่วนตัว' }}
         />
         <Stack.Screen
           name="VoiceSettings"

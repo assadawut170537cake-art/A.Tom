@@ -18,4 +18,6 @@ export interface Message {
   createdAt: number;
   /** ไฟล์ที่บอสแนบมากับข้อความนี้ (เก็บแค่ที่อยู่ ไม่เก็บเนื้อไฟล์) */
   attachments?: AttachmentRef[] | undefined;
+  /** รูปที่แนบกับข้อความ (เช่น รูปที่ผู้ช่วยวาด) — file:// ในเครื่อง */
+  imageUri?: string | undefined;
 }

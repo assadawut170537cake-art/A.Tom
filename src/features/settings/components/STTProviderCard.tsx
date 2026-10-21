@@ -23,7 +23,7 @@ export function STTProviderCard({ provider, meta }: STTProviderCardProps) {
 
   useEffect(
     () => whileMounted(() => ProviderSettings.getVoiceEnabled('stt', provider.id), setEnabled),
-    [provider.id]
+    [provider.id],
   );
 
   const toggle = (value: boolean) => {
@@ -35,12 +35,17 @@ export function STTProviderCard({ provider, meta }: STTProviderCardProps) {
     <Card>
       <ProviderToggle
         label={meta.name}
-        subtitle={meta.isDefault ? 'บนเครื่อง · ยังไม่รองรับ (ต้องใช้ development build)' : undefined}
+        subtitle={
+          meta.isDefault ? 'บนเครื่อง · ยังไม่รองรับ (ต้องใช้ development build)' : undefined
+        }
         value={enabled}
         onChange={toggle}
       />
       {meta.requiresKey && (
-        <ApiKeyInput storageKey={secretKey('stt', provider.id)} keyUrl={keyUrlFor('stt', provider.id)} />
+        <ApiKeyInput
+          storageKey={secretKey('stt', provider.id)}
+          keyUrl={keyUrlFor('stt', provider.id)}
+        />
       )}
       <VoiceExtraFields kind="stt" id={provider.id} />
       <TestConnectionButton test={() => provider.testConnection()} />

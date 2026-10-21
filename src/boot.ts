@@ -31,6 +31,9 @@ import { registerAIProviders } from './features/ai';
 import { registerCustomProviders } from './features/ai/customProviders';
 import { useAtomStore } from './features/jarvis/stores/useAtomStore';
 import { settingsHealthEntries } from './features/settings/settingsHealthEntries';
+import { loadAssistantData, registerAssistantAgents } from './features/assistant';
+import { composeBriefing } from './features/assistant/agents/reminder';
+import { setupNotifications } from './features/assistant/notifications';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
 import { registerNotebookLMAgent } from './modules/agents/notebooklm-agent';
@@ -95,6 +98,19 @@ export function bootApp(): Promise<BootReport> {
   registerUltronAgent();
   registerNotebookLMAgent();
   registerTodayAgent();
+  // ผู้ช่วยส่วนตัว (ปลุก/ปฏิทิน/โทร/อากาศ/รูป/Home Assistant) — ก่อน task/device ให้ pattern เฉพาะเจาะจงได้ก่อน
+  registerAssistantAgents();
+  void loadAssistantData().catch((e: unknown) =>
+    console.error('[boot] โหลดผู้ช่วยที่สร้างเองไม่สำเร็จ', e),
+  );
+  // แตะแจ้งเตือนสรุปเช้า → ให้ผู้ช่วยสรุปให้ทันที (ผลขึ้นเป็นข้อความในแชท)
+  setupNotifications(() => {
+    void composeBriefing().then((content) => {
+      const store = useAtomStore.getState();
+      store.setUIMode('conversation');
+      store.pushMessage({ role: 'assistant', content });
+    });
+  });
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());

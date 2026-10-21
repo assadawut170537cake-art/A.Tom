@@ -25,9 +25,9 @@ function useLLMPriority() {
   useEffect(
     () =>
       whileMounted(ProviderSettings.getPriority, (saved) =>
-        setOrder((current) => mergeOrder(saved, current))
+        setOrder((current) => mergeOrder(saved, current)),
       ),
-    []
+    [],
   );
 
   const change = (ids: AIProviderId[]) => {
@@ -52,7 +52,7 @@ function AdvancedSection() {
         setAdv(a);
         setTimeoutText(String(a.timeoutMs / 1000));
       }),
-    []
+    [],
   );
 
   const patch = (p: Partial<AdvancedSettings>) => {
@@ -146,7 +146,11 @@ export function AISettingsScreen() {
         {jev && <ProviderCard provider={jev} subtitle="ตัดสินใจหลัก (ค่าเริ่มต้น) — ไม่มี key / ล่ม = สลับไปตัวกรองคำ + AI ให้เอง" />}
       </Section>
       <Section title="Priority" hint="ลากที่ไอคอน ⋮⋮ หรือกด ↑↓ — ตัวบนสุดถูกเรียกก่อน">
-        <PriorityList items={priority.items} onChange={priority.change} onDragStateChange={setDragging} />
+        <PriorityList
+          items={priority.items}
+          onChange={priority.change}
+          onDragStateChange={setDragging}
+        />
       </Section>
       <Section title="Advanced">
         <AdvancedSection />

@@ -23,9 +23,12 @@ export class AgentHandler implements IntentHandler<'agent'> {
 
     try {
       const result = await this.registry.run(agentId, { text: input.text, commandText, capabilityId, persona });
-      return result.showScreen && agent.hasScreen
-        ? { reply: result.reply, persona, agentScreen: { agentId } }
-        : { reply: result.reply, persona };
+      return {
+        reply: result.reply,
+        persona,
+        ...(result.showScreen && agent.hasScreen ? { agentScreen: { agentId } } : {}),
+        ...(result.imageUri ? { imageUri: result.imageUri } : {}),
+      };
     } catch (e) {
       const reason = redactSecrets(e instanceof Error ? e.message : String(e));
       return { reply: `${agent.name}ทำงานไม่สำเร็จครับ — ${reason}`, persona };

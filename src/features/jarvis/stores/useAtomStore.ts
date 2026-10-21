@@ -16,6 +16,7 @@ interface PushMessageInput {
   /** Defaults to the active persona */
   persona?: Persona;
   attachments?: AttachmentRef[] | undefined;
+  imageUri?: string | undefined;
 }
 
 interface AtomState {
@@ -113,7 +114,7 @@ export const useAtomStore = create<AtomState>()(
         // Ignore stale results if the persona changed while loading
         if (get().activePersona === persona) set({ voice });
       },
-      pushMessage: ({ role, content, persona, attachments }) => {
+      pushMessage: ({ role, content, persona, attachments, imageUri }) => {
         const target = persona ?? get().activePersona;
         const message: Message = {
           id: createId(),
@@ -122,6 +123,7 @@ export const useAtomStore = create<AtomState>()(
           content,
           createdAt: Date.now(),
           ...(attachments?.length && { attachments }),
+          ...(imageUri ? { imageUri } : {}),
         };
         set((s) => ({
           messagesByPersona: {

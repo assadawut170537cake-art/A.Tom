@@ -29,7 +29,7 @@ import { OrbLayer } from '../components/orb/OrbLayer';
 import { LAYOUT, PERSONAS } from '../constants';
 import { useAIKeyStatus } from '../hooks/useAIKeyStatus';
 import { useKeyboardOverlap } from '../hooks/useKeyboardOverlap';
-import { useLiveVoice } from '../hooks/useLiveVoice';
+import { useVoiceChat } from '../hooks/useVoiceChat';
 import { sendMessage } from '../services/conversation';
 import { useAtomStore } from '../stores/useAtomStore';
 import { useTabsStore } from '../stores/useTabsStore';
@@ -56,7 +56,7 @@ function AtomTab({ keyboardOverlap }: AtomTabProps) {
   const persona = PERSONAS[useAtomStore((s) => s.activePersona)];
   const keyStatus = useAIKeyStatus();
 
-  const live = useLiveVoice();
+  const live = useVoiceChat();
 
   const agentId = useAgentPanelStore((s) => s.agentId);
   const closeAgent = useAgentPanelStore((s) => s.close);

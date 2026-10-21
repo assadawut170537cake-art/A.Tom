@@ -40,9 +40,9 @@ export function TTSProviderCard({ provider, meta }: TTSProviderCardProps) {
         ([e, v]) => {
           setEnabled(e);
           setVoiceId(v || undefined);
-        }
+        },
       ),
-    [provider.id, scope]
+    [provider.id, scope],
   );
 
   const toggle = (value: boolean) => {

@@ -59,14 +59,21 @@ export function ModelSelector<T extends string>({
         accessibilityLabel={`${label}: ${current?.label ?? value ?? placeholder}`}
         className="flex-row items-center rounded-xl border border-white/15 bg-black/30 px-3 py-2.5 active:bg-white/10"
       >
-        <Text className={`flex-1 text-sm ${value ? 'text-white' : 'text-white/30'}`} numberOfLines={1}>
+        <Text
+          className={`flex-1 text-sm ${value ? 'text-white' : 'text-white/30'}`}
+          numberOfLines={1}
+        >
           {current?.label ?? value ?? placeholder}
         </Text>
         <ChevronDown size={16} color="rgba(255,255,255,0.6)" />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <Pressable className="flex-1 bg-black/60" onPress={() => setOpen(false)} accessibilityLabel="ปิด" />
+        <Pressable
+          className="flex-1 bg-black/60"
+          onPress={() => setOpen(false)}
+          accessibilityLabel="ปิด"
+        />
         <View
           className="max-h-[70%] rounded-t-3xl border-t border-white/10 bg-[#11131a]"
           style={{ paddingBottom: insets.bottom + 12 }}
@@ -74,7 +81,11 @@ export function ModelSelector<T extends string>({
           <View className="flex-row items-center gap-2 px-5 pb-2 pt-4">
             <Text className="flex-1 text-base font-semibold text-white">{label}</Text>
             {onRefresh && (
-              <SmallButton label={loading ? 'กำลังโหลด…' : 'โหลดรายการ'} disabled={loading} onPress={refresh} />
+              <SmallButton
+                label={loading ? 'กำลังโหลด…' : 'โหลดรายการ'}
+                disabled={loading}
+                onPress={refresh}
+              />
             )}
           </View>
           {loading && <ActivityIndicator color="#fff" className="py-2" />}

@@ -60,7 +60,7 @@ function DragHandle({ label, callbacks }: DragHandleProps) {
       onPanResponderMove: (_e, g) => latest.current.move(g.dy),
       onPanResponderRelease: (_e, g) => latest.current.end(g.dy),
       onPanResponderTerminate: () => latest.current.end(null),
-    })
+    }),
   );
 
   return (
@@ -146,7 +146,9 @@ export function PriorityList<T extends string>({
               }`}
             >
               <DragHandle label={item.label} callbacks={callbacksFor(index)} />
-              <Text className="w-5 text-center text-sm font-semibold text-white/50">{index + 1}</Text>
+              <Text className="w-5 text-center text-sm font-semibold text-white/50">
+                {index + 1}
+              </Text>
               <View className="flex-1">
                 <Text className="text-[15px] text-white" numberOfLines={1}>
                   {item.label}

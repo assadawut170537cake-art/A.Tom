@@ -103,9 +103,12 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
     });
     if (isLatest()) useAtomStore.getState().clearStreaming();
     // A switch moves the reply (the new persona's greeting) into the new persona's history
-    useAtomStore
-      .getState()
-      .pushMessage({ role: 'assistant', content: result.reply, persona: result.persona });
+    useAtomStore.getState().pushMessage({
+      role: 'assistant',
+      content: result.reply,
+      persona: result.persona,
+      imageUri: result.imageUri,
+    });
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest())
       useAgentPanelStore.getState().open(result.agentScreen.agentId);
