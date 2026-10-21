@@ -308,8 +308,9 @@
 - store `streaming` = บับเบิลสด (ไม่บันทึก ไม่ซิงก์) · คำตอบเต็มบันทึกครั้งเดียวตอนจบ · `clearStreaming()` ทุกเริ่ม turn/ล้ม
 - ยังไม่ทำ: พูดแทรก (barge-in) · Voice B = Gemini Live realtime
 
-### ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบน)
-- route `History` (`features/jarvis/screens/HistoryScreen.tsx`) · แท็บ persona · "คุยต่อกับ…" = สลับ persona แล้วกลับหน้าหลัก · "ล้าง" ถามยืนยัน → `clearHistory(persona)` ลบเฉพาะในเครื่อง (สำเนาฝั่ง Mark 55 ยังอยู่)
+### ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบน) — แบบรายการแชทของ Claude (Boss ขอ 2026-10-21)
+- route `History` · รายการ "บทสนทนา" จัดกลุ่มตามวัน (`dayLabel`) · กรอง ทั้งหมด/persona · แตะ = อ่านทั้งบท (ChatBubble) → "คุยต่อกับ…" / "ลบ" (ยืนยัน → `removeMessages` เฉพาะในเครื่อง)
+- ไม่มี session จริงใน storage (lock ข้อ 6 สายเดียวต่อ persona) → `features/jarvis/history.ts` แบ่งจากช่วงเงียบ `CONVERSATION_GAP_MS` (30 นาที) · ชื่อ = ข้อความแรกของบอส
 
 ### ปุ่ม + (ไฟล์แนบ · ทางลัด) — Boss อนุมัติ dep `expo-image-picker` + `expo-document-picker` 2026-10-20
 - type: `core/types/attachment.ts` — `AttachmentRef` (เก็บในแชท: ชื่อ/mime/kind/uri — **ไม่เก็บเนื้อไฟล์**) · `AttachmentData` (ตอนส่ง: base64 หรือข้อความดิบ) · `attachmentKind()` เดาจาก mime + นามสกุล (ไฟล์โค้ดที่ Android บอก octet-stream = text)
@@ -343,6 +344,9 @@
 ### กันแอปเด้ง (Boss เจอแอปเด้ง 2026-10-21 · ยังไม่ได้ logcat)
 - ทุกหน้า (RootNavigator `screenLayout`) ครอบ `ScreenErrorBoundary` (`core/components`) — error ตอน render แสดงข้อความจริง ไม่ปิดแอป · `installCrashGuard()` (`features/jarvis/crashGuard.ts`, เรียกใน App) = error JS นอก React → ข้อความ ⚠️ ในแชท (dev ยังเห็นจอแดง)
 - ONNX (คำปลุก/จำเสียง) ครอบ `withOnnxGuard()` (`features/voice/onnxGuard.ts`): จด `loading` ก่อนโหลด · เปิดแอปแล้วเจอค้าง = native crash รอบก่อน → `broken` ไม่โหลดอีก + แจ้งบอส · ปุ่ม "ลองโหลดโมเดลอีกครั้ง" ใน WakeWordCard · `isOnnxAvailable()` ดูแค่ `NativeModules.Onnxruntime` (ห้าม require ตอน render — require = install JSI)
+- **ต้นเหตุจริง (screenshot Boss):** `onnxruntime-react-native` ไม่ถูก autolink (android/ ไม่มี package ให้ Expo อ่าน) → `NativeModules.Onnxruntime` = null → `install of null` · แก้ด้วย root `react-native.config.js` (ระบุ package เอง) — ห้ามลบ · `loadOrt()` เช็ก NativeModules ก่อน require (require ที่โยนตอนโหลด module = Metro รายงานเป็น fatal แม้มี try/catch)
+- เสียงสด: `react-native-audio-api` `AudioBufferQueueSourceNode.start()` ค่าเริ่มต้น offset = -1 แล้วโยนเอง → เรียก `start(0, 0)` เสมอ
+- ตอบช้า: Gemini 3 คิด medium/high เป็นค่าเริ่มต้น → `thinkingFor()` (GeminiAdapter): 3.x = `thinkingLevel: low` · 2.5 flash = budget 0 · ตอบเกิน `SLOW_REPLY_MS` (12s) → ข้อความ ⏱ บอกว่าช้าช่วงไหน
 - เสียงสดต่อไม่ติด → `onConnectFailed` → `useVoiceChat` สลับไป system/classic ทันที + จำว่าพังทั้งรอบเปิดแอป (`realtimeBroken`) · error ที่ไม่ใช่ ProviderError ห้ามบอกว่า "ไม่มีเน็ต" (`describeRealtimeError` แสดงข้อความจริง)
 
 ### เสียงของฉัน (Speaker verification) + ตัวรู้จำเสียงระบบ

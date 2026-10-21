@@ -5,7 +5,7 @@ import { ProviderError } from '../core/http/errors';
 import { requestStream } from '../core/http/request';
 import { SecureKeyStore } from '../core/storage/SecureKeyStore';
 import { createProvider, PROVIDERS, registerAIProviders } from '../features/ai';
-import { GeminiAdapter } from '../features/ai/adapters/GeminiAdapter';
+import { GeminiAdapter, thinkingFor } from '../features/ai/adapters/GeminiAdapter';
 import { Orchestrator } from '../features/ai/core/Orchestrator';
 import { sendMessage } from '../features/jarvis/services/conversation';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
@@ -382,5 +382,14 @@ describe('แก้ตามรีวิว (สตรีม)', () => {
     const orch = new Orchestrator(reg);
     await orch.chatStream({ messages: [{ role: 'user', content: 'x' }] }, () => {});
     expect(orch.takeNotices().join('\n')).toContain('ขาดกลางคัน');
+  });
+});
+
+describe('Gemini คิดน้อยลงเพื่อตอบไว', () => {
+  test('3.x = thinkingLevel low · 2.5 flash = ปิดคิด · 2.5 pro / รุ่นอื่น = ไม่ส่ง', () => {
+    expect(thinkingFor('gemini-3-flash')).toEqual({ thinkingConfig: { thinkingLevel: 'low' } });
+    expect(thinkingFor('gemini-2.5-flash-lite')).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+    expect(thinkingFor('gemini-2.5-pro')).toEqual({});
+    expect(thinkingFor('gemma-3')).toEqual({});
   });
 });

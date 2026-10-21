@@ -10,6 +10,9 @@ import { useAtomStore } from '../stores/useAtomStore';
  * ฟังคำปลุกตลอดเวลาที่แอปเปิดอยู่และ "ไม่ได้คุย" (`idle`) — ได้ยินแล้วปล่อยไมค์ให้เสร็จก่อน แล้วเรียก `onWake`
  * เริ่มใหม่อัตโนมัติเมื่อจบการคุย / เปลี่ยนการตั้งค่า / กลับเข้าแอป · แอปอยู่เบื้องหลัง = หยุดฟัง (Android ไม่ให้ใช้ไมค์เงียบ ๆ)
  */
+/** แจ้งเตือนเรื่องคำปลุกไปแล้วในรอบเปิดแอปนี้ */
+let warnedThisLaunch = false;
+
 export function useWakeWord(idle: boolean, onWake: () => void): void {
   const onWakeRef = useRef(onWake);
   // อัปเดตใน effect (ไม่แตะ ref ตอน render) — callback ล่าสุดเสมอโดยไม่ต้องเริ่มฟังใหม่
@@ -32,14 +35,24 @@ export function useWakeWord(idle: boolean, onWake: () => void): void {
       await stop();
       if (cancelled || AppState.currentState !== 'active') return;
       if (wakeSettings.isMicBusy() || !(await wakeSettings.isEnabled())) return;
-      const resolved = await resolveWake().catch(() => null);
+      let failure: unknown = null;
+      const resolved = await resolveWake().catch((e: unknown) => {
+        failure = e;
+        return null;
+      });
       if (cancelled) return;
       if (!resolved) {
-        useAtomStore.getState().pushMessage({
-          role: 'system',
-          content:
-            '⚠️ ยังไม่ได้ลงทะเบียนคำปลุก “เฮ่ อะตอม” — ไปที่ ตั้งค่า › ผู้ช่วยส่วนตัว หรือเลือก Hey Jarvis',
-        });
+        // บอกครั้งเดียวต่อการเปิดแอป — เดิมขึ้นซ้ำทุกครั้งที่กลับมาหน้าหลัก (Boss เจอ 2026-10-21)
+        if (!warnedThisLaunch) {
+          warnedThisLaunch = true;
+          useAtomStore.getState().pushMessage({
+            role: 'system',
+            content:
+              failure instanceof Error
+                ? `⚠️ คำปลุกใช้ไม่ได้ตอนนี้ — ${failure.message}`
+                : '⚠️ ยังไม่ได้ลงทะเบียนคำปลุก “เฮ่ อะตอม” — ไปที่ ตั้งค่า › ผู้ช่วยส่วนตัว หรือเลือก Hey Jarvis',
+          });
+        }
         return;
       }
       const next = new WakeWordService({

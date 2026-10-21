@@ -68,7 +68,11 @@ export class GeminiAdapter extends BaseAIProvider {
     return JSON.stringify({
       contents,
       ...(system.length && { systemInstruction: { parts: [{ text: system.join('\n\n') }] } }),
-      generationConfig: { temperature: req.temperature, maxOutputTokens: req.maxTokens },
+      generationConfig: {
+        temperature: req.temperature,
+        maxOutputTokens: req.maxTokens,
+        ...thinkingFor(req.model),
+      },
     });
   }
 
@@ -204,4 +208,15 @@ function safeParse(text: string): unknown {
   } catch {
     return null;
   }
+}
+
+/**
+ * ลดเวลา "คิด" ของโมเดล — Gemini 3.x คิดระดับ medium/high เป็นค่าเริ่มต้น → แชทสั้น ๆ รอนาน (Boss เจอ ~1 นาที/ข้อความ 2026-10-21)
+ * ผู้ช่วยคุยเสียงต้องการตอบไวกว่าตอบลึก: 3.x = `thinkingLevel: low` · 2.5 flash = ปิดคิด (budget 0) · 2.5 pro ปิดไม่ได้ = ไม่ส่ง
+ * รุ่นที่ไม่รู้จัก = ไม่ส่ง (กัน 400 จาก field ที่รุ่นนั้นไม่รับ)
+ */
+export function thinkingFor(model: string): { thinkingConfig?: Record<string, unknown> } {
+  if (/^gemini-[3-9]/.test(model)) return { thinkingConfig: { thinkingLevel: 'low' } };
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingConfig: { thinkingBudget: 0 } };
+  return {};
 }

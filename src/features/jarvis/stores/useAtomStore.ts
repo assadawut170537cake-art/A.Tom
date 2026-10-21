@@ -56,6 +56,8 @@ interface AtomState {
   clearStreaming: () => void;
   /** ลบประวัติแชทของ persona หนึ่ง (หน้า ประวัติ › ล้าง · บอสยืนยันก่อน) */
   clearHistory: (persona: Persona) => void;
+  /** ลบบางข้อความ (หน้า ประวัติ › ลบบทสนทนานี้) — เฉพาะในเครื่อง เหมือน clearHistory */
+  removeMessages: (persona: Persona, ids: readonly string[]) => void;
 }
 
 const emptyHistory = (): Record<Persona, Message[]> => ({ 1: [], 2: [], 3: [], 4: [] });
@@ -184,6 +186,16 @@ export const useAtomStore = create<AtomState>()(
       clearStreaming: () => set({ streaming: null }),
       clearHistory: (persona) => {
         set((s) => ({ messagesByPersona: { ...s.messagesByPersona, [persona]: [] } }));
+        if (get().historyLoaded) void saveHistory(persona);
+      },
+      removeMessages: (persona, ids) => {
+        const drop = new Set(ids);
+        set((s) => ({
+          messagesByPersona: {
+            ...s.messagesByPersona,
+            [persona]: s.messagesByPersona[persona].filter((m) => !drop.has(m.id)),
+          },
+        }));
         if (get().historyLoaded) void saveHistory(persona);
       },
     }),

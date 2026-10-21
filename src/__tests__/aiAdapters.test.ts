@@ -50,7 +50,7 @@ describe('registry + factory', () => {
     expect(custom).toBeInstanceOf(OpenAICompatibleAdapter);
     expect(custom).not.toBeInstanceOf(OpenRouterAdapter);
     expect(
-      createProvider({ ...config('openrouter'), id: 'custom', type: 'openai-compatible' })
+      createProvider({ ...config('openrouter'), id: 'custom', type: 'openai-compatible' }),
     ).not.toBeInstanceOf(OpenRouterAdapter);
   });
 
@@ -92,7 +92,7 @@ describe('GeminiAdapter (mocked generativelanguage API)', () => {
     await gemini().chat({ ...REQ, model: 'gemini-2.5-flash', timeoutMs: 5000 });
     const c = nth(calls, 0);
     expect(c.url.href).toBe(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
     );
     expect(c.url.searchParams.has('key')).toBe(false);
     expect(c.headers['x-goog-api-key']).toBe('gemini-test-key');
@@ -103,12 +103,23 @@ describe('GeminiAdapter (mocked generativelanguage API)', () => {
         { role: 'user', parts: [{ text: 'again' }] },
       ],
       systemInstruction: { parts: [{ text: 'sys A\n\nsys B' }] },
-      generationConfig: { temperature: 0.3, maxOutputTokens: 64 },
+      // 2.5 flash = ปิดการคิด (ตอบไว · thinkingFor)
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 64,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     });
   });
 
   test('chat: multi-part text joined; no usage → tokensUsed undefined; model from request', async () => {
-    mockFetch([[GEMINI, () => json({ candidates: [{ content: { parts: [{ text: 'สวัส' }, { text: 'ดี' }, {}] } }] })]]);
+    mockFetch([
+      [
+        GEMINI,
+        () =>
+          json({ candidates: [{ content: { parts: [{ text: 'สวัส' }, { text: 'ดี' }, {}] } }] }),
+      ],
+    ]);
     await expect(gemini().chat(REQ)).resolves.toEqual({
       content: 'สวัสดี',
       model: 'm',
@@ -119,7 +130,10 @@ describe('GeminiAdapter (mocked generativelanguage API)', () => {
 
   test.each([
     [{ promptFeedback: { blockReason: 'SAFETY' } }, 'ไม่มีคำตอบ (SAFETY)'],
-    [{ candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [] } }] }, 'ไม่มีคำตอบ (MAX_TOKENS)'],
+    [
+      { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [] } }] },
+      'ไม่มีคำตอบ (MAX_TOKENS)',
+    ],
     [{}, 'ไม่มีข้อความในคำตอบ'],
   ])('empty/blocked answer %j → invalid_response', async (body, message) => {
     mockFetch([[GEMINI, () => json(body)]]);
@@ -143,7 +157,10 @@ describe('GeminiAdapter (mocked generativelanguage API)', () => {
             models: [
               { name: 'models/gemini-3-pro', supportedGenerationMethods: ['generateContent'] },
               { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
-              { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent', 'countTokens'] },
+              {
+                name: 'models/gemini-2.5-flash',
+                supportedGenerationMethods: ['generateContent', 'countTokens'],
+              },
               { name: 'models/legacy' },
             ],
           }),
@@ -176,7 +193,12 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
       'HTTP-Referer': 'https://github.com/assadawut170537cake-art/A.Tom',
       'X-Title': 'A.T.O.M.',
     });
-    expect(c.body).toEqual({ model: 'm', messages: REQ.messages, temperature: 0.3, max_tokens: 64 });
+    expect(c.body).toEqual({
+      model: 'm',
+      messages: REQ.messages,
+      temperature: 0.3,
+      max_tokens: 64,
+    });
   });
 
   test('chat: missing usage / model fall back; null content → invalid_response', async () => {
@@ -194,7 +216,10 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
 
   test('dynamic model list from /models (sorted); probe validates the key via /key', async () => {
     const { calls } = mockFetch([
-      [/openrouter\.ai\/api\/v1\/models/, () => json({ data: [{ id: 'z/model' }, { id: 'a/model' }] })],
+      [
+        /openrouter\.ai\/api\/v1\/models/,
+        () => json({ data: [{ id: 'z/model' }, { id: 'a/model' }] }),
+      ],
       [/openrouter\.ai\/api\/v1\/key/, () => json({ data: { label: 'k' } })],
     ]);
     await expect(openrouter().getModels()).resolves.toEqual(['a/model', 'z/model']);
@@ -207,7 +232,9 @@ describe('OpenRouter / OpenAI-compatible (mocked openrouter.ai)', () => {
   });
 
   test('probe 401 → readable auth error', async () => {
-    mockFetch([[OPENROUTER, () => json({ error: { message: 'No auth credentials found', code: 401 } }, 401)]]);
+    mockFetch([
+      [OPENROUTER, () => json({ error: { message: 'No auth credentials found', code: 401 } }, 401)],
+    ]);
     await expect(openrouter().testConnection()).resolves.toEqual({
       ok: false,
       error: '[openrouter] HTTP 401: API key ไม่ถูกต้องหรือไม่มีสิทธิ์ — No auth credentials found',
@@ -241,7 +268,12 @@ describe('JevAdapter (mocked TypeSafe System One)', () => {
             model: 'jev-2026-09',
             answers: {
               spam: { type: 'noul', noul: 0.97 },
-              tone: { type: 'choice', choice: 'angry', confidence: 0.8, probabilities: { angry: 0.8, calm: 0.2 } },
+              tone: {
+                type: 'choice',
+                choice: 'angry',
+                confidence: 0.8,
+                probabilities: { angry: 0.8, calm: 0.2 },
+              },
               urgency: { type: 'score', score: 1.7, confidence: 0.9 },
             },
             usage: { input_tokens: 120, output_tokens: 12 },
@@ -258,15 +290,22 @@ describe('JevAdapter (mocked TypeSafe System One)', () => {
     expect(res.answers.urgency).toMatchObject({ score: 1.7 });
     expect(nth(calls, 0).url.href).toBe('https://api.typesafe.ai/v1/systemone');
     expect(nth(calls, 0).headers.Authorization).toBe('Bearer jev-test-key');
-    expect(nth(calls, 0).body).toMatchObject({ model: 'jev-latest', state: 'I was charged twice!' });
+    expect(nth(calls, 0).body).toMatchObject({
+      model: 'jev-latest',
+      state: 'I was charged twice!',
+    });
   });
 
   test('ask(): empty answers → invalid_response; 422 validation detail is surfaced', async () => {
     mockFetch([[JEV, () => json({ model: 'jev-latest', answers: {}, usage: {} })]]);
-    await expect(jev().ask('x', { q: { type: 'noul' } })).rejects.toMatchObject({ kind: 'invalid_response' });
+    await expect(jev().ask('x', { q: { type: 'noul' } })).rejects.toMatchObject({
+      kind: 'invalid_response',
+    });
 
     jest.restoreAllMocks();
-    mockFetch([[JEV, () => json({ detail: [{ loc: ['body', 'questions'], msg: 'Field required' }] }, 422)]]);
+    mockFetch([
+      [JEV, () => json({ detail: [{ loc: ['body', 'questions'], msg: 'Field required' }] }, 422)],
+    ]);
     await expect(jev().ask('x', { q: { type: 'noul' } }, 'jev-preview')).rejects.toMatchObject({
       kind: 'bad_request',
       message: '[jev] HTTP 422: คำขอไม่ถูกต้อง — Field required',
@@ -281,18 +320,45 @@ describe('JevAdapter (mocked TypeSafe System One)', () => {
 
   test('getModels / probe use GET /v1/models', async () => {
     const { calls } = mockFetch([
-      [JEV, () => json({ models: [{ name: 'jev-latest', description: 'x', release_date: '2026-09-15' }, { name: 'jev-preview', description: 'y', release_date: '2026-10-01' }] })],
+      [
+        JEV,
+        () =>
+          json({
+            models: [
+              { name: 'jev-latest', description: 'x', release_date: '2026-09-15' },
+              { name: 'jev-preview', description: 'y', release_date: '2026-10-01' },
+            ],
+          }),
+      ],
     ]);
     await expect(jev().getModels()).resolves.toEqual(['jev-latest', 'jev-preview']);
     await expect(jev().testConnection()).resolves.toEqual({ ok: true });
-    expect(calls.map((c) => `${c.method} ${c.url.pathname}`)).toEqual(['GET /v1/models', 'GET /v1/models']);
+    expect(calls.map((c) => `${c.method} ${c.url.pathname}`)).toEqual([
+      'GET /v1/models',
+      'GET /v1/models',
+    ]);
   });
 
   test('TypeSafe auth error body ({detail:{message}}) is readable', async () => {
-    mockFetch([[JEV, () => json({ detail: { error_type: 'authentication_error', message: 'Cannot authenticate with the server.' } }, 401)]]);
+    mockFetch([
+      [
+        JEV,
+        () =>
+          json(
+            {
+              detail: {
+                error_type: 'authentication_error',
+                message: 'Cannot authenticate with the server.',
+              },
+            },
+            401,
+          ),
+      ],
+    ]);
     await expect(jev().testConnection()).resolves.toEqual({
       ok: false,
-      error: '[jev] HTTP 401: API key ไม่ถูกต้องหรือไม่มีสิทธิ์ — Cannot authenticate with the server.',
+      error:
+        '[jev] HTTP 401: API key ไม่ถูกต้องหรือไม่มีสิทธิ์ — Cannot authenticate with the server.',
     });
   });
 
@@ -304,6 +370,8 @@ describe('JevAdapter (mocked TypeSafe System One)', () => {
     });
     jest.restoreAllMocks();
     mockFetch([[JEV, () => httpError(429, 'slow down')]]);
-    await expect(jev().testConnection()).resolves.toMatchObject({ error: expect.stringContaining('rate limit') });
+    await expect(jev().testConnection()).resolves.toMatchObject({
+      error: expect.stringContaining('rate limit'),
+    });
   });
 });

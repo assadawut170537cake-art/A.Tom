@@ -27,7 +27,10 @@ interface OrtModule {
 }
 
 function loadOrt(): OrtModule {
+  // เช็ก native module ก่อน require: ไม่มีแล้ว require = binding โยน "install of null" ตอนโหลด module
+  // ซึ่ง Metro รายงานเป็น error ร้ายแรงทั้งแอปแม้จะครอบ try/catch ไว้ (Boss เจอซ้ำหลายรอบในแชท 2026-10-21)
   try {
+    if (NativeModules.Onnxruntime == null) throw new Error('no native module');
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy: native module ไม่มีใน Expo Go / jest
     return require('onnxruntime-react-native') as OrtModule;
   } catch {

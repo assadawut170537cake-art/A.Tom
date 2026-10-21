@@ -37,6 +37,9 @@ interface SendOptions {
   attachments?: AttachmentRef[] | undefined;
 }
 
+/** ตอบนานเกินนี้ → ขึ้นข้อความบอกว่าช้าช่วงไหน (หาสาเหตุตอบช้าบนเครื่องจริง) */
+export const SLOW_REPLY_MS = 12_000;
+
 /** แนบไฟล์มาแต่ไม่พิมพ์อะไร */
 export const ATTACHMENT_ONLY_PROMPT = 'ช่วยดูไฟล์ที่แนบมาให้หน่อย';
 
@@ -71,7 +74,10 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
   // ref object: ถูกตั้งค่าใน callback ของสตรีม (TS ตามการกำหนดค่าใน closure ไม่ได้ถ้าใช้ let เปล่า)
   const speech: { current: SpeechStream | null } = { current: null };
   let speechRefused = false;
+  const startedAt = Date.now();
+  let firstDeltaAt = 0;
   const onDelta = (delta: string) => {
+    if (!firstDeltaAt) firstDeltaAt = Date.now();
     if (!isLatest()) return; // รอบเก่าที่ยังพิมพ์ค้างต้องไม่มาแทรกรอบใหม่
     useAtomStore.getState().appendStreaming(persona, delta);
     if (!speakAllowed || speechRefused) return;
@@ -109,6 +115,18 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       persona: result.persona,
       imageUri: result.imageUri,
     });
+    // ตอบช้า → บอกว่าช้าช่วงไหน (ก่อนเริ่มพิมพ์ = ตัดสินใจคำสั่ง/รอโมเดล · หลังเริ่มพิมพ์ = โมเดลพิมพ์ยาว) ให้บอสส่งทีมแก้ตรงจุด
+    const took = Date.now() - startedAt;
+    if (took > SLOW_REPLY_MS) {
+      const first = firstDeltaAt
+        ? ` · เริ่มพิมพ์หลัง ${((firstDeltaAt - startedAt) / 1000).toFixed(1)} วิ`
+        : '';
+      useAtomStore.getState().pushMessage({
+        role: 'system',
+        content: `⏱ ตอบช้า ${(took / 1000).toFixed(1)} วิ${first} · ทาง ${route.intent}/${route.provider}`,
+        persona: result.persona,
+      });
+    }
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest())
       useAgentPanelStore.getState().open(result.agentScreen.agentId);

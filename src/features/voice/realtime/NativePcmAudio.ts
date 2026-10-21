@@ -90,7 +90,9 @@ export class NativePcmAudio implements PcmAudio {
     this.context = new AudioContext({ sampleRate: PLAYBACK_SAMPLE_RATE });
     this.queue = this.context.createBufferQueueSource();
     this.queue.connect(this.context.destination);
-    this.queue.start();
+    // ส่ง offset เอง: react-native-audio-api ตั้งค่าเริ่มต้น offset = -1 แล้วโยน RangeError ใส่ตัวเอง
+    // ("offset must be a finite non-negative number: -1" — เสียงสด Gemini เริ่มไม่ได้ · Boss เจอ 2026-10-21)
+    this.queue.start(0, 0);
 
     const recorder = new AudioRecorder();
     this.recorder = recorder;

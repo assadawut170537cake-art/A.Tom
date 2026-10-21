@@ -150,7 +150,12 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
       generationConfig: { temperature: number; maxOutputTokens: number };
     };
     expect(body.systemInstruction.parts[0].text).toBe(CLASSIFIER_SYSTEM_PROMPT);
-    expect(body.generationConfig).toEqual({ temperature: 0, maxOutputTokens: 50 });
+    // ลดการคิด — ไม่งั้น token คิดของ Gemini 3 กิน maxOutputTokens 50 จนคำตอบว่าง
+    expect(body.generationConfig).toEqual({
+      temperature: 0,
+      maxOutputTokens: 50,
+      thinkingConfig: { thinkingLevel: 'low' },
+    });
   });
 
   test('falls back to OpenRouter when Gemini is rate limited', async () => {
