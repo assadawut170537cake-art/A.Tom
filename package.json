@@ -64,7 +64,8 @@
     "test": "jest",
     "test:coverage": "jest --coverage",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "postinstall": "node scripts/patch-native-deps.js"
   },
   "private": true,
   "jest": {
