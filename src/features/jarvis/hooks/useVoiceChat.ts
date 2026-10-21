@@ -10,11 +10,21 @@ import { useWakeWord } from './useWakeWord';
 export type LiveEngine = 'auto' | 'realtime' | 'system' | 'classic';
 type Picked = 'realtime' | 'system' | 'classic';
 
+/** เสียงสดต่อไม่ติดแล้วในรอบเปิดแอปนี้ — auto ข้ามไปทางสำรองเลย ไม่ต้องรอ error ซ้ำทุกครั้ง (รีเซ็ตเมื่อเปิดแอปใหม่) */
+let realtimeBroken = false;
+export const resetRealtimeBroken = () => {
+  realtimeBroken = false;
+};
+
+/** ทางสำรองเมื่อไม่ใช้เสียงสด */
+const fallbackEngine = (): Picked => (isSystemSttAvailable() ? 'system' : 'classic');
+
 export async function pickEngine(): Promise<Picked> {
   const engine = ((await ProviderSettings.getOption('live', 'engine')) ?? 'auto') as LiveEngine;
   if (engine === 'classic' || engine === 'system') return engine;
-  if (engine === 'realtime' || (await shouldUseRealtime())) return 'realtime';
-  return isSystemSttAvailable() ? 'system' : 'classic';
+  if (engine === 'realtime') return 'realtime';
+  if (!realtimeBroken && (await shouldUseRealtime())) return 'realtime';
+  return fallbackEngine();
 }
 
 /**
@@ -24,8 +34,14 @@ export async function pickEngine(): Promise<Picked> {
  */
 export function useVoiceChat(): LiveVoiceControls {
   const classic = useLiveVoice();
-  const realtime = useRealtimeVoice();
   const system = useSystemSpeechVoice();
+  // เสียงสดต่อไม่ติด (key/รุ่น/native/เน็ต) → สลับไปทางสำรองทันที บอสพูดต่อได้เลย (Boss เจอไมค์ใช้ไม่ได้ 2026-10-21)
+  const realtime = useRealtimeVoice(() => {
+    realtimeBroken = true;
+    if (fallbackEngine() === 'system') system.start();
+    else classic.start();
+    return true;
+  });
 
   const start = useCallback(() => {
     void pickEngine().then((engine) => {

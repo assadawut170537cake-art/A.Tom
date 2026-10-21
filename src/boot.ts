@@ -30,6 +30,7 @@ import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
 import { registerCustomProviders } from './features/ai/customProviders';
 import { useAtomStore } from './features/jarvis/stores/useAtomStore';
+import { ONNX_BROKEN_MESSAGE, checkOnnxGuardOnBoot } from './features/voice/onnxGuard';
 import { settingsHealthEntries } from './features/settings/settingsHealthEntries';
 import { loadAssistantData, registerAssistantAgents } from './features/assistant';
 import { composeBriefing } from './features/assistant/agents/reminder';
@@ -110,6 +111,11 @@ export function bootApp(): Promise<BootReport> {
       store.setUIMode('conversation');
       store.pushMessage({ role: 'assistant', content });
     });
+  });
+  // ครั้งก่อนแอปเด้งตอนโหลดโมเดลเสียง → ปิด ONNX ไว้ + บอกบอส (ไม่ให้เด้งวนทุกครั้งที่เปิดแอป)
+  void checkOnnxGuardOnBoot().then((crashed) => {
+    if (crashed)
+      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${ONNX_BROKEN_MESSAGE}` });
   });
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();

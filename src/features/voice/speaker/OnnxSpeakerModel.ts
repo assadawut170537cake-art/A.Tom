@@ -8,8 +8,10 @@
 
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
+import { NativeModules } from 'react-native';
 
 import { ProviderError } from '../../../core/http/errors';
+import { withOnnxGuard } from '../onnxGuard';
 import { EMBEDDING_DIM, type SpeakerModel } from './embedding';
 import { FBANK_MEL_BINS } from './fbank';
 
@@ -37,14 +39,13 @@ function loadOrt(): OrtModule {
   }
 }
 
-/** มี native module ONNX ใน build นี้ไหม */
+/**
+ * มี native module ONNX ใน build นี้ไหม — ดูแค่ว่ามี module ลงทะเบียนไว้ **ไม่ require**
+ * เพราะ require = `Module.install()` (ติดตั้ง JSI) ทันที · หน้าตั้งค่าเรียกตัวนี้ตอน render
+ * ถ้า install มีปัญหาบนเครื่อง (สงสัยว่าทำแอปเด้งตอนเปิดหน้าเสียง 2026-10-21) จะไม่ลากหน้าตั้งค่าพังไปด้วย
+ */
 export function isOnnxAvailable(): boolean {
-  try {
-    loadOrt();
-    return true;
-  } catch {
-    return false;
-  }
+  return NativeModules.Onnxruntime != null;
 }
 
 export class OnnxSpeakerModel implements SpeakerModel {
@@ -56,8 +57,8 @@ export class OnnxSpeakerModel implements SpeakerModel {
   }
 
   async embed(feats: Float32Array, frames: number): Promise<Float32Array> {
+    const session = await this.getSession(); // ก่อน loadOrt: require/install อยู่ใต้ onnxGuard
     const ort = loadOrt();
-    const session = await this.getSession();
     const input = new ort.Tensor('float32', feats, [1, frames, FBANK_MEL_BINS]);
     const result = await session.run({ feats: input });
     const data = result.embs?.data;
@@ -69,7 +70,7 @@ export class OnnxSpeakerModel implements SpeakerModel {
 
   private getSession(): Promise<OrtSession> {
     if (!this.session) {
-      const pending = this.load();
+      const pending = withOnnxGuard('speaker', () => this.load());
       // โหลดไม่สำเร็จ → รอบหน้าลองใหม่ได้ (ไม่แคช error)
       pending.catch(() => {
         if (this.session === pending) this.session = null;

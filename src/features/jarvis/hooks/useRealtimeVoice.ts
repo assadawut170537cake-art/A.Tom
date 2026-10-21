@@ -24,7 +24,14 @@ export async function shouldUseRealtime(): Promise<boolean> {
  * โหมดคุยด้วยเสียงสด (speech-to-speech) บนหน้าหลัก — คืน interface เดียวกับ `useLiveVoice`
  * เพื่อให้ MainScreen สลับเครื่องยนต์ได้ · สถานะแปลงเป็น mood ของ Orb
  */
-export function useRealtimeVoice(): LiveVoiceControls {
+/**
+ * @param onConnectFailed ต่อสายไม่สำเร็จ → ให้ผู้เรียกสลับเครื่องยนต์ (คืน true = สลับแล้ว) · อ่านค่าล่าสุดทุกครั้งผ่าน ref
+ */
+export function useRealtimeVoice(onConnectFailed?: (error: unknown) => boolean): LiveVoiceControls {
+  const fallbackRef = useRef(onConnectFailed);
+  useEffect(() => {
+    fallbackRef.current = onConnectFailed;
+  }, [onConnectFailed]);
   const [state, setState] = useState<LiveVoiceState>('idle');
   const sessionRef = useRef<RealtimeVoiceSession | null>(null);
 
@@ -53,6 +60,7 @@ export function useRealtimeVoice(): LiveVoiceControls {
       },
       onMessage: (message) =>
         useAtomStore.getState().pushMessage({ role: 'system', content: message }),
+      onConnectFailed: (error) => fallbackRef.current?.(error) ?? false,
     });
     sessionRef.current = session;
     return () => {

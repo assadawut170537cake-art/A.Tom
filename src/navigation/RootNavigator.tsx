@@ -1,6 +1,7 @@
 import { DarkTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { ScreenErrorBoundary } from '../core/components/ScreenErrorBoundary';
 import { AgentScreen } from '../features/agents/screens/AgentScreen';
 import { HistoryScreen } from '../features/jarvis/screens/HistoryScreen';
 import { MainScreen } from '../features/jarvis/screens/MainScreen';
@@ -39,6 +40,10 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={THEME}>
       <Stack.Navigator
+        // ทุกหน้ามีตัวกัน error — หน้าพังแล้วแสดงข้อความแทนการปิดแอป
+        screenLayout={({ route, children }) => (
+          <ScreenErrorBoundary screen={route.name}>{children}</ScreenErrorBoundary>
+        )}
         screenOptions={{
           headerStyle: { backgroundColor: BG },
           headerTintColor: '#fff',

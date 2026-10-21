@@ -8,6 +8,7 @@ import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 
 import { ProviderError } from '../../../core/http/errors';
+import { withOnnxGuard } from '../onnxGuard';
 import type { WakeModels } from './WakeWordDetector';
 
 interface OrtSession {
@@ -53,24 +54,24 @@ export class OnnxWakeModels implements WakeModels {
   }
 
   async mel(samples: Float32Array): Promise<Float32Array> {
+    const [mel] = await this.load(); // ก่อน loadOrt: require/install อยู่ใต้ onnxGuard
     const ort = loadOrt();
-    const [mel] = await this.load();
     return firstOutput(
       await mel.run({ input: new ort.Tensor('float32', samples, [1, samples.length]) }),
     );
   }
 
   async embed(mel: Float32Array): Promise<Float32Array> {
+    const [, embed] = await this.load(); // ก่อน loadOrt: require/install อยู่ใต้ onnxGuard
     const ort = loadOrt();
-    const [, embed] = await this.load();
     return firstOutput(
       await embed.run({ input_1: new ort.Tensor('float32', mel, [1, 76, 32, 1]) }),
     );
   }
 
   async score(features: Float32Array): Promise<number> {
+    const [, , ww] = await this.load(); // ก่อน loadOrt: require/install อยู่ใต้ onnxGuard
     const ort = loadOrt();
-    const [, , ww] = await this.load();
     return (
       firstOutput(await ww.run({ 'x.1': new ort.Tensor('float32', features, [1, 16, 96]) }))[0] ?? 0
     );
@@ -78,15 +79,17 @@ export class OnnxWakeModels implements WakeModels {
 
   private load(): Promise<[OrtSession, OrtSession, OrtSession]> {
     if (!this.sessions) {
-      const ort = loadOrt();
-      const pending = Promise.all([
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
-        loadSession(ort, require('../../../../assets/models/melspectrogram.onnx') as number),
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
-        loadSession(ort, require('../../../../assets/models/embedding_model.onnx') as number),
-        // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
-        loadSession(ort, require('../../../../assets/models/hey_jarvis_v0.1.onnx') as number),
-      ]);
+      const pending = withOnnxGuard('wakeword', () => {
+        const ort = loadOrt();
+        return Promise.all([
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
+          loadSession(ort, require('../../../../assets/models/melspectrogram.onnx') as number),
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
+          loadSession(ort, require('../../../../assets/models/embedding_model.onnx') as number),
+          // eslint-disable-next-line @typescript-eslint/no-require-imports -- asset ของ Metro ต้อง require แบบ static
+          loadSession(ort, require('../../../../assets/models/hey_jarvis_v0.1.onnx') as number),
+        ]);
+      });
       pending.catch(() => {
         if (this.sessions === pending) this.sessions = null; // โหลดไม่สำเร็จ → รอบหน้าลองใหม่
       });

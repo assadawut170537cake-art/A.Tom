@@ -14,7 +14,12 @@
  *   (เสียงที่สตรีมขึ้นไปถูกคิดเงินแม้เป็นความเงียบ)
  */
 
-import { toProviderError, userAdvice } from '../../../core/http/errors';
+import {
+  ProviderError,
+  redactSecrets,
+  toProviderError,
+  userAdvice,
+} from '../../../core/http/errors';
 import type { LiveVoiceState } from '../live/LiveVoiceSession';
 import type { RealtimeConfig, RealtimeEvents, RealtimeToolCall, RealtimeTransport } from './types';
 
@@ -57,11 +62,23 @@ export interface RealtimeVoiceDeps {
   onStateChange?(state: LiveVoiceState): void;
   /** ข้อความไทยที่ควรแสดงในแชท (error / เหตุผลที่ตัดสาย) */
   onMessage?(message: string): void;
+  /**
+   * ต่อสายไม่สำเร็จ (ก่อนเริ่มคุย) — คืน true = ผู้เรียกสลับไปเครื่องยนต์อื่นให้แล้ว (เช่นตัวฟังเสียงของระบบ)
+   * ไม่ส่ง = ตัดสายแล้วแจ้ง error ตามเดิม
+   */
+  onConnectFailed?(error: unknown): boolean;
   timers?: RealtimeTimers;
 }
 
+/** ต่อสายเสียงสดไม่สำเร็จแต่สลับไปทางอื่นได้ — ต่อท้ายข้อความ error */
+export const REALTIME_FALLBACK_NOTE = '↪ สลับไปฟังด้วยวิธีสำรองให้แล้ว คุยต่อได้เลย';
+
 /** ข้อความไทยสำหรับ error ของเสียงสด */
 export function describeRealtimeError(e: unknown): string {
+  // error ที่ไม่ใช่ ProviderError (native module / WebSocket / เสียง) ไม่ใช่ "ไม่มีเน็ต" เสมอไป — บอกข้อความจริง
+  if (!(e instanceof ProviderError)) {
+    return `⚠️ เสียงสดเริ่มไม่ได้\n${redactSecrets(e instanceof Error ? e.message : String(e))}`;
+  }
   const err = toProviderError('realtime', e);
   if (err.kind === 'permission') return `⚠️ ${err.message.replace(/^\[[^\]]+\]\s*/, '')}`;
   if (err.kind === 'missing_key') return REALTIME_KEY_MESSAGE;
@@ -116,7 +133,21 @@ export class RealtimeVoiceSession {
       if (!this.isCurrent(run)) return;
       await this.deps.transport.connect(config, this.eventsFor(run));
     } catch (e) {
-      if (this.isCurrent(run)) this.fail(describeRealtimeError(e));
+      if (!this.isCurrent(run)) return;
+      const message = describeRealtimeError(e);
+      // ไมค์ไม่ได้สิทธิ์ = ทางอื่นก็ใช้ไม่ได้ ไม่ต้องสลับ
+      const kind = e instanceof ProviderError ? e.kind : null;
+      if (kind !== 'permission') {
+        this.runId++;
+        this.end();
+        if (this.deps.onConnectFailed?.(e)) {
+          this.deps.onMessage?.(`${message}\n${REALTIME_FALLBACK_NOTE}`);
+          return;
+        }
+        this.deps.onMessage?.(message);
+        return;
+      }
+      this.fail(message);
       return;
     }
     if (!this.isCurrent(run)) {

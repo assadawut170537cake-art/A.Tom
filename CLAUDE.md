@@ -340,6 +340,11 @@
 - ผลมีรูป: `AgentRunResult.imageUri` → `HandlerResult.imageUri` → `pushMessage({imageUri})` → `ChatBubble`
 - คำปลุก `voice/wakeword/`: `WakeWordDetector` (พอร์ตจาก `scripts/speaker/ref_wakeword.py`) · `templates.ts` ("เฮ่ อะตอม" จับคู่เทมเพลต + `calibrate`) · `wakeConfig.ts` (โหมด atom|jarvis, เกณฑ์, โปรไฟล์เป็นไฟล์ใน documents) · `wakeSettings.ts` (เปิด/ปิด + `acquireMic` ประสานไมค์) · `useWakeWord` ใน `useVoiceChat` · UI `settings/components/WakeWordCard.tsx` · ใครใช้ไมค์ในหน้าตั้งค่าต้อง `acquireMic()` ก่อนเสมอ ไม่งั้นชนกับตัวฟังคำปลุก
 
+### กันแอปเด้ง (Boss เจอแอปเด้ง 2026-10-21 · ยังไม่ได้ logcat)
+- ทุกหน้า (RootNavigator `screenLayout`) ครอบ `ScreenErrorBoundary` (`core/components`) — error ตอน render แสดงข้อความจริง ไม่ปิดแอป · `installCrashGuard()` (`features/jarvis/crashGuard.ts`, เรียกใน App) = error JS นอก React → ข้อความ ⚠️ ในแชท (dev ยังเห็นจอแดง)
+- ONNX (คำปลุก/จำเสียง) ครอบ `withOnnxGuard()` (`features/voice/onnxGuard.ts`): จด `loading` ก่อนโหลด · เปิดแอปแล้วเจอค้าง = native crash รอบก่อน → `broken` ไม่โหลดอีก + แจ้งบอส · ปุ่ม "ลองโหลดโมเดลอีกครั้ง" ใน WakeWordCard · `isOnnxAvailable()` ดูแค่ `NativeModules.Onnxruntime` (ห้าม require ตอน render — require = install JSI)
+- เสียงสดต่อไม่ติด → `onConnectFailed` → `useVoiceChat` สลับไป system/classic ทันที + จำว่าพังทั้งรอบเปิดแอป (`realtimeBroken`) · error ที่ไม่ใช่ ProviderError ห้ามบอกว่า "ไม่มีเน็ต" (`describeRealtimeError` แสดงข้อความจริง)
+
 ### เสียงของฉัน (Speaker verification) + ตัวรู้จำเสียงระบบ
 - `features/voice/speaker/`: `fbank.ts` (Kaldi fbank TS) → `OnnxSpeakerModel.ts` (WeSpeaker ONNX, lazy) → `embedding.ts` · `profile.ts` (SecureStore: ห้ามลง AsyncStorage/log) · `gate.ts` (state machine ตามจำนวนตัวอย่าง ไม่ใช้นาฬิกา) · `SpeakerService.ts` (สร้าง gate / ลงทะเบียน) · gate ต่อที่ `GeminiLiveTransport` (DI `gate`) · UI `settings/components/SpeakerEnrollmentCard.tsx`
 - ตรวจ fbank เทียบ numpy: `scripts/speaker/ref_fbank.py > src/__tests__/fixtures/fbank_golden.json` (ปัดสัญญาณเป็น float32 ให้เหมือนฝั่งแอป)

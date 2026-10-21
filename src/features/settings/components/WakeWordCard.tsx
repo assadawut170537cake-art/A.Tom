@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Switch, Text, View } from 'react-native';
 
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
+import { ONNX_BROKEN_MESSAGE, isOnnxBroken, resetOnnxGuard } from '../../voice/onnxGuard';
 import { recordSamples } from '../../voice/speaker/SpeakerService';
 import { OnnxWakeModels } from '../../voice/wakeword/OnnxWakeModels';
 import { buildTemplates, type WakeProfile } from '../../voice/wakeword/templates';
@@ -35,15 +36,19 @@ export function WakeWordCard() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [live, setLive] = useState<{ last: number; max: number; hits: number } | null>(null);
+  /** ครั้งก่อนแอปเด้งตอนโหลดโมเดล (onnxGuard) */
+  const [onnxBroken, setOnnxBroken] = useState(false);
   const releaseRef = useRef<(() => void) | null>(null);
 
   const reload = useCallback(async () => {
-    const [on, m, p, jt] = await Promise.all([
+    const [on, m, p, jt, broken] = await Promise.all([
       wakeSettings.isEnabled(),
       wakeConfig.getMode(),
       wakeConfig.loadProfile(),
       wakeConfig.getJarvisThreshold(),
+      isOnnxBroken(),
     ]);
+    setOnnxBroken(broken);
     setEnabled(on);
     setMode(m);
     setProfile(p);
@@ -150,6 +155,15 @@ export function WakeWordCard() {
   return (
     <Card>
       <Text className="text-sm font-semibold text-white">คำปลุก</Text>
+      {onnxBroken && (
+        <View className="gap-2 rounded-xl bg-red-500/15 p-3">
+          <Text className="text-xs leading-5 text-red-200">{ONNX_BROKEN_MESSAGE}</Text>
+          <SmallButton
+            label="ลองโหลดโมเดลอีกครั้ง"
+            onPress={() => void resetOnnxGuard().then(() => setOnnxBroken(false))}
+          />
+        </View>
+      )}
       <Text className="text-xs leading-5 text-white/50">
         พูดคำปลุกตอนเปิดแอปอยู่ เพื่อเริ่มคุยโดยไม่ต้องแตะ (ฟังบนเครื่อง
         ไม่ส่งเสียงออกไปจนกว่าจะตื่น) ไมค์เปิดตลอดจึงกินแบตเพิ่ม และ Android
