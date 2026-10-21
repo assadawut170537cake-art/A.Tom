@@ -1,5 +1,7 @@
 import { MAX_PROMPT_LINE, toPromptLine } from '../../../core/memory/promptLine';
 import type { MemoryFact, MemoryStore } from '../../../core/memory/types';
+import { ProviderSettings } from '../../../core/storage/ProviderSettings';
+import type { AIProviderId } from '../../../core/types/aiProvider';
 import { aiOrchestrator, type Orchestrator } from '../../ai/core/Orchestrator';
 import type { ChatMessage } from '../../ai/core/types';
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
@@ -18,6 +20,8 @@ export const MAX_FACT_LENGTH = MAX_PROMPT_LINE;
 export { toPromptLine };
 
 type SystemPromptFor = (persona: Persona) => string | undefined;
+/** LLM ที่บอสผูกไว้กับ persona (ตั้งค่า › AI) — undefined = อัตโนมัติ */
+type LLMFor = (persona: Persona) => Promise<AIProviderId | undefined>;
 
 /**
  * Forwards the conversation to the AI Orchestrator with the active persona's system prompt.
@@ -28,7 +32,8 @@ export class ChatHandler implements IntentHandler<'chat'> {
   constructor(
     private readonly orchestrator: Orchestrator = aiOrchestrator,
     private readonly systemPromptFor: SystemPromptFor = getPersonaPrompt,
-    private readonly memoryStore?: MemoryStore
+    private readonly memoryStore?: MemoryStore,
+    private readonly llmFor: LLMFor = ProviderSettings.getLLMFor,
   ) {}
 
   async handle(input: RouterInput): Promise<HandlerResult> {
@@ -39,10 +44,29 @@ export class ChatHandler implements IntentHandler<'chat'> {
     const messages: ChatMessage[] = [
       ...(system ? [{ role: 'system' as const, content: system }] : []),
       ...(input.context?.history ?? []).filter((m) => m.role !== 'system').slice(-MAX_HISTORY),
-      { role: 'user', content: input.text },
+      {
+        role: 'user',
+        content: input.text,
+        ...(input.attachments?.length && { attachments: input.attachments }),
+      },
     ];
-    const res = await this.orchestrator.chat({ messages });
-    return { reply: res.content.trim(), persona };
+    // persona ที่ผูกโมเดลไว้ = ลองตัวนั้นก่อน (ล้มยัง fallback ตามลำดับ) · ไม่ผูก = อัตโนมัติเหมือนเดิม
+    const providerId = await this.preferredLLM(persona);
+    const req = providerId ? { messages, providerId } : { messages };
+    // มีผู้ฟังท่อนข้อความ = สตรีม (เริ่มพูด/แสดงก่อนตอบจบ) · ไม่มี = เหมือนเดิม
+    const res = input.onDelta
+      ? await this.orchestrator.chatStream(req, input.onDelta)
+      : await this.orchestrator.chat(req);
+    return { reply: res.content.trim(), persona, ...(input.onDelta && { streamed: true }) };
+  }
+
+  private async preferredLLM(persona: Persona): Promise<AIProviderId | undefined> {
+    try {
+      return await this.llmFor(persona);
+    } catch (e) {
+      console.error('[chat] อ่านโมเดลของ persona ไม่ได้ — ใช้อัตโนมัติ', e);
+      return undefined;
+    }
   }
 
   /** "What I remember about Boss" block, or '' when there is no memory (or it can't be read). */

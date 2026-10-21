@@ -42,6 +42,8 @@ export interface AgentRunResult {
   reply: string;
   /** true = ขอเปิด UI ของ agent (มีผลเฉพาะ agent ที่มี `loadScreen`) */
   showScreen?: boolean | undefined;
+  /** รูปที่แนบกับคำตอบ (file:// ในเครื่อง) — แสดงใต้ข้อความในแชท */
+  imageUri?: string | undefined;
 }
 
 export interface AgentScreenProps {

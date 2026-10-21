@@ -5,6 +5,9 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+// expo/fetch = native · ในเทสต์ชี้ไปที่ global fetch (เทสต์เดิม mock ตัวนี้อยู่แล้ว) → สตรีม LLM ใช้ mock เดียวกัน
+jest.mock('expo/fetch', () => ({ fetch: (...args) => globalThis.fetch(...args) }));
+
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => require('react-native-reanimated/mock'));
 
@@ -66,6 +69,17 @@ jest.mock('expo-audio', () => ({
   }),
   getRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
   requestRecordingPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+  requestNotificationPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+}));
+
+// ปุ่ม + : ตัวเลือกรูป/ไฟล์ — ค่าเริ่มต้น = บอสกดยกเลิก (test mock ผลเองตามต้องการ)
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  launchCameraAsync: jest.fn(async () => ({ canceled: true, assets: null })),
+  requestCameraPermissionsAsync: jest.fn(async () => ({ granted: true, status: 'granted', canAskAgain: true })),
+}));
+jest.mock('expo-document-picker', () => ({
+  getDocumentAsync: jest.fn(async () => ({ canceled: true, assets: null })),
 }));
 
 jest.mock('expo-brightness', () => ({

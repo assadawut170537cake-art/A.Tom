@@ -7,6 +7,7 @@ import { ExpoSpeechSTT } from './stt/ExpoSpeechSTT';
 import { GoogleCloudSTT } from './stt/GoogleCloudSTT';
 import { RevAISTT } from './stt/RevAISTT';
 import { WhisperSTT } from './stt/WhisperSTT';
+import { XaiSTT } from './stt/XaiSTT';
 import { AzureTTS } from './tts/AzureTTS';
 import { CustomTTS } from './tts/CustomTTS';
 import { ElevenLabsTTS } from './tts/ElevenLabsTTS';
@@ -16,8 +17,9 @@ import { GoogleCloudTTS } from './tts/GoogleCloudTTS';
 import { OpenAITTS } from './tts/OpenAITTS';
 import { PlayHTTTS } from './tts/PlayHTTTS';
 import { PollyTTS } from './tts/PollyTTS';
+import { XaiTTS } from './tts/XaiTTS';
 
-/** Registers all 9 TTS + 8 STT providers (idempotent). Call once at app start. */
+/** Registers all 10 TTS + 9 STT providers (idempotent). Call once at app start. */
 export function registerVoiceProviders(registry: VoiceRegistry = voiceRegistry): VoiceRegistry {
   [
     new ExpoSpeechTTS(),
@@ -28,6 +30,7 @@ export function registerVoiceProviders(registry: VoiceRegistry = voiceRegistry):
     new AzureTTS(),
     new PollyTTS(),
     new PlayHTTTS(),
+    new XaiTTS(),
     new CustomTTS(),
   ].forEach((p) => registry.registerTTS(p));
   [
@@ -38,6 +41,7 @@ export function registerVoiceProviders(registry: VoiceRegistry = voiceRegistry):
     new AzureSTT(),
     new AssemblyAISTT(),
     new RevAISTT(),
+    new XaiSTT(),
     new CustomSTT(),
   ].forEach((p) => registry.registerSTT(p));
   return registry;

@@ -3,7 +3,18 @@ import { File, Paths } from 'expo-file-system';
 
 import { ProviderError, testWith } from '../../../core/http/errors';
 import { providerOption, providerSecret } from './credentials';
-import type { SpeakOptions, TTSProvider, TTSProviderId, Voice } from './types';
+import type { PreparedSpeech, SpeakOptions, TTSProvider, TTSProviderId, Voice } from './types';
+
+/** เลขต่อท้ายชื่อไฟล์ — กันชื่อชนเมื่อเตรียมหลายประโยคในมิลลิวินาทีเดียว */
+let fileSeq = 0;
+
+function deleteQuietly(file: File): void {
+  try {
+    file.delete();
+  } catch {
+    // cache cleanup is best-effort
+  }
+}
 
 /** Default speech language for the app. */
 export const TTS_LANGUAGE = 'th-TH';
@@ -14,8 +25,7 @@ export function toGender(value: string | undefined): Voice['gender'] {
   return undefined;
 }
 
-export const escapeXml = (s: string) =>
-  s.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
+export const escapeXml = (s: string) => s.replace(/[<>&'"]/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** SSML <prosody> attributes from SpeakOptions multipliers (1 = normal), or '' when unchanged. */
 export function ssmlProsody(opts: SpeakOptions): string {
@@ -62,12 +72,39 @@ export abstract class BaseCloudTTS implements TTSProvider {
     const audio = await this.synthesize(text, opts);
     // stop() or a newer speak() ran while we were synthesizing: don't play stale audio
     if (currentRun !== this.runId) return;
+    await this.playFile(this.writeAudio(audio));
+  }
 
-    const file = new File(Paths.cache, `tts-${this.id}-${Date.now()}.${audio.ext}`);
+  /**
+   * สังเคราะห์ + เขียนไฟล์ไว้ก่อน ยังไม่เล่น (ไม่แตะเสียงที่กำลังเล่นอยู่) — สตรีมเสียงใช้เตรียมประโยคถัดไป
+   * ระหว่างที่ประโยคปัจจุบันยังพูด · `play()` ทีหลัง (stop() หยุดได้ตามปกติ) · ไม่ใช้ = `discard()`
+   */
+  async prepare(text: string, opts: SpeakOptions = {}): Promise<PreparedSpeech> {
+    const file = this.writeAudio(await this.synthesize(text, opts));
+    let used = false;
+    return {
+      play: () => {
+        used = true;
+        return this.playFile(file);
+      },
+      discard: () => {
+        if (used) return;
+        used = true;
+        deleteQuietly(file);
+      },
+    };
+  }
+
+  private writeAudio(audio: SynthesizedAudio): File {
+    const file = new File(Paths.cache, `tts-${this.id}-${Date.now()}-${fileSeq++}.${audio.ext}`);
     if (audio.data instanceof Uint8Array) file.write(audio.data);
     else file.write(audio.data.base64, { encoding: 'base64' });
+    return file;
+  }
 
-    await new Promise<void>((resolve, reject) => {
+  /** เล่นไฟล์ · resolve เมื่อจบหรือ stop() · ลบไฟล์เสมอ · เล่นไม่ได้ = reject (ให้ VoiceOrchestrator fallback) */
+  private playFile(file: File): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const player = createAudioPlayer(file.uri);
       this.player = player;
       const cleanup = () => {
@@ -75,11 +112,7 @@ export abstract class BaseCloudTTS implements TTSProvider {
         player.remove();
         if (this.player === player) this.player = null;
         this.finish = null;
-        try {
-          file.delete();
-        } catch {
-          // cache cleanup is best-effort
-        }
+        deleteQuietly(file);
       };
       this.finish = () => {
         cleanup();

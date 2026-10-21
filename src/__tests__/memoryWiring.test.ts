@@ -162,6 +162,25 @@ describe('boot', () => {
     expect(report).toEqual({ modules: { ready: ['demo'], failed: [] }, memoryFacts: 2 });
   });
 
+  test('เรียก checkSettings ก่อน module.start (ซ่อมค่ามีผลรอบ boot นี้) · ล้มก็ไม่ crash boot', async () => {
+    const order: string[] = [];
+    const checkSettings = jest.fn(async () => void order.push('check'));
+    const modules = {
+      start: async () => {
+        order.push('modules');
+        return { ready: [], failed: [] };
+      },
+    };
+    await startServices(fakeDeps({ checkSettings, modules }));
+    expect(checkSettings).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['check', 'modules']); // invariant: ตรวจ/ซ่อมก่อน module อ่าน blob
+
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(
+      startServices(fakeDeps({ checkSettings: () => Promise.reject(new Error('พัง')) })),
+    ).resolves.toBeDefined();
+  });
+
   test('module init blowing up never crashes boot', async () => {
     const error = jest.spyOn(console, 'error').mockImplementation(() => {});
     const report = await startServices(

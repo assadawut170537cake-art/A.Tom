@@ -1,14 +1,49 @@
 import { ProviderError } from '../../../core/http/errors';
-import { requestJson } from '../../../core/http/request';
+import { requestJson, requestStream } from '../../../core/http/request';
+import { streamingFetch } from '../../../core/http/streamingFetch';
+import { isArray, isRecord, isString } from '../../../core/types/guards';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { geminiParts } from '../core/attachmentParts';
 import { normalizeModelIds, parseGeminiModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
 interface GenerateContentResponse {
-  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+  candidates?: {
+    content?: { parts?: { text?: string; thought?: boolean }[] };
+    finishReason?: string;
+  }[];
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
   modelVersion?: string;
   promptFeedback?: { blockReason?: string };
+}
+
+/** ข้อความของคำตอบหนึ่งก้อน — ข้าม part ที่เป็น "ความคิด" ของโมเดล (thought) ไม่ให้หลุดไปพูด */
+function textOf(data: GenerateContentResponse): string {
+  return (data.candidates?.[0]?.content?.parts ?? [])
+    .filter((p) => !p.thought)
+    .map((p) => p.text ?? '')
+    .join('');
+}
+
+/**
+ * ตรวจรูปทรงของคำตอบ Gemini ที่เราอ่านจริง (ไม่ cast) — field ที่เหลืออ่านแบบ optional ทุกครั้ง
+ * candidates/parts ต้องเป็น array ถ้ามี · text เป็น string ถ้ามี
+ */
+function isGenerateContentResponse(v: unknown): v is GenerateContentResponse {
+  if (!isRecord(v)) return false;
+  if (v.candidates === undefined) return true;
+  if (!isArray(v.candidates)) return false;
+  return v.candidates.every((c) => {
+    if (!isRecord(c)) return false;
+    if (c.content === undefined) return true;
+    if (!isRecord(c.content)) return false;
+    const parts = c.content.parts;
+    return (
+      parts === undefined ||
+      (isArray(parts) &&
+        parts.every((p) => isRecord(p) && (p.text === undefined || isString(p.text))))
+    );
+  });
 }
 
 /** pageSize สูงสุดที่ Gemini ยอม · ตามหน้าไม่เกิน MAX_PAGES กัน loop ไม่จบถ้า API ส่ง token วน */
@@ -22,12 +57,26 @@ export class GeminiAdapter extends BaseAIProvider {
     return { 'x-goog-api-key': await this.apiKey(), 'Content-Type': 'application/json' };
   }
 
-  async chat(req: ChatRequest): Promise<ChatResponse> {
+  private body(req: ChatRequest): string {
     const system = req.messages.filter((m) => m.role === 'system').map((m) => m.content);
     const contents = req.messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: geminiParts(m),
+      }));
+    return JSON.stringify({
+      contents,
+      ...(system.length && { systemInstruction: { parts: [{ text: system.join('\n\n') }] } }),
+      generationConfig: {
+        temperature: req.temperature,
+        maxOutputTokens: req.maxTokens,
+        ...thinkingFor(req.model),
+      },
+    });
+  }
 
+  async chat(req: ChatRequest): Promise<ChatResponse> {
     const data = await requestJson<GenerateContentResponse>(
       this.config.id,
       this.url(`/v1beta/models/${encodeURIComponent(req.model)}:generateContent`),
@@ -35,36 +84,90 @@ export class GeminiAdapter extends BaseAIProvider {
         method: 'POST',
         headers: await this.headers(),
         timeoutMs: req.timeoutMs,
-        body: JSON.stringify({
-          contents,
-          ...(system.length && { systemInstruction: { parts: [{ text: system.join('\n\n') }] } }),
-          generationConfig: { temperature: req.temperature, maxOutputTokens: req.maxTokens },
-        }),
-      }
+        body: this.body(req),
+      },
     );
+    return this.toResponse(req, textOf(data), data, data);
+  }
 
-    const parts = data.candidates?.[0]?.content?.parts;
-    const text = parts
-      ?.map((p) => p.text ?? '')
-      .join('')
-      .trim();
-    if (!text) {
-      const reason = data.promptFeedback?.blockReason ?? data.candidates?.[0]?.finishReason;
+  /**
+   * `streamGenerateContent?alt=sse` — ส่งข้อความทีละท่อนให้ `onDelta` ทันทีที่มาถึง (แอปเริ่มพูดก่อนตอบจบ)
+   * body ที่ไม่ใช่ SSE (เช่น proxy/เทสต์ที่ตอบ JSON ก้อนเดียว) → อ่านทั้งก้อนแล้วส่งเป็นท่อนเดียว
+   */
+  async chatStream(req: ChatRequest, onDelta: (text: string) => void): Promise<ChatResponse> {
+    let pending = ''; // ข้อความที่ยังไม่ครบบรรทัด
+    let raw = ''; // เก็บไว้เผื่อ body ไม่ใช่ SSE
+    let sawEvent = false;
+    let full = '';
+    let last: GenerateContentResponse = {};
+    let firstMeta: GenerateContentResponse = {};
+
+    /** ก้อนข้อมูลหนึ่งก้อน (event SSE หรือ item ของ JSON array) → สะสมข้อความ + ส่งท่อนใหม่ */
+    const handleData = (value: unknown) => {
+      if (!isGenerateContentResponse(value)) return;
+      sawEvent = true;
+      if (!firstMeta.modelVersion && value.modelVersion) firstMeta = value;
+      last = value;
+      const text = textOf(value);
+      if (text) {
+        full += text;
+        onDelta(text);
+      }
+    };
+
+    await requestStream(
+      this.config.id,
+      this.url(`/v1beta/models/${encodeURIComponent(req.model)}:streamGenerateContent?alt=sse`),
+      {
+        method: 'POST',
+        headers: await this.headers(),
+        timeoutMs: req.timeoutMs,
+        body: this.body(req),
+        fetchImpl: streamingFetch,
+      },
+      (chunk) => {
+        if (!sawEvent) raw += chunk;
+        pending += chunk;
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop() ?? '';
+        for (const line of lines) {
+          if (line.startsWith('data:')) handleData(safeParse(line.slice(5).trim()));
+        }
+      },
+    );
+    if (pending.startsWith('data:')) handleData(safeParse(pending.slice(5).trim()));
+
+    if (!sawEvent) {
+      // ไม่ใช่ SSE → JSON ก้อนเดียว หรือ array ของก้อน (โหมด stream แบบไม่มี alt=sse)
+      const parsed = safeParse(raw.trim());
+      for (const item of isArray(parsed) ? parsed : [parsed]) handleData(item);
+    }
+    return this.toResponse(req, full, last, firstMeta);
+  }
+
+  /** ประกอบ ChatResponse · ข้อความว่าง = invalid_response (บอกเหตุผลที่ถูกบล็อกถ้ามี) */
+  private toResponse(
+    req: ChatRequest,
+    text: string,
+    last: GenerateContentResponse,
+    meta: GenerateContentResponse,
+  ): ChatResponse {
+    const content = text.trim();
+    if (!content) {
+      const reason = last.promptFeedback?.blockReason ?? last.candidates?.[0]?.finishReason;
       throw new ProviderError(
         this.config.id,
         'invalid_response',
-        reason ? `ไม่มีคำตอบ (${reason})` : 'ไม่มีข้อความในคำตอบ'
+        reason ? `ไม่มีคำตอบ (${reason})` : 'ไม่มีข้อความในคำตอบ',
       );
     }
+    const usage = last.usageMetadata;
     return {
-      content: text,
-      model: data.modelVersion ?? req.model,
+      content,
+      model: meta.modelVersion ?? last.modelVersion ?? req.model,
       providerId: this.config.id,
-      tokensUsed: data.usageMetadata
-        ? {
-            input: data.usageMetadata.promptTokenCount ?? 0,
-            output: data.usageMetadata.candidatesTokenCount ?? 0,
-          }
+      tokensUsed: usage
+        ? { input: usage.promptTokenCount ?? 0, output: usage.candidatesTokenCount ?? 0 }
         : undefined,
     };
   }
@@ -97,4 +200,23 @@ export class GeminiAdapter extends BaseAIProvider {
       headers: await this.headers(),
     });
   }
+}
+
+function safeParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ลดเวลา "คิด" ของโมเดล — Gemini 3.x คิดระดับ medium/high เป็นค่าเริ่มต้น → แชทสั้น ๆ รอนาน (Boss เจอ ~1 นาที/ข้อความ 2026-10-21)
+ * ผู้ช่วยคุยเสียงต้องการตอบไวกว่าตอบลึก: 3.x = `thinkingLevel: low` · 2.5 flash = ปิดคิด (budget 0) · 2.5 pro ปิดไม่ได้ = ไม่ส่ง
+ * รุ่นที่ไม่รู้จัก = ไม่ส่ง (กัน 400 จาก field ที่รุ่นนั้นไม่รับ)
+ */
+export function thinkingFor(model: string): { thinkingConfig?: Record<string, unknown> } {
+  if (/^gemini-[3-9]/.test(model)) return { thinkingConfig: { thinkingLevel: 'low' } };
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingConfig: { thinkingBudget: 0 } };
+  return {};
 }

@@ -1,4 +1,14 @@
-import { ChevronRight, Cpu, Mic, Monitor, Puzzle, RefreshCw, Store, Users, type LucideIcon } from 'lucide-react-native';
+import {
+  ChevronRight,
+  Cpu,
+  Mic,
+  Monitor,
+  Puzzle,
+  RefreshCw,
+  Sparkles,
+  Users,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import type { RootScreenProps, RootStackParamList } from '../../../navigation/types';
@@ -17,12 +27,42 @@ const ENTRIES: Entry[] = [
     subtitle: 'Gemini · OpenRouter · Jev router · ลำดับความสำคัญ',
     icon: Cpu,
   },
-  { route: 'Modules', title: 'Modules', subtitle: 'เปิด/ปิดความสามารถเสริม · ดูสถานะ module', icon: Puzzle },
-  { route: 'Marketplace', title: 'Marketplace', subtitle: 'MCP servers · Plugins · Skills · ควบคุมอุปกรณ์', icon: Store },
-  { route: 'Sync', title: 'Sync', subtitle: 'ซิงก์ความจำกับ Mark 55 · จับคู่อุปกรณ์', icon: RefreshCw },
-  { route: 'PcBridge', title: 'Mark 55 Bus', subtitle: 'สั่งงาน Mark 55 จากแชท · token เครื่อง', icon: Monitor },
-  { route: 'VoiceSettings', title: 'Voice (TTS + STT)', subtitle: 'ผู้ให้บริการเสียงพูดและถอดเสียง', icon: Mic },
-  { route: 'PersonaVoice', title: 'Persona Voice Map', subtitle: 'เสียงของแต่ละผู้ช่วย', icon: Users },
+  {
+    route: 'Modules',
+    title: 'Modules',
+    subtitle: 'ความสามารถเสริม · Marketplace (ทักษะ · MCP · ปลั๊กอิน)',
+    icon: Puzzle,
+  },
+  {
+    route: 'Sync',
+    title: 'Sync',
+    subtitle: 'ซิงก์ความจำกับ Mark 55 · จับคู่อุปกรณ์',
+    icon: RefreshCw,
+  },
+  {
+    route: 'PcBridge',
+    title: 'Mark 55 Bus',
+    subtitle: 'สั่งงาน Mark 55 จากแชท · token เครื่อง',
+    icon: Monitor,
+  },
+  {
+    route: 'AssistantSettings',
+    title: 'ผู้ช่วยส่วนตัว',
+    subtitle: 'คำปลุก · Home Assistant · ความสามารถสั่งด้วยเสียง',
+    icon: Sparkles,
+  },
+  {
+    route: 'VoiceSettings',
+    title: 'Voice (TTS + STT)',
+    subtitle: 'ผู้ให้บริการเสียงพูดและถอดเสียง',
+    icon: Mic,
+  },
+  {
+    route: 'PersonaVoice',
+    title: 'Persona Voice Map',
+    subtitle: 'เสียงของแต่ละผู้ช่วย',
+    icon: Users,
+  },
 ];
 
 /** Settings hub. */

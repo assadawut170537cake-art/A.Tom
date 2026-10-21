@@ -12,8 +12,12 @@ const PADDING_Y = 8;
 export const CHAT_INPUT_MAX_HEIGHT = LINE_HEIGHT * MAX_LINES + PADDING_Y * 2;
 
 interface ChatInputProps {
-  /** ได้ข้อความที่ trim แล้ว (ไม่ถูกเรียกเมื่อว่าง) */
+  /** ได้ข้อความที่ trim แล้ว (ไม่ถูกเรียกเมื่อว่าง — ยกเว้น `allowEmpty`) */
   onSend: (text: string) => void;
+  /** มีไฟล์แนบรออยู่ = ส่งได้แม้ไม่พิมพ์อะไร */
+  allowEmpty?: boolean | undefined;
+  /** ใส่ข้อความตั้งต้นลงช่อง (เมนู + เช่น "ส่งเข้า NotebookLM: ") — เปลี่ยน `key` เพื่อใส่ซ้ำข้อความเดิม */
+  prefill?: { text: string; key: number } | undefined;
   /**
    * ห้ามส่งระหว่างผู้ช่วยกำลังคิด/พูด — แต่ยังพิมพ์ร่างข้อความถัดไปได้
    * (ถ้าปิด editable คีย์บอร์ดจะหุบเองทุกครั้งที่ผู้ช่วยเริ่มคิด)
@@ -42,9 +46,17 @@ export function ChatInput({
   onVoice,
   voiceActive = false,
   voiceDisabled = false,
+  allowEmpty = false,
+  prefill,
 }: ChatInputProps) {
   const [text, setText] = useState('');
-  const canSend = !disabled && text.trim().length > 0;
+  // ปรับ state ตอน render เมื่อ prefill ใหม่มา (แบบที่ React แนะนำ — ไม่ใช้ effect ที่ render ซ้ำสองรอบ)
+  const [prefillKey, setPrefillKey] = useState(prefill?.key);
+  if (prefill && prefill.key !== prefillKey) {
+    setPrefillKey(prefill.key);
+    setText(prefill.text);
+  }
+  const canSend = !disabled && (allowEmpty || text.trim().length > 0);
 
   const send = () => {
     if (!canSend) return;
@@ -105,7 +117,11 @@ export function ChatInput({
         className="mb-0.5 h-9 w-9 items-center justify-center rounded-full"
         style={{ backgroundColor: canSend ? accentColor : 'rgba(255,255,255,0.1)' }}
       >
-        <SendHorizontal size={18} color={canSend ? '#ffffff' : 'rgba(255,255,255,0.4)'} strokeWidth={2} />
+        <SendHorizontal
+          size={18}
+          color={canSend ? '#ffffff' : 'rgba(255,255,255,0.4)'}
+          strokeWidth={2}
+        />
       </Pressable>
     </View>
   );

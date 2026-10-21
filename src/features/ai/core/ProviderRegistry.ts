@@ -8,6 +8,11 @@ export class ProviderRegistry {
     this.providers.set(provider.config.id, provider);
   }
 
+  /** ใช้กับผู้ให้บริการที่บอสเพิ่มเอง (ลบแล้วหายทันที ไม่ต้องรอเปิดแอปใหม่) */
+  unregister(id: AIProviderId): void {
+    this.providers.delete(id);
+  }
+
   get(id: AIProviderId): AIProvider | undefined {
     return this.providers.get(id);
   }

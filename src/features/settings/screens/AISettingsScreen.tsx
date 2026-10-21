@@ -8,6 +8,8 @@ import {
 } from '../../../core/storage/ProviderSettings';
 import { aiRegistry } from '../../ai/core/ProviderRegistry';
 import type { AIProviderId } from '../../ai/core/types';
+import { CustomProviders } from '../components/CustomProviders';
+import { PersonaLLMMapper } from '../components/PersonaLLMMapper';
 import { PriorityList } from '../components/PriorityList';
 import { ProviderCard } from '../components/ProviderCard';
 import { ProviderToggle } from '../components/ProviderToggle';
@@ -23,9 +25,9 @@ function useLLMPriority() {
   useEffect(
     () =>
       whileMounted(ProviderSettings.getPriority, (saved) =>
-        setOrder((current) => mergeOrder(saved, current))
+        setOrder((current) => mergeOrder(saved, current)),
       ),
-    []
+    [],
   );
 
   const change = (ids: AIProviderId[]) => {
@@ -50,7 +52,7 @@ function AdvancedSection() {
         setAdv(a);
         setTimeoutText(String(a.timeoutMs / 1000));
       }),
-    []
+    [],
   );
 
   const patch = (p: Partial<AdvancedSettings>) => {
@@ -111,6 +113,11 @@ export function AISettingsScreen() {
   const gemini = aiRegistry.get('gemini');
   const openrouter = aiRegistry.get('openrouter');
   const jev = aiRegistry.get('jev');
+  const xai = aiRegistry.get('xai');
+  const dahl = (['dahl-minimax', 'dahl-deepseek', 'dahl-glm'] as const).flatMap((id) => {
+    const p = aiRegistry.get(id);
+    return p ? [p] : [];
+  });
 
   return (
     <ScrollView
@@ -122,12 +129,28 @@ export function AISettingsScreen() {
       <Section title="LLM Providers">
         {gemini && <ProviderCard provider={gemini} />}
         {openrouter && <ProviderCard provider={openrouter} subtitle="โมเดลจาก OpenRouter (โหลดรายการได้)" />}
+        {xai && <ProviderCard provider={xai} subtitle="Grok — key เดียวกันใช้กับเสียงพูด/ฟังเสียงของ xAI ได้" />}
       </Section>
-      <Section title="Router" hint="Jev จัดประเภทคำสั่ง (intent) ก่อนส่งให้ LLM — ไม่ได้ใช้ตอบแชท">
-        {jev && <ProviderCard provider={jev} subtitle="TypeSafe System One" />}
+      <Section title="Dahl" hint="inference.dahl.global — ใส่ key ของแต่ละโมเดลแล้วเปิดสวิตช์">
+        {dahl.map((p) => (
+          <ProviderCard key={p.config.id} provider={p} subtitle={p.config.defaultModel} />
+        ))}
+      </Section>
+      <Section title="เพิ่มเอง" hint="ต่อ AI เจ้าไหนก็ได้ที่เป็นแบบ OpenAI-compatible — ใส่ URL + key + โมเดล ไม่ต้องรออัปเดตแอป">
+        <CustomProviders />
+      </Section>
+      <Section title="สมอง + เสียง ต่อ Persona" hint="สมอง = โมเดลที่คิดคำตอบ (อัตโนมัติ = สลับเองตาม Priority) · เสียง = ตัวที่พูดออกเสียง แยกกันได้ — เสียงบนเครื่อง (Expo) ไม่กินโควต้า">
+        <PersonaLLMMapper />
+      </Section>
+      <Section title="Router (ตัดสินใจ)" hint="Jev ตัดสินว่าเป็นคุย/คำสั่ง — แยกจากสมองที่ตอบแชท · Jev ใช้ไม่ได้ = สลับเองอัตโนมัติ">
+        {jev && <ProviderCard provider={jev} subtitle="ตัดสินใจหลัก (ค่าเริ่มต้น) — ไม่มี key / ล่ม = สลับไปตัวกรองคำ + AI ให้เอง" />}
       </Section>
       <Section title="Priority" hint="ลากที่ไอคอน ⋮⋮ หรือกด ↑↓ — ตัวบนสุดถูกเรียกก่อน">
-        <PriorityList items={priority.items} onChange={priority.change} onDragStateChange={setDragging} />
+        <PriorityList
+          items={priority.items}
+          onChange={priority.change}
+          onDragStateChange={setDragging}
+        />
       </Section>
       <Section title="Advanced">
         <AdvancedSection />

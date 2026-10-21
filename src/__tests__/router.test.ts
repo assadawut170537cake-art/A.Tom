@@ -6,6 +6,7 @@ import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { JevClassifier } from '../features/router/classifiers/JevClassifier';
 import {
   CLASSIFIER_SYSTEM_PROMPT,
+  COMMAND_HINT,
   LLMClassifier,
   parseClassification,
 } from '../features/router/classifiers/LLMClassifier';
@@ -114,8 +115,14 @@ describe('RuleClassifier', () => {
 describe('LLMClassifier (Gemini → OpenRouter)', () => {
   test.each([
     ['{"intent":"chat","confidence":0.8}', { intent: 'chat', confidence: 0.8 }],
-    ['```json\n{"intent":"pc_command","confidence":0.82}\n```', { intent: 'pc_command', confidence: 0.82 }],
-    ['Sure: {"intent": "switch_assistant", "confidence": 95}', { intent: 'switch_assistant', confidence: 0.95 }],
+    [
+      '```json\n{"intent":"pc_command","confidence":0.82}\n```',
+      { intent: 'pc_command', confidence: 0.82 },
+    ],
+    [
+      'Sure: {"intent": "switch_assistant", "confidence": 95}',
+      { intent: 'switch_assistant', confidence: 0.95 },
+    ],
     ['{"intent":"chat","confidence":"high"}', { intent: 'chat', confidence: 0.5 }],
     ['{"intent":"chat","confidence":-3}', { intent: 'chat', confidence: 0 }],
   ])('parseClassification(%s)', (text, expected) => {
@@ -124,7 +131,7 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
 
   test.each(['{"intent":"dance"}', 'no json here', '{not valid json}'])(
     'parseClassification rejects %s',
-    (text) => expect(parseClassification(text)).toBeNull()
+    (text) => expect(parseClassification(text)).toBeNull(),
   );
 
   test('classifies via Gemini with the classifier prompt and extracts the persona entity', async () => {
@@ -143,7 +150,12 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
       generationConfig: { temperature: number; maxOutputTokens: number };
     };
     expect(body.systemInstruction.parts[0].text).toBe(CLASSIFIER_SYSTEM_PROMPT);
-    expect(body.generationConfig).toEqual({ temperature: 0, maxOutputTokens: 50 });
+    // ลดการคิด — ไม่งั้น token คิดของ Gemini 3 กิน maxOutputTokens 50 จนคำตอบว่าง
+    expect(body.generationConfig).toEqual({
+      temperature: 0,
+      maxOutputTokens: 50,
+      thinkingConfig: { thinkingLevel: 'low' },
+    });
   });
 
   test('falls back to OpenRouter when Gemini is rate limited', async () => {
@@ -160,7 +172,20 @@ describe('LLMClassifier (Gemini → OpenRouter)', () => {
 
   test('returns null when the LLM answers with something unparseable', async () => {
     mockFetch([[GEMINI, () => geminiText('I think it is a chat')]]);
-    await expect(new LLMClassifier().classify({ text: 'อืม' })).resolves.toBeNull();
+    await expect(new LLMClassifier().classify({ text: 'อืม เครื่องนี้' })).resolves.toBeNull();
+  });
+
+  test('ข้อความคุยธรรมดา (ไม่มีคำใบ้คำสั่ง) → ไม่ถามโมเดลเลย · ปิดตัวกรอง = ถามทุกข้อความ', async () => {
+    const { spy } = mockFetch([[GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')]]);
+    await expect(new LLMClassifier().classify({ text: 'วันนี้เหนื่อยจัง' })).resolves.toBeNull();
+    expect(spy).not.toHaveBeenCalled();
+    for (const text of ['ขอคุยกับไฟรเดย์', 'เช็กเครื่องหน่อย', 'switch to ultron', 'ส่งต่อให้ PC'])
+      expect(COMMAND_HINT.test(text)).toBe(true);
+    for (const text of ['สวัสดี', 'เล่านิทานหน่อย', 'ร้อนมาก', 'pcs ที่ไหนถูก'])
+      expect(COMMAND_HINT.test(text)).toBe(false);
+    await expect(
+      new LLMClassifier(undefined, false).classify({ text: 'วันนี้เหนื่อยจัง' }),
+    ).resolves.toMatchObject({ intent: 'chat', provider: 'llm' });
   });
 });
 
@@ -192,7 +217,10 @@ describe('JevClassifier (TypeSafe System One)', () => {
       questions: { intent: { type: string; criteria: Record<string, string> } };
     };
     expect(body.model).toBe('jev-preview');
-    expect(body.state).toEqual({ message: 'ช่วยรันโปรแกรมให้ที', recent_messages: ['b', 'c', 'd', 'e', 'f'] });
+    expect(body.state).toEqual({
+      message: 'ช่วยรันโปรแกรมให้ที',
+      recent_messages: ['b', 'c', 'd', 'e', 'f'],
+    });
     expect(body.questions.intent.type).toBe('choice');
     expect(Object.keys(body.questions.intent.criteria)).toEqual([
       'chat',
@@ -268,7 +296,10 @@ describe('IntentRouter pipeline', () => {
 
     test('just below 0.7 (0.6999) → LLM decides', async () => {
       const llm = stubClassifier(chatOut('llm', 0.8));
-      const out = await new IntentRouter({ jev: stubClassifier(chatOut('jev', 0.6999)), llm }).route({
+      const out = await new IntentRouter({
+        jev: stubClassifier(chatOut('jev', 0.6999)),
+        llm,
+      }).route({
         text: 'อืม',
       });
       expect(out.provider).toBe('llm');
@@ -297,11 +328,11 @@ describe('IntentRouter pipeline', () => {
     const llm = stubClassifier(chatOut('llm', 0.8));
     expect(
       (await new IntentRouter({ jev: stubClassifier(new Error('down')), llm }).route({ text: 'x' }))
-        .provider
+        .provider,
     ).toBe('llm');
-    expect((await new IntentRouter({ jev: stubClassifier(null), llm }).route({ text: 'x' })).provider).toBe(
-      'llm'
-    );
+    expect(
+      (await new IntentRouter({ jev: stubClassifier(null), llm }).route({ text: 'x' })).provider,
+    ).toBe('llm');
   });
 
   test('every classifier unavailable → default chat; blank text never calls a classifier', async () => {
@@ -328,7 +359,7 @@ describe('IntentRouter pipeline', () => {
       [JEV, () => httpError(503)],
       [GEMINI, () => geminiText('{"intent":"chat","confidence":0.9}')],
     ]);
-    const out = await new IntentRouter().route({ text: 'เล่าเรื่องตลกหน่อย' });
+    const out = await new IntentRouter().route({ text: 'เล่าเรื่องตลกเกี่ยวกับคอมหน่อย' });
     expect(out.provider).toBe('llm');
     expect(hosts()).toEqual(['api.typesafe.ai', 'generativelanguage.googleapis.com']);
   });
@@ -342,9 +373,13 @@ describe('IntentRouter pipeline', () => {
     };
     for (const intent of ['chat', 'pc_command', 'switch_assistant'] as const) {
       const route: RouterOutput = { intent, confidence: 1, provider: 'rule' };
-      const { result } = await new IntentRouter({ rule: fixed(route), handlers }).handle({ text: 'x' });
+      const { result } = await new IntentRouter({ rule: fixed(route), handlers }).handle({
+        text: 'x',
+      });
       expect(handlers[intent].handle).toHaveBeenLastCalledWith({ text: 'x' }, route);
-      expect(result.reply).toBe(intent === 'chat' ? 'chat!' : intent === 'pc_command' ? 'pc!' : 'sw!');
+      expect(result.reply).toBe(
+        intent === 'chat' ? 'chat!' : intent === 'pc_command' ? 'pc!' : 'sw!',
+      );
     }
   });
 });
@@ -379,14 +414,18 @@ describe('Handlers', () => {
     const { calls } = mockFetch([[GEMINI, () => geminiText('ok')]]);
     const res = await new ChatHandler(undefined, () => undefined).handle({ text: 'hi' });
     expect(res.persona).toBe(1);
-    expect((nth(calls, 0).body as { systemInstruction?: unknown }).systemInstruction).toBeUndefined();
+    expect(
+      (nth(calls, 0).body as { systemInstruction?: unknown }).systemInstruction,
+    ).toBeUndefined();
   });
 
   test('PCCommandHandler is a Phase 4 stub that keeps the persona', async () => {
     await expect(
-      new PCCommandHandler().handle({ text: 'เปิดคอม', context: { activePersona: 2 } })
+      new PCCommandHandler().handle({ text: 'เปิดคอม', context: { activePersona: 2 } }),
     ).resolves.toEqual({ reply: 'Phase 4 ครับ', persona: 2 });
-    await expect(new PCCommandHandler().handle({ text: 'x' })).resolves.toMatchObject({ persona: 1 });
+    await expect(new PCCommandHandler().handle({ text: 'x' })).resolves.toMatchObject({
+      persona: 1,
+    });
   });
 
   describe('SwitchAssistantHandler', () => {
@@ -400,7 +439,7 @@ describe('Handlers', () => {
     test('switches to the entity persona and answers with its greeting', async () => {
       const res = await new SwitchAssistantHandler().handle(
         { text: 'เรียกไฟรเดย์', context: { activePersona: 1 } },
-        route('3')
+        route('3'),
       );
       expect(res).toEqual({ reply: PERSONA_GREETINGS[3], persona: 3 });
       expect(useAtomStore.getState().activePersona).toBe(3);
@@ -411,7 +450,7 @@ describe('Handlers', () => {
       const res = await new SwitchAssistantHandler(set).handle(
         { text: 'ขอจาร์วิส', context: { activePersona: 1 } },
         // Deliberately out of range: checks the handler's runtime validation of entities
-        route('9' as PersonaEntity)
+        route('9' as PersonaEntity),
       );
       expect(set).toHaveBeenCalledWith(2);
       expect(res.persona).toBe(2);
@@ -421,7 +460,7 @@ describe('Handlers', () => {
       const set = jest.fn();
       const handler = new SwitchAssistantHandler(set);
       await expect(
-        handler.handle({ text: 'เรียกอะตอม', context: { activePersona: 1 } }, route('1'))
+        handler.handle({ text: 'เรียกอะตอม', context: { activePersona: 1 } }, route('1')),
       ).resolves.toEqual({ reply: 'อะตอมอยู่ตรงนี้แล้วครับบอส', persona: 1 });
       await expect(handler.handle({ text: 'เปลี่ยนคน' }, route())).resolves.toEqual({
         reply: 'จะให้เรียกใครครับ อะตอม จาร์วิส ไฟรเดย์ หรืออัลตรอน',
@@ -435,9 +474,13 @@ describe('Handlers', () => {
 describe('Fetch mock sanity', () => {
   test('classifier calls are distinguishable from chat calls', async () => {
     const { calls } = mockFetch([
-      [GEMINI, (c) => (isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":1}') : geminiText('hi'))],
+      [
+        GEMINI,
+        (c) =>
+          isClassifierCall(c) ? geminiText('{"intent":"chat","confidence":1}') : geminiText('hi'),
+      ],
     ]);
-    await new LLMClassifier().classify({ text: 'x' });
+    await new LLMClassifier().classify({ text: 'เช็กเครื่อง' });
     await new ChatHandler().handle({ text: 'x' });
     expect(calls.map(isClassifierCall)).toEqual([true, false]);
   });

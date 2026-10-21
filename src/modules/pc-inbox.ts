@@ -10,12 +10,12 @@ import { deviceControl } from '../core/agent/DeviceControlBridge';
 import type { AgentToolCall } from '../core/agent/types';
 import { useAtomStore } from '../features/jarvis/stores/useAtomStore';
 import { MemoryBusClient } from '../features/pc-bridge/MemoryBusClient';
-import { PcInbox, type InboxHandlers } from '../features/pc-bridge/PcInbox';
+import { NOTIFY_PREFIX, PcInbox, type InboxHandlers } from '../features/pc-bridge/PcInbox';
 import { pcBridgeSettings } from '../features/pc-bridge/settings';
 import { voiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { deviceConfirmations } from './agents/confirmations';
 
-export const NOTIFY_PREFIX = '📩 Mark 55: ';
+export { NOTIFY_PREFIX };
 
 export const appInboxHandlers: InboxHandlers = {
   notify(text, speak) {

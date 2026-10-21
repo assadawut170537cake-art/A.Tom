@@ -1,6 +1,7 @@
 import { ProviderError } from '../../../core/http/errors';
 import { requestJson } from '../../../core/http/request';
 import { BaseAIProvider } from '../core/ProviderInterface';
+import { openAIMessage } from '../core/attachmentParts';
 import { parseOpenAIModels } from '../core/modelLists';
 import type { ChatRequest, ChatResponse } from '../core/types';
 
@@ -8,6 +9,18 @@ interface ChatCompletionResponse {
   model?: string;
   choices?: { message?: { content?: string | null } }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+/**
+ * โมเดลแนว reasoning (MiniMax M2, GLM, DeepSeek บางรุ่น) ใส่ความคิดไว้ใน `<think>…</think>` ปนกับคำตอบ
+ * → ตัดทิ้ง ไม่งั้นแชทแสดง/พูดความคิดออกมา และ agent อ่าน JSON ไม่ได้ · ไม่มีแท็ก = คืนตามเดิม
+ */
+export function stripThinking(content: string): string {
+  const stripped = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // แท็กเปิดที่ไม่มีแท็กปิด (โดนตัดเพราะ max_tokens) = ทั้งหมดเป็นความคิด
+  const open = stripped.search(/<think>/i);
+  const out = open === -1 ? stripped : stripped.slice(0, open);
+  return out === content ? content : out.trim();
 }
 
 /** Base for any OpenAI-compatible /chat/completions API (OpenRouter, custom gateways, …). */
@@ -35,11 +48,11 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
         timeoutMs: req.timeoutMs,
         body: JSON.stringify({
           model: req.model,
-          messages: req.messages,
+          messages: req.messages.map(openAIMessage),
           temperature: req.temperature,
           max_tokens: req.maxTokens,
         }),
-      }
+      },
     );
 
     const content = data.choices?.[0]?.message?.content;
@@ -47,7 +60,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
       throw new ProviderError(this.config.id, 'invalid_response', 'ไม่มีข้อความในคำตอบ');
     }
     return {
-      content,
+      content: stripThinking(content),
       model: data.model ?? req.model,
       providerId: this.config.id,
       tokensUsed: data.usage
@@ -71,7 +84,7 @@ export class OpenAICompatibleAdapter extends BaseAIProvider {
 
   protected probe(): Promise<unknown> {
     return this.headers().then((headers) =>
-      requestJson(this.config.id, this.url('/models'), { headers })
+      requestJson(this.config.id, this.url('/models'), { headers }),
     );
   }
 }

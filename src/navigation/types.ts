@@ -2,6 +2,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 export type RootStackParamList = {
   Main: undefined;
+  /** ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบนของหน้าหลัก) */
+  History: undefined;
   Settings: undefined;
   AISettings: undefined;
   Modules: undefined;
@@ -9,6 +11,7 @@ export type RootStackParamList = {
   PcBridge: undefined;
   Marketplace: undefined;
   VoiceSettings: undefined;
+  AssistantSettings: undefined;
   PersonaVoice: undefined;
   /** UI ของ agent แบบเต็มจอ */
   Agent: { agentId: string };

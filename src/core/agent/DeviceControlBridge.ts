@@ -487,7 +487,7 @@ export class DeviceControlBridge implements AgentToolProvider {
     const tool = DEVICE_TOOLS.find((t) => t.id === call.tool);
     if (!tool) return { ok: false, output: `ไม่พบคำสั่งอุปกรณ์ "${call.tool}"` };
     if (!this.enabled)
-      return { ok: false, output: 'การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Marketplace' };
+      return { ok: false, output: 'การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Modules › Marketplace' };
     if (!tool.supported(this.driver))
       return { ok: false, output: `เครื่องนี้ยังไม่รองรับ "${tool.name}"` };
     try {

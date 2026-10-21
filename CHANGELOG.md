@@ -12,6 +12,77 @@
 
 ## [Unreleased]
 
+### Marketplace ใหม่ ([ADR-021](docs/DECISIONS.md#adr-021--marketplace-แบบหน้า-ปรับแต่ง-ของ-claude--คลัง-mcp-ทางการ))
+
+**Changed**
+- Marketplace จัดแบบหน้า "ปรับแต่ง" ของ Claude: แท็บ ทักษะ / ตัวเชื่อมต่อ / ปลั๊กอิน · ของคุณ / สำรวจ · หมวดหมู่ · ค้นหา · เรียง
+
+**Added**
+- สำรวจ › ตัวเชื่อมต่อ: ค้นและเพิ่ม MCP server จากคลังทางการได้ในแตะเดียว
+
+
+### เพิ่มผู้ให้บริการเอง + ล็อกโครงสร้าง ([ADR-020](docs/DECISIONS.md#adr-020--ล็อกโครงสร้างแทนล็อกชื่อเจ้า--เพิ่มผู้ให้บริการเองจากในแอป))
+
+**Added**
+- ตั้งค่า › AI › "เพิ่มเอง" — ต่อ AI เจ้าไหนก็ได้ที่เป็น OpenAI-compatible (URL + key + โมเดล) ใช้ได้ทั้ง Priority / Fallback / สมองต่อ persona
+- `docs/CORE_AUDIT.md` — แผนแยกแกนหลักกับโมดูล
+
+
+### Jev ตัดสินใจหลัก ([ADR-019](docs/DECISIONS.md#adr-019--jev-เป็นตัวตัดสินใจหลักโดยค่าเริ่มต้น))
+
+**Changed**
+- Jev เปิดเป็นค่าเริ่มต้น — ตัดสินว่าข้อความเป็นคุยหรือคำสั่ง แยกจากสมองที่ตอบ · Jev ใช้ไม่ได้ = สลับไปตัวกรองคำ + AI ให้เอง
+
+
+### xAI ครบชุด ([ADR-018](docs/DECISIONS.md#adr-018--เพิ่ม-xai-grok-สมอง--tts--stt))
+
+**Added**
+- สมอง xAI Grok (ตั้งค่า › AI) · เสียงพูด xAI TTS และฟังเสียง xAI STT (ตั้งค่า › เสียง) — คีย์ xAI ตัวเดียวใช้ได้ทั้งสามทาง
+
+
+### แอปปรับตัวเองเมื่อโควต้าหมด ([ADR-017](docs/DECISIONS.md#adr-017--แอปปรับตัวเองเมื่อโควต้าหมด-quota-self-healing))
+
+**Changed**
+- คุยธรรมดาไม่ถาม AI แยกประเภทก่อนแล้ว (เดิม 2 request ต่อข้อความ → เหลือ 1) — ถามเฉพาะข้อความที่มีแววเป็นคำสั่ง
+- โควต้าของโมเดลที่เลือกหมด → สลับไปรุ่นสำรองของเจ้าเดียวกันให้เอง (Gemini 3 Flash → 2.5 Flash → 2.5 Flash-Lite) แล้วแจ้งบอส · พักตัวที่หมดไว้ ไม่ยิงซ้ำจนครบเวลา
+
+
+### Dahl + โมเดลต่อ persona ([ADR-016](docs/DECISIONS.md#adr-016--เพิ่ม-dahl-3-โมเดล--เลือก-llm-ต่อ-persona))
+
+**Added**
+- ผู้ให้บริการ AI ใหม่ Dahl 3 โมเดล (MiniMax M2.7 · DeepSeek V4 Flash · GLM 5.3 Flash) — การ์ดแยกใน ตั้งค่า › AI · สลับกันเองอัตโนมัติผ่าน Priority/Fallback เดิม
+- "สมอง + เสียง ต่อ Persona" ใน ตั้งค่า › AI — แต่ละ persona เลือกโมเดลที่ใช้คิด (หรือ "อัตโนมัติ") และผู้ให้บริการเสียงที่ใช้พูดแยกกันได้
+
+**Fixed**
+- โมเดล reasoning ที่ใส่ `<think>…</think>` ในคำตอบ — ตัดทิ้งก่อนแสดง/พูด
+
+### คุยด้วยเสียงสด Realtime (speech-to-speech)
+- **Added:** `features/voice/realtime/` — `RealtimeVoiceSession` (state machine DI, เหมือน LiveVoiceSession) + `OpenAIRealtimeTransport` (OpenAI Realtime ผ่าน WebRTC: mint ephemeral key → SDP → data channel `oai-events`) + `config.ts` · hook `useRealtimeVoice` / `useVoiceChat` (MainScreen ใช้ตัวหลัง: เสียงสดเมื่อมี OpenAI key + native module ไม่งั้นตกไปโหมดอัดไฟล์เดิม · บังคับด้วย option `live.engine` = `auto | realtime | classic`)
+- **เร็ว:** เสียงสตรีมตรงมือถือ ↔ OpenAI (ไม่อัปโหลดไฟล์ ไม่รอ STT/TTS ต่อคิว) · server VAD + พูดแทรก (barge-in) ตัดเสียงทันที · echo cancellation ของ WebRTC
+- **ประหยัดโทเคน:** โมเดลเสียงคุยเล่นเอง งานที่ต้องใช้ memory/agent/เครื่องมือส่งต่อผ่าน tool `ask_atom` เข้า router เดิม (`sendMessage(..., { speak: false })`) แล้วอ่านผล · prompt สั้น · `max_output_tokens` 600 · `truncation` retention_ratio 0.5 · ตัดสายเองเมื่อเงียบ 60s
+- **Dependencies (Boss อนุมัติ):** `react-native-webrtc` 155.0.1 · `@config-plugins/react-native-webrtc` 15.0.2 (ใน `app.json`) — ⚠️ ต้อง prebuild + build dev build ใหม่ (`npx expo prebuild -p android` แล้ว `npx expo run:android`) · ⚠️ ยังไม่ได้ทดสอบบนเครื่องจริง (เทสต์ครอบ state machine + payload ด้วย transport ปลอม)
+- **Gemini Live (ค่าเริ่มต้นของ `auto`):** `GeminiLiveTransport` — WebSocket `BidiGenerateContent` รุ่น `gemini-3.8-live` (ตั้งเองที่ option `rt.gemini/model`) + เสียง PCM สตรีมด้วย `react-native-audio-api` (`NativePcmAudio`: ไมค์ 16 kHz → ลำโพง 24 kHz, `clearBuffers()` ตัดเสียงตอนพูดแทรก) · tool `NON_BLOCKING` (โมเดลพูดเกริ่นต่อได้ระหว่างรอ ask_atom) · บีบ context (`triggerTokens` 12k → 6k) + session resumption/`goAway` ต่อสายใหม่เอง · setup เสริมถูกปฏิเสธ = ลองใหม่แบบเรียบ · ใช้ key Gemini ที่ตั้งไว้ใน ตั้งค่า › AI (สำรอง: key Gemini TTS) · เลือกเจ้าที่ option `live.provider` = `auto | gemini | openai` (`registry.ts`)
+- **Dependencies เพิ่ม:** `react-native-audio-api` 0.13.6 (plugin ใน `app.json`: ปิด FFmpeg + foreground service)
+- **เสียงสะท้อน:** iOS ใช้โหมด `voiceChat` (AEC) → คุยพร้อมกัน/พูดแทรกได้เต็ม · **Android ไลบรารีไม่มี AEC** → เล่นออกลำโพงมือถือ = ปิดไมค์ระหว่างผู้ช่วยพูด (+หาง 350ms) · ใส่หูฟัง/บลูทูธ = เปิดเต็ม (ตรวจจากเส้นทางเสียงตอนเริ่มสาย) · OpenAI/WebRTC มี AEC ในตัว
+- **ข้อจำกัด:** persona ของโมเดลเสียงถูกตั้งตอนเริ่มสาย (สลับ persona กลางสาย = ต้องเริ่มสายใหม่) · key OpenAI ใช้ตัวเดียวกับ OpenAI TTS / Whisper (ยังไม่มีช่องกรอกแยก)
+
+### ผู้ช่วยส่วนตัว 11 ความสามารถ (ปิดช่องว่างเทียบแอปต้นแบบ — ดู docs/JARVIS_GAP_AUDIT.md)
+- **Added:** `features/assistant/` — 10 agent ลงทะเบียนผ่านระบบ pattern เดิม (ไม่แตะ router): **ค้นเว็บ** (Gemini Google Search grounding) · **Home Assistant** (REST + token ใน SecureStore, allow-list โดเมน/บริการ ไม่แตะ lock/alarm) · **ปฏิทิน** (expo-calendar ดู/สร้างนัด) · **ปลุก/จับเวลา** (Android Intent + parser เวลาไทย) + อ่านคลิปบอร์ด · **รายชื่อ/โทร/ร่าง SMS** (เปิดหน้าให้บอสกดเอง) · **ตำแหน่ง/อากาศ/ร้านใกล้ฉัน** (expo-location + Open-Meteo + OpenStreetMap ไม่ต้องมี key) · **สร้างรูป** (Gemini image, แสดงในแชท: `Message.imageUri`) · **ดูด้วยกล้อง** (ถ่ายครั้งละภาพ → Gemini อ่าน) · **เตือนความจำ + สรุปเช้ารายวัน** (expo-notifications, แตะแล้วสรุปนัด+อากาศ) · **ผู้ช่วยเฉพาะทางที่สร้างเอง** ("สร้างผู้ช่วยชื่อ …" วางทับ 4 persona)
+- **Added (คำปลุก):** `features/voice/wakeword/` — openWakeWord ONNX (mel → embedding → ตัวทำนาย) ตรวจ "Hey Jarvis" สำเร็จรูป (ทดสอบกับ TTS: 0.999 vs ≤0.13) + **"เฮ่ อะตอม" แบบเทมเพลตจากเสียงที่ลงทะเบียน** (ไม่มีโมเดลสำเร็จรูปคำนี้) · ลงทะเบียน 6 ครั้ง → **ปรับเทียบเกณฑ์จากประโยคทั่วไปจริง** → ปรับความไว ± ภายหลัง · ทดสอบสดดูคะแนน · `useWakeWord` ฟังตอนแอปเปิดและไม่ได้คุย, พักอัตโนมัติเมื่อหน้าตั้งค่าใช้ไมค์ (`wakeSettings.acquireMic`)
+- **Added:** หน้า **ตั้งค่า › ผู้ช่วยส่วนตัว** (`AssistantSettingsScreen`: คำปลุก + Home Assistant URL/Token/ทดสอบ)
+- **Fixed (พบจากเทสต์):** pattern "นัด/โทร/เตือน/วาด" กว้างเกินแย่งประโยคคุยปกติ → เข้มงวดขึ้น · "2 ทุ่ม" = 20:00 · ชื่อสถานที่ภาษาไทยไม่มีเว้นวรรค → ตัดคำท้ายประโยค · เสียงเงียบถูกนับเป็นเสียงพูดตอนลงทะเบียนคำปลุก → อุ่น pipeline ด้วยความเงียบก่อน
+- **⚠️ ความแม่นยำของ "เฮ่ อะตอม" ยังไม่ได้วัดกับเสียงจริง** (ทดลองกับ TTS ไทยไม่ได้ข้อสรุป: สร้างตัวลบเสียงไทยเสียงเดียวกันไม่สำเร็จ) — ระบบจึงออกแบบให้ปรับเทียบ/ปรับความไว/ทดสอบสดจากเสียงจริงในแอป · โมเดลคำปลุกสำเร็จรูปเป็น CC BY-NC-SA (ไม่เชิงพาณิชย์)
+- **Dependencies:** expo-calendar · expo-contacts · expo-location · expo-notifications · expo-image-picker · expo-intent-launcher (+ plugin/permission ใน `app.json`, `SET_ALARM`) · ต้อง prebuild + build ใหม่ · ⚠️ ยังไม่ได้ build/ทดสอบบนเครื่องจริง
+
+### เสียงของฉัน + ตัวรู้จำเสียงของระบบ
+- **Added (ตอบเฉพาะเสียงเจ้าของ):** `features/voice/speaker/` — โมเดล WeSpeaker ResNet34 ONNX (`assets/models/voxceleb_resnet34_LM.onnx`, 26.5 MB, CC-BY-4.0) รันบนเครื่องด้วย `onnxruntime-react-native` · `fbank.ts` (Kaldi fbank เขียนเอง ตรวจเทียบ numpy: `scripts/speaker/ref_fbank.py`) · `gate.ts` ตัดสินเสียงช่วงพูดก่อนส่งขึ้นเซิร์ฟเวอร์ (เสียงคนอื่น/ความเงียบไม่ถูกส่ง = ไม่เสียโทเคน) · `profile.ts` เก็บเฉพาะ embedding ใน SecureStore · การ์ด **ตั้งค่า › เสียง › เสียงของฉัน** (ลงทะเบียน 20 วินาที, เปิด/ปิด, ปรับความเข้มงวด, ลบ)
+- **ตรวจกับเสียงพูดจริง (Windows TTS 2 เสียง):** คนเดียวกัน cosine 0.83–0.91 · คนละคน 0.18–0.24 · หน้าต่าง 1.2 วินาที 0.69–0.75 เทียบ 0.09–0.21 → threshold เริ่มต้น 0.45 — ⚠️ ยังไม่ได้ตรวจกับเสียงคนจริงผ่านไมค์มือถือ (สัญญาณรบกวนทำให้ช่องว่างแคบลง)
+- **ข้อจำกัด:** กรองได้เฉพาะเส้นทาง Gemini Live (เราคุมเสียง PCM เอง) — OpenAI/WebRTC กับตัวรู้จำเสียงของระบบกรองไม่ได้ · ไม่ใช่ระบบความปลอดภัย (เสียงอัดเลียนแบบได้) · เสียงเริ่มช้าลง ~1.2 วินาทีต่อการพูดแต่ละครั้ง (เก็บเสียงตัดสินก่อนปล่อย)
+- **Added (STT ฟรีบนเครื่อง):** `SystemSpeechSession` + `SystemRecognizer` ใช้ตัวรู้จำเสียงของระบบ (Google บน Android) ผ่าน `expo-speech-recognition` — ไม่ต้องอัดไฟล์/ไม่ต้องมี key · `useVoiceChat` เลือกเครื่องยนต์: เสียงสด → ตัวรู้จำเสียงระบบ → อัดไฟล์ + STT คลาวด์ (เดิม) (บังคับด้วย option `live.engine` = `auto|realtime|system|classic`)
+- **Added:** Gemini Live ค้นเว็บได้ผ่าน Google Search ในตัว (`googleSearch` tool ใน setup)
+- **Docs:** `docs/JARVIS_GAP_AUDIT.md` — ตรวจช่องว่างเทียบแอปต้นแบบ
+- **Dependencies:** `expo-speech-recognition` ^58 · `onnxruntime-react-native` ^1.24 (plugin ใน `app.json`) · ต้อง prebuild + build ใหม่
+
 ### ควบคุมเครื่องเต็มรูปแบบ ([ADR-015](docs/DECISIONS.md#adr-015--บทบาท-4-persona-ข้ามอุปกรณ์--ควบคุมเครื่องเต็มรูปแบบ))
 - **Docs:** ADR-015 — บทบาท 4 persona บนมือถือ/PC (อะตอม ↔ Mark 55 · ไฟรเดย์ ↔ Gemini/Gemini Spark · จาร์วิส ↔ Hermes · อัลตรอน = เบื้องหลัง + sandbox บน PC) และแผนควบคุมเครื่อง 3 ระดับ · Boss อนุมัติ dev build + native code
 - **อัลตรอน sandbox:** "อัลตรอน ทำว่า สุ่มเลข 6 หลัก" → AI เขียนโค้ด → Mark 55 รันใน Docker ที่ไม่มีเน็ต/แตะเครื่องจริงไม่ได้ → ผลเด้งกลับแชท → "ปลด" (เก็บผล) หรือ "ทำลาย" (ลบทิ้ง) · ต้องมี Docker Desktop บน Mark 55 + รัน `mark55/sql/004_ultron.sql` · ทดสอบกับ Docker จริงแล้ว (บล็อกเน็ต · root อ่านอย่างเดียว · หมดเวลา)

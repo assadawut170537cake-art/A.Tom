@@ -1,5 +1,6 @@
 import type { ChatMessage } from '../../ai/core/types';
 import type { Persona } from '../../../core/types/persona';
+import type { AttachmentData } from '../../../core/types/attachment';
 
 export const INTENTS = ['chat', 'pc_command', 'switch_assistant', 'agent'] as const;
 export type Intent = (typeof INTENTS)[number];
@@ -9,7 +10,11 @@ export type Intent = (typeof INTENTS)[number];
  * alone can't say *which* agent, so only AgentClassifier (pattern match on registered capabilities)
  * produces agent routes.
  */
-export const MODEL_INTENTS = ['chat', 'pc_command', 'switch_assistant'] as const satisfies readonly Intent[];
+export const MODEL_INTENTS = [
+  'chat',
+  'pc_command',
+  'switch_assistant',
+] as const satisfies readonly Intent[];
 export type ModelIntent = (typeof MODEL_INTENTS)[number];
 
 /** Which stage decided the route. */
@@ -20,6 +25,13 @@ export type PersonaEntity = `${Persona}`;
 
 export interface RouterInput {
   text: string;
+  /**
+   * มี = ขอให้ส่งคำตอบทีละท่อนระหว่างที่ AI ยังพิมพ์ (ChatHandler สตรีม · handler อื่นไม่เรียก)
+   * ใช้ให้แอปเริ่มพูด/แสดงข้อความก่อนตอบจบ — ไม่เปลี่ยนการ route (เสียงกับพิมพ์ route ทางเดียวกัน)
+   */
+  onDelta?: ((text: string) => void) | undefined;
+  /** ไฟล์ที่บอสแนบ (อ่านเนื้อแล้ว) — มี = ส่งเข้าแชทเสมอ เพราะมีแค่ ChatHandler ที่ส่งไฟล์ให้ AI อ่านได้ */
+  attachments?: AttachmentData[] | undefined;
   context?: {
     activePersona?: Persona;
     recentMessages?: string[];
@@ -64,6 +76,10 @@ export interface HandlerResult {
   persona: Persona;
   /** agent ที่ขอเปิด UI (Agent Panel บนหน้าหลัก) — มีเฉพาะผลจาก AgentHandler */
   agentScreen?: { agentId: string } | undefined;
+  /** true = ข้อความถูกส่งผ่าน `onDelta` ครบแล้ว (ผู้เรียกพูด/แสดงไประหว่างทางแล้ว ไม่ต้องพูดซ้ำทั้งก้อน) */
+  streamed?: boolean | undefined;
+  /** รูปที่แนบกับคำตอบ — มีเฉพาะผลจาก AgentHandler */
+  imageUri?: string | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

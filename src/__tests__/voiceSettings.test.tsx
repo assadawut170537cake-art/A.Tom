@@ -65,24 +65,24 @@ const rowOrder = () =>
     .map((el) => String(el.props.accessibilityLabel).replace(/^ลำดับ \d+: /, ''));
 
 describe('Voice settings screen — layout', () => {
-  test('one card per provider: 9 TTS + 8 STT, each with a connection test', async () => {
+  test('one card per provider: 10 TTS + 9 STT, each with a connection test', async () => {
     await renderScreen();
     expect(screen.getByText('TTS — เสียงพูด')).toBeTruthy();
     expect(screen.getByText('STT — ถอดเสียง')).toBeTruthy();
-    expect(screen.getAllByText('ทดสอบการเชื่อมต่อ')).toHaveLength(17);
+    expect(screen.getAllByText('ทดสอบการเชื่อมต่อ')).toHaveLength(19);
     // 9 + 8 toggles (Azure appears in both sections)
     for (const p of TTS_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
     for (const p of STT_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
     // 17 providers + สวิตช์โหมดเฝ้า
-    expect(screen.getAllByRole('switch')).toHaveLength(18);
+    expect(screen.getAllByRole('switch')).toHaveLength(20);
     expect(screen.getByLabelText('โหมดเฝ้า')).toBeTruthy();
     // keyless on-device providers don't ask for a key: 8 TTS + 7 STT key fields
-    expect(screen.getAllByLabelText('API key')).toHaveLength(15);
+    expect(screen.getAllByLabelText('API key')).toHaveLength(17);
     // Gemini TTS can share the Gemini LLM key — its field says so
     expect(screen.getByPlaceholderText('ว่างไว้ = ใช้ key ของ Gemini (AI Providers)')).toBeTruthy();
     // TTS cards have a default-voice picker and a preview button
-    expect(screen.getAllByLabelText(/^เสียงเริ่มต้น:/)).toHaveLength(9);
-    expect(screen.getAllByText('ลองฟัง')).toHaveLength(9);
+    expect(screen.getAllByLabelText(/^เสียงเริ่มต้น:/)).toHaveLength(10);
+    expect(screen.getAllByText('ลองฟัง')).toHaveLength(10);
   });
 
   test('provider-specific extra fields are rendered', async () => {
@@ -102,13 +102,13 @@ describe('Voice settings screen — layout', () => {
     await renderScreen();
     await waitFor(() => expect(rowOrder()[0]).toBe('Play.ht'));
     const order = rowOrder();
-    expect(order.slice(0, 9)).toEqual([
+    expect(order.slice(0, 10)).toEqual([
       'Play.ht', 'Expo Speech', 'Gemini TTS', 'OpenAI TTS', 'ElevenLabs', 'Google Cloud TTS', 'Azure Speech',
-      'Amazon Polly', 'Custom (OpenAI-compatible)',
+      'Amazon Polly', 'xAI TTS', 'Custom (OpenAI-compatible)',
     ]);
-    expect(order.slice(9)).toEqual([
+    expect(order.slice(10)).toEqual([
       'Deepgram', 'Expo Speech Recognition', 'OpenAI Whisper', 'Google Cloud STT', 'Azure Speech', 'AssemblyAI',
-      'Rev AI', 'Custom',
+      'Rev AI', 'xAI STT', 'Custom',
     ]);
   });
 });
@@ -197,7 +197,7 @@ describe('Voice settings screen — interactions', () => {
     expect(await screen.findByText('✓ เชื่อมต่อได้')).toBeTruthy();
     expect(nth(calls, 0).headers.Authorization).toBe('Bearer sk');
 
-    await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 10)); // Whisper
+    await fireEvent.press(nth(screen.getAllByText('ทดสอบการเชื่อมต่อ'), 11)); // Whisper
     expect(await screen.findByText('[whisper] ยังไม่ได้ตั้งค่า API key')).toBeTruthy();
   });
 

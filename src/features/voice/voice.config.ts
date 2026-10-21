@@ -27,6 +27,12 @@ export const TTS_PROVIDERS: VoiceProviderMeta<TTSProviderId>[] = [
   { id: 'azure', name: 'Azure Speech', requiresKey: true },
   { id: 'polly', name: 'Amazon Polly', requiresKey: true },
   { id: 'playht', name: 'Play.ht', requiresKey: true },
+  {
+    id: 'xai',
+    name: 'xAI TTS',
+    requiresKey: true,
+    keyPlaceholder: 'ว่างไว้ = ใช้ key ของ xAI Grok (AI Providers)',
+  },
   { id: 'custom', name: 'Custom (OpenAI-compatible)', requiresKey: true },
 ];
 
@@ -38,6 +44,12 @@ export const STT_PROVIDERS: VoiceProviderMeta<STTProviderId>[] = [
   { id: 'azure', name: 'Azure Speech', requiresKey: true },
   { id: 'assemblyai', name: 'AssemblyAI', requiresKey: true },
   { id: 'revai', name: 'Rev AI', requiresKey: true },
+  {
+    id: 'xai',
+    name: 'xAI STT',
+    requiresKey: true,
+    keyPlaceholder: 'ว่างไว้ = ใช้ key ของ xAI Grok (AI Providers)',
+  },
   { id: 'custom', name: 'Custom', requiresKey: true },
 ];
 

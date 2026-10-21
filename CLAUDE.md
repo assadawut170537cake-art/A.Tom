@@ -5,6 +5,19 @@
 
 ---
 
+## 0. ประหยัดโควต้า (Boss ตั้งเป็นกฎส่วนกลาง 2026-10-20 — ใช้ทุก session)
+
+ใช้โควต้าให้น้อยที่สุด **โดยไม่ลดคุณภาพงาน** — Claude เลือกวิธีเองตามงาน:
+- **APK:** ไม่ build ทุกรอบ — build ครั้งเดียวเมื่อแก้ชุดงานเสร็จ หรือเมื่อบอสขอ
+- **Test:** ระหว่างแก้รันเฉพาะไฟล์ test ที่เกี่ยว · ชุดเต็ม (`npm test` + tsc + lint + export) ครั้งเดียวก่อน commit
+- **อ่านไฟล์:** อ่านเฉพาะส่วนที่ต้องใช้ (grep / ช่วงบรรทัด) · ไม่อ่านซ้ำของที่อ่านแล้ว · ไม่เปิด subagent ถ้าค้นเองได้
+- **ค้นเว็บ:** เฉพาะเมื่อข้อมูลอาจเปลี่ยน/ไม่แน่ใจ (API ใหม่ ราคา ชื่อโมเดล)
+- **คำตอบ:** กระชับ ตรงประเด็น ไม่ทวนสิ่งที่บอสรู้แล้ว · รวมคำถามที่ต้องถามบอสไว้ทีเดียว
+- **Commit/push:** รวมงานที่เกี่ยวกันใน commit เดียวตามกฎ sub-phase · ไม่ push ถี่โดยไม่จำเป็น
+- งานที่ต้องตัดสินใจระหว่างประหยัดกับคุณภาพ → เลือกคุณภาพ แล้วบอกบอสสั้น ๆ
+
+---
+
 ## 1. PROJECT OVERVIEW
 
 **A.T.O.M.** = AI ผู้ช่วยที่ "โตไปด้วยกัน" กับ Boss (คุณเค้ก)
@@ -14,7 +27,9 @@
 
 **Repo:** `assadawut170537cake-art/A.Tom` (branch: `main`)
 **Owner:** คุณเค้ก — พูดไทย
-**Workflow:** DeepSeek (architect) → Claude Code (coder) → Argon/Gemini (reviewer)
+**ผู้ใช้:** บอสใช้คนเดียว **ไม่เผยแพร่** (Boss ยืนยัน 2026-10-20) — ไม่ต้องออกแบบเผื่อหลายผู้ใช้ / Play Store · ติดตั้ง APK เอง · ผู้ให้บริการเสียงหลัก = Gemini (xAI เพิ่มไว้สำรอง)
+**แกนหลัก:** `docs/CONCEPT.md` (คุยลื่น · ส่งงานต่อ · หาความสามารถเอง · ซ่อมตัวเอง) — งานใหม่ต้องเช็กกับไฟล์นี้ก่อน
+**Workflow:** DeepSeek (architect) → Claude Code (coder) → Argon/Gemini (reviewer) · พรอมต์ดึงทีม = `docs/TEAM_PROMPTS.md`
 
 ---
 
@@ -28,7 +43,7 @@
 - **Voice:** expo-speech + expo-audio + expo-network
 - **Navigation:** @react-navigation/native-stack (ไม่ใช่ Expo Router)
 - **Icons:** lucide-react-native
-- **AI:** Gemini + OpenRouter (Jev = optional, default off)
+- **AI:** Gemini + OpenRouter + Dahl ×3 + xAI Grok (Jev = ตัวตัดสินใจหลัก default on · ADR-019 · Dahl Boss เพิ่ม 2026-10-19 · ADR-016 · xAI 2026-10-20 · ADR-018)
 
 ---
 
@@ -54,10 +69,10 @@
     │
     └── features/       ← implementation (เปิด/ปิดได้)
         ├── ai/         ← providers, orchestrator, prompts
-        ├── voice/      ← 17 providers (9 TTS + 8 STT), orchestrator
+        ├── voice/      ← 19 providers (10 TTS + 9 STT), orchestrator
         ├── router/     ← IntentRouter, classifiers, handlers
         ├── jarvis/     ← MainScreen, conversation service
-        ├── marketplace/← ตั้งค่า › Marketplace: MCP servers · Plugins · Skills · ควบคุมอุปกรณ์ (ค้นหา/กรอง/เปิดปิด/ติดตั้ง)
+        ├── marketplace/← ตั้งค่า › Modules › Marketplace แบบหน้า "ปรับแต่ง" ของ Claude: แท็บ ทักษะ/ตัวเชื่อมต่อ/ปลั๊กอิน · ของคุณ/สำรวจ · หมวดหมู่ · คลัง MCP ทางการ (ADR-021)
         ├── agents/     ← AgentScreen (route `Agent`) · AgentPanel (inline บนหน้าหลัก) · AgentHost · useAgentPanelStore
         ├── memory/     ← Memory tab: MemoryScreen + FactEditor (ดู/เพิ่ม/แก้/ลบ fact ใน Shared Memory)
         └── settings/   ← screens (Hub, AI, Modules, Sync, Voice, Persona Voice), components
@@ -75,18 +90,17 @@
 
 ---
 
-## 4. LOCK DECISIONS (Phase 3 — ห้ามแก้)
+## 4. LOCK DECISIONS — ล็อก "โครงสร้าง" ไม่ล็อก "ชื่อเจ้า" (Boss อนุมัติ 2026-10-20 · ADR-020 · แผน `docs/CORE_AUDIT.md`)
 
-1. LLM: Gemini + OpenRouter
-2. Jev: default ปิด, fallback Gemini, ใช้ classifier เท่านั้น
-3. Voice: 17 providers (TTS 9 + STT 8), Expo Speech = ตัวสุดท้าย (Boss เพิ่ม Gemini TTS 2026-10-15)
-4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` (Boss เพิ่ม `agent` 2026-10-16 · Jev/LLM ยังตอบได้แค่ 3 ตัวแรก)
-5. Auto-Switch: Priority + Fallback + sticky lastGood
-6. Storage: SecureStore (secrets) + AsyncStorage (data)
-7. Settings: 3 หน้า (Hub + AI + Voice) + Persona Voice Map
-8. Chat History: แยกต่อ persona (key: `atom.history.v1.<1-4>`)
-9. Voice per Persona: Boss กำหนดเอง
-10. Shared Memory: Phase 4.5 (scaffold แล้ว)
+คอนเซ็ปต์ของบอส: **แกนหลักต้องต่อ API ได้ทุกรูปแบบ และเพิ่มได้ในอนาคต** — สิ่งที่ล็อก (ห้ามแก้โดยไม่ขอ):
+1. ผู้ให้บริการทุกประเภท (AI / TTS / STT) เข้าทาง **registry + interface กลาง** เท่านั้น — รายชื่อเจ้าไม่ใช่ lock (ตอนนี้: Gemini · OpenRouter · Dahl ×3 · xAI · TTS 10 · STT 9 = ชุดสำเร็จรูป)
+2. **เพิ่มเจ้าใหม่ได้จากในแอปโดยไม่แก้โค้ด** (OpenAI-compatible — AI: `customProviders.ts` หลายตัว · TTS/STT: การ์ด Custom)
+3. ความสามารถเสริม = module / agent / MCP — ปิดแล้วแกนยังคุย/ฟัง/พูด/จำ/สลับ persona ได้
+4. Router: 4 intents — `chat` / `pc_command` / `switch_assistant` / `agent` · ลำดับ Rule → Agent → **Jev (ตัดสินใจหลัก default on · ADR-019)** → LLM → chat · Jev/LLM ตอบได้แค่ 3 ตัวแรก
+5. Auto-Switch: Priority → Fallback → sticky lastGood → สลับรุ่นเมื่อโควต้าหมด (ADR-017) · Expo Speech = เสียงตัวสุดท้าย
+6. Storage: SecureStore (secrets) + AsyncStorage (data) · Chat History แยกต่อ persona (`atom.history.v1.<1-4>`)
+7. Settings: Hub + AI + Voice + Persona Voice Map · สมอง/เสียงต่อ persona บอสกำหนดเอง
+8. Shared Memory: core = ในเครื่อง · sync ภายนอก (Mark 55 / Supermemory) = module
 ---
 
 ## 5. CONVENTIONS
@@ -200,7 +214,7 @@
 - tool มาจาก ModuleRegistry ก่อน แล้วค่อย `providers` (SkillEngine → MCPClientBridge → DeviceControlBridge) · id ซ้ำ = ตัวแรกชนะ
 - `memory` → แนบ facts (global + persona) ผ่าน `toPromptLine()` (ย้ายไป `core/memory/promptLine.ts`, ChatHandler re-export)
 - **MCP:** Streamable HTTP JSON-RPC ผ่าน fetch (ไม่มี dep ใหม่) · รายการ server = AsyncStorage `atom.mcp.v1.servers` · token = SecureStore `mcp.<id>` · server ใหม่**ปิดไว้ก่อน** · tool id `mcp.<server>.<tool>` · https เท่านั้น (ยกเว้น localhost)
-- **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
+- **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **Boss อนุมัติ 2026-10-20** → `learn` เปิดเป็นค่าเริ่มต้น (`SkillEngine.isLearnEnabled`/`setLearnEnabled`, key `atom.skills.v1.learn`) · createAppAgent ไม่ส่ง `learn` = ตามค่านี้ · ทักษะที่เขียนขึ้นยัง `enabled:false` รอบอสเปิดใน Marketplace (เนื้อหาผ่าน `toPromptLine` redact ก่อนเข้า prompt)
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · `defaultDriver` = `Linking` + expo-brightness + expo-clipboard (ADR-015 ระดับ A) · ความสว่าง Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก — ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป · เสียง (STREAM_MUSIC) + ไฟฉาย = native module ของเราเอง `modules/atom-device` (Kotlin, Android เท่านั้น, autolink จาก `./modules`) — ไม่มี module (Expo Go / iOS / jest) = "ยังไม่รองรับ" · Kotlin ห้าม throw กรณีที่รู้ล่วงหน้า (expo ห่อเป็นข้อความอังกฤษ) → คืนค่าแล้วให้ JS แปลงเป็นไทย · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
 - **Device ระดับ B** (`AtomAccessibilityService.kt` + manifest/xml ใน `modules/atom-device` — merge เข้า app เอง ไม่ต้อง config plugin): `device.launch` (เปิดแอปตามชื่อ, ไม่ต้องใช้ accessibility · ต้องมี `<queries>` LAUNCHER) · `device.nav` · `device.tap` · `device.type` · `device.read_screen` · `device.accessibility_settings` — บอสต้องเปิดเองที่ ตั้งค่าเครื่อง › การช่วยเหลือพิเศษ › "A.T.O.M. ควบคุมเครื่อง"
 - ระดับ B ทำกับ **แอปหน้าสุด** → สั่งในแชทของเรา = กดในแอปเรา · ใช้ "เปิดแอป X แล้วกด Y" (tapText รอจอวาดได้ 6s, `AsyncFunction` ฝั่ง Kotlin) · ปุ่มที่เข้า `RISKY_TAP` (ซื้อ/โอน/ลบ/ส่ง/ยืนยัน/…) → `needsConfirmation` → agent จำไว้ 60s ให้พิมพ์ "ยืนยัน" / "ยกเลิก" · ฟังก์ชันระดับ B ใน `AtomDeviceNative` เป็น optional (APK เก่าไม่มี = "ยังไม่รองรับ" ไม่ crash)
@@ -240,6 +254,7 @@
 - release build Android เปิด http ไว้ด้วย config plugin `plugins/withCleartextTraffic.js` (ใช้ expo/config-plugins ที่มากับ expo · ไม่ต้องเพิ่ม expo-build-properties) — การจำกัด http ให้แค่ LAN ทำในโค้ด (`normalizeServerUrl`)
 - Build APK: `npx eas-cli build -p android --profile preview` (eas.json) หรือ local `npx expo prebuild -p android` แล้ว `cd android && ./gradlew assembleRelease` · package `com.atom.assistant` (เปลี่ยนแล้วแอปเดิมอัปเดตทับไม่ได้) · local build เซ็นด้วย debug keystore ของ template
 - `plugins/withGregorianBuildLocale.js`: Windows ภูมิภาคไทย → Java ได้ปี พ.ศ. (2569) → AGP เขียนวันที่ลง zip แบบ MS-DOS (รับแค่ 1980–2107) ไม่ได้ → `VerifyException (no error message)` ที่ `mergeReleaseJavaResource` · plugin เติม `-Duser.language=en -Duser.country=US` ใน `org.gradle.jvmargs` · ห้ามลบ ไม่งั้น build บนเครื่อง Boss ล้ม
+- `scripts/patch-native-deps.js` (postinstall): แก้ `onnxruntime-react-native` ที่ใช้ `VersionNumber` (Gradle 9 ถอดออก → build ล้ม) · ห้ามลบ · lib อื่นพังกับ Gradle 9 → เพิ่มแถวใน `PATCHES` (ไม่ใช้ patch-package = ไม่เพิ่ม dep)
 - `plugins/withAndroidProjectName.js`: Gradle 9 ห้ามชื่อโปรเจกต์ขึ้นต้น/ลงท้ายด้วย "." ("A.T.O.M.") → ตั้ง rootProject.name = slug · ห้ามลบ ไม่งั้น build Android ล้ม
 
 ### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)
@@ -252,7 +267,7 @@
 - บอสเก็บคีย์ใน Supermemory space `SECRETS_CONTAINER_TAG` (`...atom_secrets` — คนละ space กับ core ที่ sync ขึ้น prompt) เนื้อหาบรรทัดละ `<ชื่อคีย์> = <ค่า>` เช่น `ai.gemini = AIza…` · ชื่อคีย์ = secretKey() ของ SecureKeyStore
 - รับเฉพาะ prefix `ai. / tts. / stt. / mcp. / pcbridge.` (`ALLOWED_KEY_PREFIXES`) — กันเขียน `mark55.auth.token` / `supermemory.apiKey` ทับจากเน็ต · bootstrap ด้วย `supermemory.apiKey` ที่บอสใส่เองที่ ตั้งค่า › Sync
 - คีย์ **ไม่** เข้า prompt (ไหลเข้า SecureStore เท่านั้น — คนละทางกับ memory fact) · ไม่ commit ลง git · fail-open (ไม่มีคีย์/เน็ตล่ม = ข้าม)
-- ⚠️ endpoint/response ของ Supermemory อิงสเปก v3 (`POST /v3/search`) — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
+- ⚠️ ใช้ `POST /v3/documents/list` (`includeContent: true`) — **ไม่ใช่** `/v3/search` (คำค้นว่าง = 400) · endpoint/response อิง OpenAPI v3 — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
 
 ### Mark 55 Bus — `pc-bridge` (4.5.5.3) · SQL `mark55/sql/002_mobile_rpc.sql`
 - คนละช่องทางกับ Sync (Fastify, memory facts): Bus = สั่งงานให้ Mark 55 รัน ผ่านตาราง `memory_tasks` บน Supabase
@@ -276,11 +291,77 @@
 - ⚠️ ชื่อ field wire อิง spec (ไม่มีโค้ด server) — Mark 55 ใช้ชื่ออื่นแก้ที่ `RemoteChatAdapter`/`chatSyncTypes` ที่เดียว · เรียงข้อความตาม `createdAt` (นาฬิกาเครื่องที่พิมพ์) เท่ากัน = ตาม id
 - PC→มือถือ (NOTIFY/DEVICE_TOOL ใน pc-inbox) ยังอยู่ = ใช้เป็น "แจ้งเตือน" ต่างหากจากห้องแชท
 
+### คุยเสียงให้ลื่น (Voice A · ลดดีเลย์ + ไม่เป็นทอด ๆ · 2026-10-20)
+- **ตอบไวขึ้น 2 ทาง:** (1) `SILENCE_END_MS` 1200→900 (จบประโยคไวขึ้นแต่ยังเผื่อพักหายใจกลางประโยค · ปรับที่เดียวถ้าเครื่องตัดเร็ว/ช้าไป) · (2) `VoiceOrchestrator.speak()` แบ่งประโยคด้วย `splitSentences()` (`voice/core/sentences.ts` — แบ่งที่ตัวจบประโยค [.!?…]/ขึ้นบรรทัด **ไม่แบ่งที่ช่องว่าง** เพราะไทยเว้นวรรคในประโยคเดียวได้ · ชิ้นแรกสั้นได้เพื่อเริ่มพูดเร็ว ชิ้นถัดไปรวมจนถึง `minChars`) พูดประโยคแรกทันที ไม่รอสังเคราะห์ทั้งก้อน
+- **fallback ครบทุกประโยค:** แต่ละประโยคลองเจ้าที่พูดประโยคก่อนหน้าสำเร็จก่อน แล้วไล่ chain ที่เหลือ (เจ้าเดิมล้มกลางคัน → ตกไป Expo Speech ไม่พูดค้างครึ่งคำตอบ) · อ่านค่าเสียงต่อเจ้าครั้งเดียวทั้งคำตอบ (memo ใน `speak()`) ไม่อ่าน AsyncStorage ซ้ำทุกประโยค · `speakRun` guard = กดหยุด/ speak ใหม่ ทิ้งประโยคที่เหลือ
+- ⚠️ **ไม่แตะ router ในโหมดเสียง** (เคยคิดทำ `fastChat` ข้าม Jev/LLM classifier แต่ถอดออก — จะทำให้สั่งงาน/สลับ persona ด้วยเสียงที่ต้องพึ่ง Jev/LLM เพี้ยนเป็นแชท ซึ่งขัดแกนข้อ 2) · เสียงกับพิมพ์ route ทางเดียวกัน
+- ⚠️ Voice A รอบแรกไม่ได้ผลบนเครื่องจริง (Boss ทดสอบ 2026-10-20): แอปยังรอคำตอบ LLM ทั้งก้อน + ไทยไม่มีจุด splitter จึงไม่แบ่ง → แก้ด้วย **สตรีม** ด้านล่าง
+
+### สตรีมคำตอบ + พูดระหว่างพิมพ์ (Voice A2 · 2026-10-20)
+- `requestStream()` (core/http/request.ts): timeout = **ช่วงเงียบ** (รีเซ็ตทุกท่อน) ไม่ใช่เวลารวม · error/status กติกาเดียวกับ `request()` · error จาก `onText` ส่งต่อตามจริง · ออกก่อนจบ → `reader.cancel()` + abort
+- RN fetch อ่าน body เป็นสตรีมไม่ได้ → ใช้ `expo/fetch` ผ่าน `streamingFetch` (core/http/streamingFetch.ts · มากับ expo ไม่ใช่ dep ใหม่) · jest mock `expo/fetch` → `globalThis.fetch` (jest.setup.js)
+- Gemini `chatStream` = `:streamGenerateContent?alt=sse` · ข้าม part `thought` · body ไม่ใช่ SSE (JSON ก้อนเดียว) ก็อ่านได้ · provider อื่นที่ไม่มี `chatStream` → Orchestrator เรียก `chat()` แล้วส่งทั้งก้อน
+- `Orchestrator.chatStream`: retry/fallback ได้เฉพาะ**ก่อน**ส่งข้อความแรก · ล้มหลังส่งไปแล้ว = คืนเท่าที่ได้ + notice "คำตอบขาดกลางคัน" (ไม่ไปเจ้าอื่น — กันพูดซ้ำ/ปน)
+- router: `RouterInput.onDelta` → ChatHandler ใช้ chatStream แล้วคืน `streamed: true` (เฉพาะตอนสตรีม) → conversation ไม่พูดทั้งก้อนซ้ำ · handler อื่น (agent/pc/switch) ไม่สตรีม = พูดแบบเดิม
+- `takeSpeakable()` (sentences.ts): ท่อนแรกตัดที่จุดจบประโยคแรก (เริ่มพูดเร็ว) · ท่อนถัดไปรวบถึงจุดจบสุดท้าย · **ไทยไม่มีจุด → ตัดที่ช่องว่างเมื่อยาวพอ** (`FIRST_SPACE_MIN` 18 / `SPACE_MIN` 40 · แทนกฎเดิม "ไม่แบ่งที่ช่องว่าง" เฉพาะตอนสตรีม) · ไม่ถือท้าย buffer เป็นจุดจบ ("ราคา 3." + "5")
+- `VoiceOrchestrator.speakStream(persona, {onFirst})` → `{push, end, started}` · TTS ที่มี `prepare()` (BaseCloudTTS) สังเคราะห์ท่อนถัดไประหว่างเล่นท่อนปัจจุบัน · เล่นไม่ได้ → เจ้านั้นถูกพักทั้งคำตอบ ท่อนเดิมพูดด้วยเจ้าถัดไป · `stop()` ปลุก worker ให้จบ
+- store `streaming` = บับเบิลสด (ไม่บันทึก ไม่ซิงก์) · คำตอบเต็มบันทึกครั้งเดียวตอนจบ · `clearStreaming()` ทุกเริ่ม turn/ล้ม
+- ยังไม่ทำ: พูดแทรก (barge-in) · Voice B = Gemini Live realtime
+
+### ประวัติการสนทนา (ปุ่มนาฬิกาซ้ายบน) — แบบรายการแชทของ Claude (Boss ขอ 2026-10-21)
+- route `History` · รายการ "บทสนทนา" จัดกลุ่มตามวัน (`dayLabel`) · กรอง ทั้งหมด/persona · แตะ = อ่านทั้งบท (ChatBubble) → "คุยต่อกับ…" / "ลบ" (ยืนยัน → `removeMessages` เฉพาะในเครื่อง)
+- ไม่มี session จริงใน storage (lock ข้อ 6 สายเดียวต่อ persona) → `features/jarvis/history.ts` แบ่งจากช่วงเงียบ `CONVERSATION_GAP_MS` (30 นาที) · ชื่อ = ข้อความแรกของบอส
+
+### ปุ่ม + (ไฟล์แนบ · ทางลัด) — Boss อนุมัติ dep `expo-image-picker` + `expo-document-picker` 2026-10-20
+- type: `core/types/attachment.ts` — `AttachmentRef` (เก็บในแชท: ชื่อ/mime/kind/uri — **ไม่เก็บเนื้อไฟล์**) · `AttachmentData` (ตอนส่ง: base64 หรือข้อความดิบ) · `attachmentKind()` เดาจาก mime + นามสกุล (ไฟล์โค้ดที่ Android บอก octet-stream = text)
+- เลือก/อ่าน: `features/attachments/attachments.ts` (`pickImages`/`takePhoto`/`pickFiles` ไม่ throw · ≤ 10 MB/ไฟล์ · ≤ 5 ไฟล์ · ข้อความ ≤ 60k ตัว) · อ่านเนื้อใน `sendMessage({ attachments })` ตอนส่งเท่านั้น
+- ส่งให้ AI: `features/ai/core/attachmentParts.ts` — ไฟล์ข้อความ/โค้ด = code block ต่อท้ายข้อความ (ทุก provider) · Gemini = `inlineData` · OpenAI-compatible = รูปเป็น `image_url` data URL, PDF/สื่อบอกในข้อความว่าอ่านไม่ได้
+- router: มีไฟล์แนบ = `chat` เสมอ (ไม่เสีย request ให้ Jev/LLM) · ChatHistoryStorage ตัดไฟล์แนบที่เสียทิ้งเฉพาะไฟล์ · ซิงก์แชทไม่ส่งไฟล์แนบ (`toWireMessage` เลือก field เอง)
+- เมนู (`AddMenu`): รูปภาพ · ถ่ายรูป · ไฟล์/โค้ด · ค้นคว้า (`RESEARCH_PREFIX` → agent "งาน") · NotebookLM (`NOTEBOOKLM_PREFIX`) · ปลั๊กอิน & ทักษะ (Marketplace) · ข้อความตั้งต้นใส่ช่องพิมพ์ด้วย `ChatInput.prefill`
+
+### NotebookLM Enterprise (ทาง A ผ่าน Mark 55 — Boss เลือก 2026-10-20)
+- API ใช้ OAuth token (ไม่ใช่ API key) → มือถือไม่ถือ token · Mark 55 ใช้ `gcloud auth print-access-token` (`mark55/notebooklm.py`, stdlib urllib ไม่มี dep ใหม่) · SQL `mark55/sql/005_notebooklm.sql` · instruction `NOTEBOOKLM_ADD` `{sources:[{type:url|youtube|text,value,name}], title?}`
+- `.env`: `NOTEBOOKLM_PROJECT` (id หรือ number — id แปลงเป็น number ด้วย gcloud) · `NOTEBOOKLM_LOCATION` (global/us/eu → host `<loc>-discoveryengine.googleapis.com/v1alpha`) · ไม่มี notebook id = สร้างครั้งแรกแล้วจำที่ `~/.mark55/notebooklm.json` · ใส่ "ใหม่ ชื่อ X:" = สร้างใหม่ไม่ทับที่จำ
+- มือถือ: agent `src/modules/agents/notebooklm-agent.ts` ("ส่งเข้า NotebookLM: <ลิงก์/ข้อความ>") · ไฟล์แนบส่งเข้า NotebookLM ยังไม่ได้ (Bus payload ≤ 16 KB) · ⚠️ v1alpha — field เปลี่ยนแก้ที่ `notebooklm.py` ที่เดียว
+
+### แท็บ "วันนี้" (Today) — Boss ขอ 2026-10-20
+- `features/today/`: `todayStore.ts` (เช็กลิสต์ AsyncStorage `atom.today.v1.tasks` · **ไม่เขียนก่อน `load()` เสร็จ** ไม่งั้นทับของเดิม · ไม่ล้างเองข้ามวัน) · `TodayScreen` (เช็กลิสต์ · นับข้อความบอสวันนี้ต่อ persona · แจ้งเตือน PC = ข้อความ assistant ที่ขึ้นต้น `NOTIFY_PREFIX` (ย้ายไป `features/pc-bridge/PcInbox.ts`) · ช่องผลวิจัยประจำวัน รอ Daily Researcher) · วันที่ไทยเขียนเอง (`thaiDate`, ไม่พึ่ง Intl ของ Hermes)
+- agent "งานวันนี้" (`src/modules/agents/today-agent.ts`): "เพิ่มงาน …" · "ติ๊กงาน …" / "งาน … เสร็จแล้ว" · "งานวันนี้มีอะไร"
+### เสียงสด Realtime (speech-to-speech)
+- `features/voice/realtime/RealtimeVoiceSession.ts` = state machine (DI) · `OpenAIRealtimeTransport.ts` = WebRTC (lazy `require('react-native-webrtc')`) · `config.ts` = prompt สั้น + tool `ask_atom` · เลือกเครื่องยนต์ที่ `jarvis/hooks/useVoiceChat.ts` (`live.engine`)
+- หลักการ: โมเดลเสียง = ปาก/หู · สมอง (memory/agent/pc-bridge) = router เดิมผ่าน `ask_atom` → `sendMessage(text, { speak: false })` · เทิร์นที่ delegate ห้ามลงแชทซ้ำ (router ลงให้แล้ว)
+- provider: `GeminiLiveTransport` (WebSocket + `NativePcmAudio`) · `OpenAIRealtimeTransport` (WebRTC) · เลือกที่ `registry.ts` (`live.provider`, auto = Gemini ก่อน) · เพิ่มเจ้าใหม่ = implement `RealtimeTransport` + `RealtimeProvider` (`realtime/types.ts`) แล้วใส่ใน `REALTIME_PROVIDERS`
+- Android ไม่มี AEC ใน react-native-audio-api → half-duplex เมื่อออกลำโพง (ดู `NativePcmAudio.ts`) · test เสียง: `geminiLive.test.ts` (socket/audio ปลอม)
+- test: `realtimeVoice.test.ts` (transport ปลอม · ต้อง `stop()` session ทุกเทสต์ ไม่งั้นตัวจับเวลา idle ค้าง)
+
+### ผู้ช่วยส่วนตัว (features/assistant) + คำปลุก
+- 10 agent ลงทะเบียนที่ `assistant/index.ts` (`registerAssistantAgents`, เรียกใน boot) — **ลำดับสำคัญ** (ตัวแรกที่ match ชนะ: แคบ→กว้าง; place ก่อน web-search) · pattern ต้องแคบเสมอ (AgentClassifier มาก่อน LLM) — มี test ตารางประโยค "ต้อง match" และ "ต้องไม่ถูกแย่ง" ใน `assistantAgents.test.ts` เพิ่ม agent/แก้ pattern ต้องเพิ่มแถวในตารางนั้น
+- ทุก agent รับ deps ผ่าน factory (`createXAgent({ api, llm, now })`) เพื่อ test; native โหลด lazy ผ่าน `shared/errors.loadNative`; ข้อผิดพลาดที่ผู้ใช้ควรเห็น = `AssistantError` (ข้อความไทย) · LLM แปลงประโยค→JSON ผ่าน `shared/llm.extractJson` (ใส่เวลาปัจจุบันให้เสมอ)
+- ความปลอดภัย: โทร/SMS เปิดหน้าให้กดเอง ไม่ส่งเอง · Home Assistant allow-list (`ALLOWED_SERVICES`) ห้ามเพิ่ม lock/alarm_control_panel/unlock · รูปถ่ายไม่เก็บ
+- ผลมีรูป: `AgentRunResult.imageUri` → `HandlerResult.imageUri` → `pushMessage({imageUri})` → `ChatBubble`
+- คำปลุก `voice/wakeword/`: `WakeWordDetector` (พอร์ตจาก `scripts/speaker/ref_wakeword.py`) · `templates.ts` ("เฮ่ อะตอม" จับคู่เทมเพลต + `calibrate`) · `wakeConfig.ts` (โหมด atom|jarvis, เกณฑ์, โปรไฟล์เป็นไฟล์ใน documents) · `wakeSettings.ts` (เปิด/ปิด + `acquireMic` ประสานไมค์) · `useWakeWord` ใน `useVoiceChat` · UI `settings/components/WakeWordCard.tsx` · ใครใช้ไมค์ในหน้าตั้งค่าต้อง `acquireMic()` ก่อนเสมอ ไม่งั้นชนกับตัวฟังคำปลุก
+
+### กันแอปเด้ง (Boss เจอแอปเด้ง 2026-10-21 · ยังไม่ได้ logcat)
+- ทุกหน้า (RootNavigator `screenLayout`) ครอบ `ScreenErrorBoundary` (`core/components`) — error ตอน render แสดงข้อความจริง ไม่ปิดแอป · `installCrashGuard()` (`features/jarvis/crashGuard.ts`, เรียกใน App) = error JS นอก React → ข้อความ ⚠️ ในแชท (dev ยังเห็นจอแดง)
+- ONNX (คำปลุก/จำเสียง) ครอบ `withOnnxGuard()` (`features/voice/onnxGuard.ts`): จด `loading` ก่อนโหลด · เปิดแอปแล้วเจอค้าง = native crash รอบก่อน → `broken` ไม่โหลดอีก + แจ้งบอส · ปุ่ม "ลองโหลดโมเดลอีกครั้ง" ใน WakeWordCard · `isOnnxAvailable()` ดูแค่ `NativeModules.Onnxruntime` (ห้าม require ตอน render — require = install JSI)
+- **ต้นเหตุจริง (screenshot Boss):** `onnxruntime-react-native` ไม่ถูก autolink (android/ ไม่มี package ให้ Expo อ่าน) → `NativeModules.Onnxruntime` = null → `install of null` · แก้ด้วย root `react-native.config.js` (ระบุ package เอง) — ห้ามลบ · `loadOrt()` เช็ก NativeModules ก่อน require (require ที่โยนตอนโหลด module = Metro รายงานเป็น fatal แม้มี try/catch)
+- เสียงสด: `react-native-audio-api` `AudioBufferQueueSourceNode.start()` ค่าเริ่มต้น offset = -1 แล้วโยนเอง → เรียก `start(0, 0)` เสมอ
+- ตอบช้า: Gemini 3 คิด medium/high เป็นค่าเริ่มต้น → `thinkingFor()` (GeminiAdapter): 3.x = `thinkingLevel: low` · 2.5 flash = budget 0 · ตอบเกิน `SLOW_REPLY_MS` (12s) → ข้อความ ⏱ บอกว่าช้าช่วงไหน
+- เสียงสดต่อไม่ติด → `onConnectFailed` → `useVoiceChat` สลับไป system/classic ทันที + จำว่าพังทั้งรอบเปิดแอป (`realtimeBroken`) · error ที่ไม่ใช่ ProviderError ห้ามบอกว่า "ไม่มีเน็ต" (`describeRealtimeError` แสดงข้อความจริง)
+
+### เสียงของฉัน (Speaker verification) + ตัวรู้จำเสียงระบบ
+- `features/voice/speaker/`: `fbank.ts` (Kaldi fbank TS) → `OnnxSpeakerModel.ts` (WeSpeaker ONNX, lazy) → `embedding.ts` · `profile.ts` (SecureStore: ห้ามลง AsyncStorage/log) · `gate.ts` (state machine ตามจำนวนตัวอย่าง ไม่ใช้นาฬิกา) · `SpeakerService.ts` (สร้าง gate / ลงทะเบียน) · gate ต่อที่ `GeminiLiveTransport` (DI `gate`) · UI `settings/components/SpeakerEnrollmentCard.tsx`
+- ตรวจ fbank เทียบ numpy: `scripts/speaker/ref_fbank.py > src/__tests__/fixtures/fbank_golden.json` (ปัดสัญญาณเป็น float32 ให้เหมือนฝั่งแอป)
+- gate ล้มเหลว/โหลดโมเดลไม่ได้ = **ปล่อยเสียงผ่าน** (ตัวกรองคือความสะดวก ไม่ใช่ความปลอดภัย)
+- `live/SystemSpeechSession.ts` + `SystemRecognizer.ts` = ฟังด้วยตัวรู้จำเสียงของระบบ (expo-speech-recognition) · `useVoiceChat` เลือก realtime → system → classic
+
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)
 - VAD จาก metering (dBFS) poll ทุก 100ms: ดัง ≥ `SPEECH_THRESHOLD_DB` (-40) = พูด · เงียบ `SILENCE_END_MS` (1.2s) = จบ · สั้นกว่า `MIN_SPEECH_MS` (0.4s) = เสียงรบกวน · ยาวสุด `MAX_UTTERANCE_MS` (30s) · ไม่มีใครพูด `IDLE_TIMEOUT_MS` (30s) = ออกเอง · เงียบนำหน้า `PRE_SPEECH_RESET_MS` (8s) = ทิ้งไฟล์อัดใหม่
 - ⚠️ ค่า dBFS ต่างกันตามเครื่อง: Android = peak (`maxAmplitude`), iOS = average power → ถ้าเครื่องจริงตัดประโยคเร็ว/ไม่ยอมจบ ปรับ `SPEECH_THRESHOLD_DB` ที่เดียว
+- ⚠️ Android 13+: background recording ต้องมีสิทธิ์ POST_NOTIFICATIONS ไม่งั้น expo-audio โยน error ตอน prepare = ไมค์ไม่ทำงานเลย → `canRecordInBackground()` (useLiveVoice) ขอสิทธิ์ก่อน · ไม่ได้ = อัดเฉพาะตอนอยู่ในแอป
+- ปุ่มกลางของ ActionBar = **กดคุย / เลิกคุย** (`toggleLive`, เดิมเป็นปุ่มคอม — Boss: สั่งคอมผ่านอัลตรอนพอ)
 - **ฟังต่อตอนอยู่แอปอื่นได้:** expo-audio `enableBackgroundRecording: true` (app.json) + `allowsBackgroundRecording: true` ตอน start → Android = `AudioRecordingService` (Foreground Service type microphone + แจ้งเตือนค้าง) · ใช้คู่ระดับ B: กดค้าง Orb → สลับไปแอปอื่น → พูด "กดปุ่ม …" · ยังออกเองเมื่อเงียบ 30s (`IDLE_TIMEOUT_MS`)
 - **โหมดเฝ้า (อัลตรอน · ADR-015 ขั้น 4):** `useStandbyStore` (`features/voice/live/standbyStore.ts`, AsyncStorage `atom.voice.v1.standby`) · เปิด = `keepAlive` (ไม่ออกเองเมื่อเงียบ) + แอปไม่อยู่หน้าสุด → `requireWakeWord` (ต้องขึ้นต้นด้วยชื่อ persona — `stripWakeWord()` ใน `wakeWord.ts`, ไม่สลับ persona) · สั่ง: ตั้งค่า › เสียง (สวิตช์) / agent "โหมดเฝ้า" ("เปิดโหมดเฝ้า" / "ปิดโหมดเฝ้า" / "ฟังตลอด") · บันทึกว่าเปิด → เปิดหน้าหลักแล้วฟังเอง · แตะ Orb / session ล้ม → ปิดโหมดเฝ้าตาม · unmount (สลับแท็บ) ไม่ปิด
 - โหมดเฝ้าใช้ Foreground Service ของ expo-audio (ไม่ใช่ของเราเอง) · ตรวจคำปลุกหลัง STT → ทุกประโยคที่ดังพอเสียค่า STT · Android อาจฆ่าแอปเมื่อแบตต่ำ/โหมดประหยัด (ต้องทดสอบบนเครื่อง)
@@ -296,12 +377,41 @@
 - cache = `modelListCache` (หน่วยความจำ, ต่อ provider, ทั้ง session) · บันทึก/ลบ key → ProviderCard ล้าง cache + remount picker (`key={keyVersion}`)
 - "พิมพ์ชื่อเอง" ต้องมีเสมอ (Boss ขอ) — ค่าที่บันทึกยังเป็น string เดียวใน `ProviderSettings.models[id]`
 
+### Dahl + โมเดลต่อ persona (ADR-016)
+- Dahl = OpenAI-compatible (`DAHL_BASE_URL` ใน providers.config) แยก 3 provider: `dahl-minimax` / `dahl-deepseek` / `dahl-glm` · key = `ai.dahl-<ชื่อ>` (SecureStore — ใส่ในการ์ด หรือเก็บใน Supermemory secrets space ก็ดึงให้เอง) · **ปิดไว้ก่อน** (ไม่มี key แล้วเปิด = โผล่ในข้อความ error ทุกครั้งที่ตัวอื่นล้ม)
+- สลับเองอัตโนมัติ = Orchestrator เดิม (Priority + fallback + lastGood) · ไม่ต้องมีโค้ดเฉพาะ Dahl
+- โมเดลต่อ persona: `ProviderSettings.getLLMFor/setLLMFor` (`llmByPersona`) → ChatHandler pin `providerId` (ล้มยัง fallback) · UI `PersonaLLMMapper` (ตั้งค่า › AI) เลือกแล้ว `setEnabled(id, true)` ให้ · มีผลเฉพาะแชทปกติ
+- "สมอง + เสียง ต่อ Persona" (Boss ขอแยก): `PersonaLLMMapper` มี 2 ช่องต่อ persona — 🧠 สมอง = `setLLMFor` · 🔊 เสียง = `setTTSFor` (เปลี่ยนเจ้า = ล้าง `voiceId` คง speed/pitch) · `sameVoiceForAll` เปิด = แสดงเฉย ๆ · เลือกเสียงละเอียดยังอยู่ที่ หน้าเสียงของ Persona · Gemini TTS ใส่ key แยก (`tts.gemini`) ได้ = คนละโปรเจกต์ คนละโควต้ากับสมอง
+- Orchestrator: ตัวที่ pin **ไม่ตั้งเป็น lastGood** (ไม่งั้น persona "อัตโนมัติ" ลากไปใช้ตัวของ persona อื่น — มี test ใน dahl.test.ts)
+- `stripThinking()` (OpenAICompatibleAdapter) ตัด `<think>…</think>` ของโมเดล reasoning — แท็กเปิดไม่ปิด = ตัดท้ายทิ้ง
+
+### แอปปรับตัวเองเมื่อโควต้าหมด (ADR-017)
+- `LLMClassifier` ถามโมเดลเฉพาะข้อความที่เข้า `COMMAND_HINT` (คอม/เครื่อง/สั่ง/สลับ/เปลี่ยน/เรียก/ขอคุย/ส่งต่อ/ชื่อ persona) — ไม่เข้า = คืน null → router ตอบ chat (provider `rule`) **ไม่เสีย request** · `new LLMClassifier(orch, false)` = ถามทุกข้อความ (test) · คำสั่งใหม่ที่ไม่มีคำพวกนี้ → เพิ่มคำใน `COMMAND_HINT`
+- Orchestrator: 429 + "quota/exhausted" (`isQuotaError`) → `QuotaGuard.strike()` (พัก 60s ×2 ทุกครั้ง สูงสุด 1 ชม., ต่อ provider+model, หน่วยความจำ) → ลอง `config.quotaFallbackModels` ก่อนไปเจ้าถัดไป · ไม่ retry โควต้า · รุ่นสำรองล้ม (404 ฯลฯ) = ข้ามเงียบ · โมเดลที่พักอยู่ = ไม่ยิง · ทุกตัวพักหมด = ลองตามปกติ · สลับสำเร็จครั้งแรก → notice
+- 429 ทั่วไป (ข้อความไม่มี quota) = กติกาเดิม — test เก่าใช้ `httpError(429)` เปล่า ๆ จึงไม่โดนสลับรุ่น · mock 429 แบบ "exhausted" จะเห็นการยิง Gemini 3 รุ่น
+
+### xAI (ADR-018)
+- สมอง `xai` (OpenAI-compatible `https://api.x.ai/v1`, models dynamic, default `grok-4.20-0309-non-reasoning` = ตอบเร็ว · ปิดไว้ก่อน) · เสียงพูด `XaiTTS` (`POST /v1/tts` → MP3 ดิบ, เสียง `GET /v1/tts/voices`, ค่าเริ่มต้น `eve`, speed บีบ 0.7–1.5) · ฟังเสียง `XaiSTT` (`POST /v1/stt` multipart, `grok-voice-transcribe-2.0`, `language=th` — ไทยรองรับทางการ, `file` ต้องเป็น field สุดท้าย)
+- key: `xaiKey()` (`features/voice/xaiKey.ts`) = key ของการ์ดนั้น (`tts.xai`/`stt.xai`) → ไม่มีก็ใช้ `ai.xai` (บอสใส่ที่การ์ด Grok ที่เดียวพอ)
+- ⚠️ TTS ไทยไม่อยู่ในรายการภาษาทางการของ xAI → ส่ง `language: auto` (ใส่ `th` เสี่ยง 400) · คุณภาพเสียงไทยต้องฟังเองบนเครื่อง
+
+### เพิ่มผู้ให้บริการ AI เอง (ADR-020)
+- `features/ai/customProviders.ts`: AsyncStorage `atom.ai.v1.customProviders` (ชื่อ/URL/โมเดล — ไม่มี key) · key = SecureStore `ai.<id>` · id = `custom-<slug>` (ชื่อซ้ำ → `-2`) · `AIProviderId` รับ `` `custom-${string}` ``
+- boot: `void registerCustomProviders()` (ไม่ reject) · เพิ่ม = `registry.register` ทันที · ลบ = `registry.unregister` + ลบ key
+- Base URL: https เท่านั้น ยกเว้น http ในบ้าน (localhost/10./192.168./172.16–31/100.64/.local) · UI `CustomProviders` (ตั้งค่า › AI › เพิ่มเอง)
+- รายการ Priority ในหน้า AI คำนวณตอนเปิดหน้า → เพิ่มเจ้าใหม่แล้วเห็นใน Priority เมื่อเปิดหน้าใหม่
+
+### Marketplace (ADR-021)
+- `marketCatalog.ts` = ตรรกะล้วน: `MARKET_TABS` (skill · connector=mcp · plugin=plugin+device) · `entriesFor(entries, tab, scope, query, sort, category)` (ของคุณ = installed · สำรวจ ทักษะ = ยังไม่ติดตั้ง · สำรวจ ปลั๊กอิน = ทั้งหมด) · หมวดเดาด้วย regex (`MARKET_CATEGORIES`, ไม่เข้า = อื่น ๆ)
+- `mcpRegistry.ts`: `GET registry.modelcontextprotocol.io/v0/servers?limit=100&version=latest&search=` · เอาเฉพาะ remote `streamable-http` (มือถือรัน stdio ไม่ได้) · header บังคับ/Authorization → ถาม token ก่อนเพิ่ม · id = `registryServerId()` · เพิ่มแล้ว**ปิดไว้ก่อน**เหมือน MCP อื่น
+- จำนวนในหมวดของตัวเชื่อมต่อไม่แสดง (คลังไม่มี total ต่อหมวด) · หน้าจอรับ `registrySearch` (DI) → test ใช้ตัวปลอม
+
 ### Network
 - `isOffline()` fail-open
 - Timeout: AbortController + ProviderError
 
 ### Jev
-- Default ปิด, threshold `>= 0.7`
+- Default **เปิด** (ADR-019), threshold `>= 0.7` · ไม่มี key → `JevAdapter` โยน missing_key → classifier คืน null → LLM classifier (เฉพาะข้อความที่เข้า `COMMAND_HINT`) → chat · test `resetSettings()` ปิด Jev ไว้ (test เก่าอิงค่านี้)
 ---
 
 ## 9. PARKING LOT (ก่อน Phase 4.5)

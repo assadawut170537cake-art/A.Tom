@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { ChatHistoryStorage } from '../../../core/storage/ChatHistoryStorage';
 import { ProviderSettings, type PersonaVoice } from '../../../core/storage/ProviderSettings';
+import type { AttachmentRef } from '../../../core/types/attachment';
 import { getPersonaPrompt } from '../../ai/prompts/personaPrompts';
 import { voiceOrchestrator } from '../../voice/core/VoiceOrchestrator';
 import { DEFAULT_PERSONA, PERSONA_IDS } from '../constants';
@@ -14,6 +15,8 @@ interface PushMessageInput {
   content: string;
   /** Defaults to the active persona */
   persona?: Persona;
+  attachments?: AttachmentRef[] | undefined;
+  imageUri?: string | undefined;
 }
 
 interface AtomState {
@@ -31,6 +34,11 @@ interface AtomState {
   /** False after a storage read/write failure: history keeps working, but only in memory. */
   historyPersisted: boolean;
   dropdownOpen: boolean;
+  /**
+   * คำตอบที่ AI กำลังพิมพ์อยู่ (สตรีม) — แสดงเป็นบับเบิลสดท้ายแชท · **ไม่บันทึก/ไม่ซิงก์**
+   * พิมพ์จบแล้ว conversation ล้างค่านี้แล้ว pushMessage คำตอบเต็มตามปกติ
+   */
+  streaming: { persona: Persona; content: string; startedAt: number } | null;
 
   setUIMode: (mode: UIMode) => void;
   setMood: (mood: OrbMood) => void;
@@ -44,6 +52,12 @@ interface AtomState {
   loadHistory: () => Promise<void>;
   toggleDropdown: () => void;
   closeDropdown: () => void;
+  appendStreaming: (persona: Persona, text: string) => void;
+  clearStreaming: () => void;
+  /** ลบประวัติแชทของ persona หนึ่ง (หน้า ประวัติ › ล้าง · บอสยืนยันก่อน) */
+  clearHistory: (persona: Persona) => void;
+  /** ลบบางข้อความ (หน้า ประวัติ › ลบบทสนทนานี้) — เฉพาะในเครื่อง เหมือน clearHistory */
+  removeMessages: (persona: Persona, ids: readonly string[]) => void;
 }
 
 const emptyHistory = (): Record<Persona, Message[]> => ({ 1: [], 2: [], 3: [], 4: [] });
@@ -86,6 +100,7 @@ export const useAtomStore = create<AtomState>()(
       historyLoaded: false,
       historyPersisted: true,
       dropdownOpen: false,
+      streaming: null,
 
       setUIMode: (uiMode) => set({ uiMode }),
       setMood: (mood) => set({ mood }),
@@ -101,7 +116,7 @@ export const useAtomStore = create<AtomState>()(
         // Ignore stale results if the persona changed while loading
         if (get().activePersona === persona) set({ voice });
       },
-      pushMessage: ({ role, content, persona }) => {
+      pushMessage: ({ role, content, persona, attachments, imageUri }) => {
         const target = persona ?? get().activePersona;
         const message: Message = {
           id: createId(),
@@ -109,6 +124,8 @@ export const useAtomStore = create<AtomState>()(
           role,
           content,
           createdAt: Date.now(),
+          ...(attachments?.length && { attachments }),
+          ...(imageUri ? { imageUri } : {}),
         };
         set((s) => ({
           messagesByPersona: {
@@ -155,6 +172,32 @@ export const useAtomStore = create<AtomState>()(
       },
       toggleDropdown: () => set((s) => ({ dropdownOpen: !s.dropdownOpen })),
       closeDropdown: () => set({ dropdownOpen: false }),
+      appendStreaming: (persona, text) =>
+        set((s) => {
+          const same = s.streaming?.persona === persona ? s.streaming : null;
+          return {
+            streaming: {
+              persona,
+              content: (same?.content ?? '') + text,
+              startedAt: same?.startedAt ?? Date.now(),
+            },
+          };
+        }),
+      clearStreaming: () => set({ streaming: null }),
+      clearHistory: (persona) => {
+        set((s) => ({ messagesByPersona: { ...s.messagesByPersona, [persona]: [] } }));
+        if (get().historyLoaded) void saveHistory(persona);
+      },
+      removeMessages: (persona, ids) => {
+        const drop = new Set(ids);
+        set((s) => ({
+          messagesByPersona: {
+            ...s.messagesByPersona,
+            [persona]: s.messagesByPersona[persona].filter((m) => !drop.has(m.id)),
+          },
+        }));
+        if (get().historyLoaded) void saveHistory(persona);
+      },
     }),
     {
       name: 'atom-store',

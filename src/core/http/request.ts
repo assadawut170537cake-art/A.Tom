@@ -35,7 +35,7 @@ interface RequestOptions extends Omit<RequestInit, 'signal'> {
 export async function request(
   providerId: string,
   url: string,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, acceptStatus, ...init }: RequestOptions = {}
+  { timeoutMs = DEFAULT_TIMEOUT_MS, acceptStatus, ...init }: RequestOptions = {},
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -47,31 +47,128 @@ export async function request(
       throw new ProviderError(providerId, 'timeout', `หมดเวลา (${timeoutMs / 1000}s)`);
     }
     const reason = e instanceof Error ? e.message : String(e);
-    throw new ProviderError(providerId, 'network', `เชื่อมต่อเครือข่ายไม่ได้ (${redactSecrets(reason)})`);
+    throw new ProviderError(
+      providerId,
+      'network',
+      `เชื่อมต่อเครือข่ายไม่ได้ (${redactSecrets(reason)})`,
+    );
   } finally {
     clearTimeout(timer);
   }
 
   if (!res.ok) {
     // Reading the body consumes it; accepted error statuses are only used by key probes
-    const { detail, raw } = await readErrorDetail(res);
-    // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
-    const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
-    if (kind !== 'auth' && acceptStatus?.includes(res.status)) return res;
-    throw new ProviderError(
-      providerId,
-      kind,
-      `HTTP ${res.status}: ${describeKind(kind)}${detail ? ` — ${detail}` : ''}`,
-      res.status
-    );
+    const error = await statusError(providerId, res);
+    if (error.kind !== 'auth' && acceptStatus?.includes(res.status)) return res;
+    throw error;
   }
   return res;
+}
+
+/** HTTP status ที่ไม่ใช่ 2xx → ProviderError (อ่าน body เพื่อหาข้อความ — body ถูกใช้หมดแล้ว) */
+async function statusError(providerId: string, res: Response): Promise<ProviderError> {
+  const { detail, raw } = await readErrorDetail(res);
+  // Google APIs answer an invalid API key with 400 API_KEY_INVALID instead of 401
+  const kind = /API_KEY_INVALID|API key not valid/i.test(raw) ? 'auth' : kindForStatus(res.status);
+  return new ProviderError(
+    providerId,
+    kind,
+    `HTTP ${res.status}: ${describeKind(kind)}${detail ? ` — ${detail}` : ''}`,
+    res.status,
+  );
+}
+
+/** fetch ที่อ่าน body เป็นสตรีมได้ (แอปจริง = `expo/fetch` · RN fetch ปกติอ่านได้แค่ทั้งก้อน) */
+export type StreamingFetch = (url: string, init: RequestInit) => Promise<Response>;
+
+interface StreamOptions extends Omit<RequestOptions, 'acceptStatus'> {
+  fetchImpl?: StreamingFetch | undefined;
+}
+
+/**
+ * เหมือน {@link request} แต่ส่งข้อความใน body ทีละท่อนให้ `onText` ระหว่างที่ยังโหลดอยู่ (เช่น SSE ของ LLM)
+ * - timeout = **ช่วงเงียบ** (ไม่มีข้อมูลใหม่นานเกิน `timeoutMs`) ไม่ใช่เวลารวม — คำตอบยาวจึงไม่โดนตัด
+ * - fetch ที่ไม่มี `body.getReader()` → อ่านทั้งก้อนแล้วส่งครั้งเดียว (ยังถูกต้อง แค่ไม่ได้ความเร็ว)
+ * - error/status ใช้กติกาเดียวกับ request() ทุกอย่าง
+ */
+export async function requestStream(
+  providerId: string,
+  url: string,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, fetchImpl, ...init }: StreamOptions,
+  onText: (text: string) => void,
+): Promise<void> {
+  const controller = new AbortController();
+  let timer = setTimeout(() => controller.abort(), timeoutMs);
+  const touch = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  };
+  const failed = (e: unknown): ProviderError => {
+    if (e instanceof ProviderError) return e;
+    if (controller.signal.aborted) {
+      return new ProviderError(
+        providerId,
+        'timeout',
+        `หมดเวลา (ไม่มีข้อมูลใหม่ ${timeoutMs / 1000}s)`,
+      );
+    }
+    const reason = e instanceof Error ? e.message : String(e);
+    return new ProviderError(
+      providerId,
+      'network',
+      `เชื่อมต่อเครือข่ายไม่ได้ (${redactSecrets(reason)})`,
+    );
+  };
+
+  try {
+    let res: Response;
+    try {
+      res = await (fetchImpl ?? fetch)(url, { ...init, signal: controller.signal });
+    } catch (e) {
+      throw failed(e);
+    }
+    if (!res.ok) throw await statusError(providerId, res);
+
+    const reader = res.body?.getReader?.();
+    if (!reader) {
+      onText(await res.text());
+      return;
+    }
+    const decoder = new TextDecoder();
+    let finished = false;
+    try {
+      for (;;) {
+        let chunk: ReadableStreamReadResult<Uint8Array>;
+        try {
+          chunk = await reader.read();
+        } catch (e) {
+          throw failed(e); // อ่านจากเน็ตพัง = network/timeout
+        }
+        if (chunk.done) break;
+        touch();
+        const text = decoder.decode(chunk.value, { stream: true });
+        // error จาก onText (ฝั่งผู้เรียก) ส่งต่อตามจริง — ไม่เหมาว่าเป็นเน็ต
+        if (text) onText(text);
+      }
+      const tail = decoder.decode();
+      if (tail) onText(tail);
+      finished = true;
+    } finally {
+      // ออกก่อนอ่านจบ (error) → ปิดสตรีม + ตัดการเชื่อมต่อ ไม่ปล่อยให้โหลดค้างโดยไม่มีคนอ่าน
+      if (!finished) {
+        reader.cancel().catch(() => undefined);
+        controller.abort();
+      }
+    }
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function requestJson<T>(
   providerId: string,
   url: string,
-  opts?: RequestOptions
+  opts?: RequestOptions,
 ): Promise<T> {
   const res = await request(providerId, url, opts);
   try {
@@ -86,7 +183,7 @@ export async function requestJson<T>(
 export async function requestBytes(
   providerId: string,
   url: string,
-  opts?: RequestOptions
+  opts?: RequestOptions,
 ): Promise<Uint8Array> {
   const res = await request(providerId, url, opts);
   return new Uint8Array(await res.arrayBuffer());

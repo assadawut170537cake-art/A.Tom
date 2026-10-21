@@ -13,7 +13,11 @@ import type { ChatRequest, ChatResponse } from '../core/types';
 type Instructions = string | Record<string, unknown> | unknown[];
 
 export type JevQuestion =
-  | { type: 'noul'; instructions?: Instructions; criteria?: { true?: Instructions; false?: Instructions } }
+  | {
+      type: 'noul';
+      instructions?: Instructions;
+      criteria?: { true?: Instructions; false?: Instructions };
+    }
   | { type: 'choice'; instructions?: Instructions; criteria: Record<string, Instructions | null> }
   | { type: 'score'; instructions?: Instructions; criteria: Instructions[] };
 
@@ -41,10 +45,12 @@ export class JevAdapter extends BaseAIProvider {
   async ask<K extends string>(
     state: JevState,
     questions: Record<K, JevQuestion>,
-    model = this.config.defaultModel
+    model = this.config.defaultModel,
+    timeoutMs?: number,
   ): Promise<SystemOneResult<K>> {
     const data = await requestJson<SystemOneResult<K>>(this.config.id, this.url('/v1/systemone'), {
       method: 'POST',
+      ...(timeoutMs !== undefined && { timeoutMs }),
       headers: await this.headers(),
       body: JSON.stringify({ model, state, questions }),
     });
@@ -59,7 +65,7 @@ export class JevAdapter extends BaseAIProvider {
     throw new ProviderError(
       this.config.id,
       'unsupported',
-      'Jev เป็นตัวจัดเส้นทาง (router) ไม่รองรับการสร้างข้อความ — ใช้ ask() แทน'
+      'Jev เป็นตัวจัดเส้นทาง (router) ไม่รองรับการสร้างข้อความ — ใช้ ask() แทน',
     );
   }
 
@@ -77,6 +83,8 @@ export class JevAdapter extends BaseAIProvider {
   }
 
   private async fetchModels(): Promise<unknown> {
-    return requestJson<unknown>(this.config.id, this.url('/v1/models'), { headers: await this.headers() });
+    return requestJson<unknown>(this.config.id, this.url('/v1/models'), {
+      headers: await this.headers(),
+    });
   }
 }

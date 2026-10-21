@@ -6,9 +6,12 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { bootApp } from './boot';
+import { installCrashGuard } from './features/jarvis/crashGuard';
 import { useAtomStore } from './features/jarvis/stores/useAtomStore';
 import { useTabsStore } from './features/jarvis/stores/useTabsStore';
 import { RootNavigator } from './navigation/RootNavigator';
+
+installCrashGuard();
 
 // providers ลงทะเบียนทันที; module init + memory ทำงาน async ไม่บล็อก render และไม่ reject
 void bootApp();

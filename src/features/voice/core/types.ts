@@ -7,9 +7,22 @@ export interface TTSProvider {
   id: TTSProviderId;
   name: string;
   speak(text: string, opts?: SpeakOptions): Promise<void>;
+  /**
+   * สังเคราะห์เสียงไว้ล่วงหน้า (ยังไม่เล่น) — ให้แอปเตรียมประโยคถัดไประหว่างที่ประโยคนี้กำลังพูด (ไม่มีช่องเงียบ)
+   * ไม่มี = เจ้าที่สังเคราะห์ไม่ใช้เวลา (Expo Speech บนเครื่อง) → เรียก speak() ตรง ๆ ได้
+   */
+  prepare?(text: string, opts?: SpeakOptions): Promise<PreparedSpeech>;
   stop(): void;
   getVoices(): Promise<Voice[]>;
   testConnection(): Promise<{ ok: boolean; error?: string }>;
+}
+
+/** เสียงที่สังเคราะห์เสร็จแล้ว รอเล่น */
+export interface PreparedSpeech {
+  /** เล่น · resolve เมื่อเล่นจบหรือถูก stop() */
+  play(): Promise<void>;
+  /** ทิ้งโดยไม่เล่น (ลบไฟล์ใน cache) */
+  discard(): void;
 }
 
 export interface STTProvider {

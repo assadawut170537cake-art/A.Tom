@@ -1,4 +1,9 @@
-import { setAudioModeAsync, type AudioRecorder } from 'expo-audio';
+import {
+  requestNotificationPermissionsAsync,
+  setAudioModeAsync,
+  type AudioRecorder,
+} from 'expo-audio';
+import { Platform } from 'react-native';
 
 import { createRecorderAdapter } from '../features/jarvis/hooks/useLiveVoice';
 
@@ -25,4 +30,27 @@ test('live voice keeps the mic in background (switch to another app and say "ก
   });
   await adapter.stop();
   expect(setAudioModeAsync).toHaveBeenLastCalledWith({ allowsRecording: false });
+});
+
+test('Android ไม่ได้สิทธิ์แจ้งเตือน → ยังอัดได้ (ปิด background แทน ไม่ให้ expo-audio โยน error จนไมค์เงียบ)', async () => {
+  const os = Platform.OS;
+  Platform.OS = 'android';
+  jest
+    .mocked(requestNotificationPermissionsAsync)
+    .mockResolvedValueOnce({
+      granted: false,
+      status: 'denied',
+      canAskAgain: false,
+      expires: 'never',
+    } as never);
+  try {
+    const recorder = fakeRecorder();
+    await createRecorderAdapter(recorder).start();
+    expect(setAudioModeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsRecording: true, allowsBackgroundRecording: false }),
+    );
+    expect(recorder.record).toHaveBeenCalled();
+  } finally {
+    Platform.OS = os;
+  }
 });

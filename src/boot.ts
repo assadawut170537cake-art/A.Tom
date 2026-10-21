@@ -8,8 +8,6 @@
  *      (module ที่ล้ม/ทั้งหมดล้ม แค่ log แอปทำงานต่อได้)
  *    - นับ Shared Memory facts (ChatHandler ของแอปแนบ facts ใน system prompt ผ่าน `getAppRouter()`)
  *    - `memorySync.start()` — จับคู่ Mark 55 ไว้แล้ว → เริ่มคิว sync + ซิงก์ 1 รอบ · ยังไม่จับคู่ = ไม่ทำอะไร
- *    - `secretSync.importOnce()` — ดึง API key จาก Supermemory ใส่ SecureStore (ไม่มีคีย์ Supermemory = ข้าม · ล้มแค่ log)
- *    - `superMemorySync.start()` — ส่ง fact ที่แก้ขึ้น Supermemory เบื้องหลัง (ไม่มี API key = ไม่ส่ง · ล้มแค่ log)
  *    - `pcInbox.start()` — รับงานที่ Mark 55 ส่งหามือถือทุก 15s (ยังไม่ตั้งค่า Mark 55 Bus = ไม่เรียกอะไร)
  *    - `startChatSync()` — ห้องแชทเดียวกัน (ซิงก์แชทข้ามเครื่องเมื่อจับคู่ Mark 55 แล้ว · ไม่จับคู่ = ไม่ทำอะไร)
  *    - `__DEV__`: log จำนวน facts + ติดตั้งเครื่องมือทดสอบ memory/module (src/dev/)
@@ -17,22 +15,34 @@
  * `bootApp()` เรียกซ้ำได้ (fast refresh) — ได้ promise เดิม ไม่ init ซ้ำ ไม่เพิ่มเมนู dev ซ้ำ
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { localMemory } from './core/memory/LocalMemoryAdapter';
 import { memorySync, type MemorySync } from './core/memory/MemorySync';
-import { secretSync, type SecretSync } from './core/memory/SecretSync';
-import { superMemorySync, type SuperMemorySyncService } from './core/memory/SuperMemorySync';
 import { ALL_MEMORY_TARGETS, type MemoryStore } from './core/memory/types';
 import { moduleManager, type ModuleManager } from './core/modules/ModuleManager';
 import type { InitReport } from './core/modules/types';
+import { recordRepair } from './core/selfRepair/SelfRepair';
+import { SettingsHealth } from './core/selfRepair/SettingsHealth';
+import { SnapshotStore } from './core/selfRepair/SnapshotStore';
 import { installMemoryDevTools } from './dev/memoryDevTools';
 import { installModuleDevTools } from './dev/moduleDevTools';
 import { registerAIProviders } from './features/ai';
+import { registerCustomProviders } from './features/ai/customProviders';
+import { useAtomStore } from './features/jarvis/stores/useAtomStore';
+import { ONNX_BROKEN_MESSAGE, checkOnnxGuardOnBoot } from './features/voice/onnxGuard';
+import { settingsHealthEntries } from './features/settings/settingsHealthEntries';
+import { loadAssistantData, registerAssistantAgents } from './features/assistant';
+import { composeBriefing } from './features/assistant/agents/reminder';
+import { setupNotifications } from './features/assistant/notifications';
 import { registerVoiceProviders } from './features/voice';
 import { registerDeviceAgent } from './modules/agents/device-agent';
+import { registerNotebookLMAgent } from './modules/agents/notebooklm-agent';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
 import { registerStandbyAgent } from './modules/agents/standby-agent';
 import { registerTaskAgent } from './modules/agents/task-agent';
+import { registerTodayAgent } from './modules/agents/today-agent';
 import { registerUltronAgent } from './modules/agents/ultron-agent';
 import { loadBootModules } from './modules/loader';
 import { startChatSync } from './features/chat/chatSyncBridge';
@@ -52,27 +62,24 @@ interface BootDeps {
   installDevTools: (memory: MemoryStore) => unknown;
   /** ไม่ส่ง = ไม่เริ่ม sync (test เดิม) */
   sync?: Pick<MemorySync, 'start'>;
-  /** ไม่ส่ง = ไม่ส่งขึ้น Supermemory (test เดิม) */
-  supermemory?: Pick<SuperMemorySyncService, 'start'>;
-  /** ไม่ส่ง = ไม่ดึงคีย์จาก Supermemory (test เดิม) */
-  secrets?: Pick<SecretSync, 'importOnce'>;
   /** ไม่ส่ง = ไม่ดึง inbox จาก Mark 55 (test เดิม) */
   inbox?: { start(): void };
   /** ไม่ส่ง = ไม่เริ่มห้องแชทเดียวกัน (test เดิม) */
   startChat?: () => void;
   /** โหลด module ก่อน start · ไม่ส่ง = ไม่โหลด (test เดิม) */
   loadModules?: () => Promise<void>;
+  /** ตรวจ+กู้การตั้งค่าที่เสีย (ครั้งเดียวต่อ boot) · ไม่ส่ง = ข้าม (test เดิม) */
+  checkSettings?: () => Promise<void>;
 }
 
 const DEFAULT_DEPS: BootDeps = {
   modules: moduleManager,
   memory: localMemory,
   sync: memorySync,
-  supermemory: superMemorySync,
-  secrets: secretSync,
   inbox: pcInbox,
   startChat: () => void startChatSync(),
   loadModules: () => loadBootModules(),
+  checkSettings: () => runSettingsHealth(),
   dev: __DEV__,
   installDevTools: (memory) => {
     installMemoryDevTools(memory);
@@ -84,18 +91,57 @@ let started: Promise<BootReport> | null = null;
 
 export function bootApp(): Promise<BootReport> {
   registerAIProviders();
+  void registerCustomProviders(); // ไม่ reject · โหลดเสร็จก่อนบอสพิมพ์ข้อความแรกแทบเสมอ
   registerVoiceProviders();
   registerSampleAgents();
   registerRouteEscortAgent();
   registerStandbyAgent();
   registerUltronAgent();
+  registerNotebookLMAgent();
+  registerTodayAgent();
+  // ผู้ช่วยส่วนตัว (ปลุก/ปฏิทิน/โทร/อากาศ/รูป/Home Assistant) — ก่อน task/device ให้ pattern เฉพาะเจาะจงได้ก่อน
+  registerAssistantAgents();
+  void loadAssistantData().catch((e: unknown) =>
+    console.error('[boot] โหลดผู้ช่วยที่สร้างเองไม่สำเร็จ', e),
+  );
+  // แตะแจ้งเตือนสรุปเช้า → ให้ผู้ช่วยสรุปให้ทันที (ผลขึ้นเป็นข้อความในแชท)
+  setupNotifications(() => {
+    void composeBriefing().then((content) => {
+      const store = useAtomStore.getState();
+      store.setUIMode('conversation');
+      store.pushMessage({ role: 'assistant', content });
+    });
+  });
+  // ครั้งก่อนแอปเด้งตอนโหลดโมเดลเสียง → ปิด ONNX ไว้ + บอกบอส (ไม่ให้เด้งวนทุกครั้งที่เปิดแอป)
+  void checkOnnxGuardOnBoot().then((crashed) => {
+    if (crashed)
+      useAtomStore.getState().pushMessage({ role: 'system', content: `⚠️ ${ONNX_BROKEN_MESSAGE}` });
+  });
   registerTaskAgent(); // ก่อนอุปกรณ์ — "เปิดแอป X แล้วพิมพ์…" ต้องมาที่นี่ก่อน
   registerDeviceAgent();
   return (started ??= startServices());
 }
 
+/** ตรวจ+กู้การตั้งค่าที่เสีย 1 รอบ · แจ้งบอสในแชทเมื่อซ่อมของจริง (ข้อความระบบถาวร) */
+async function runSettingsHealth(): Promise<void> {
+  const health = new SettingsHealth({
+    snapshots: new SnapshotStore(),
+    kv: AsyncStorage,
+    notify: (content) => void useAtomStore.getState().pushMessage({ role: 'system', content }),
+    log: recordRepair,
+  });
+  await health.check(settingsHealthEntries());
+}
+
 /** ไม่ reject เด็ดขาด — ทุกขั้นที่ล้มถูก log แล้วข้ามไป */
 export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<BootReport> {
+  // ตรวจ+กู้การตั้งค่าที่เสีย "ก่อน" module/consumer อ่าน blob → ซ่อมมีผลในรอบ boot นี้เลย (ครั้งเดียว · ไม่ reject)
+  try {
+    await deps.checkSettings?.();
+  } catch (e) {
+    console.error('[boot] ตรวจ/ซ่อมการตั้งค่าไม่สำเร็จ — แอปทำงานต่อได้', e);
+  }
+
   let modules: InitReport | null = null;
   try {
     await deps.loadModules?.(); // loadBootModules() ไม่ reject อยู่แล้ว — กันไว้อีกชั้น
@@ -121,16 +167,7 @@ export async function startServices(deps: BootDeps = DEFAULT_DEPS): Promise<Boot
   } catch (e) {
     console.error('[boot] เริ่ม Sync ไม่สำเร็จ — ใช้ Shared Memory แบบเครื่องเดียว', e);
   }
-  try {
-    await deps.secrets?.importOnce();
-  } catch (e) {
-    console.error('[boot] ดึงคีย์จาก Supermemory ไม่สำเร็จ — ใส่เองได้ตามปกติ', e);
-  }
-  try {
-    deps.supermemory?.start();
-  } catch (e) {
-    console.error('[boot] เริ่มส่งขึ้น Supermemory ไม่สำเร็จ — แอปทำงานต่อได้', e);
-  }
+  // supermemory (ดึงคีย์ + ส่งขึ้น Supermemory) ย้ายเป็น module 'supermemory' แล้ว — init ผ่าน moduleManager.start()
   try {
     deps.inbox?.start();
   } catch (e) {

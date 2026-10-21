@@ -9,9 +9,15 @@ import type {
   AIProviderId,
   ChatRequest,
 } from '../features/ai/core/types';
+import { splitSentences } from '../features/voice/core/sentences';
 import { VoiceOrchestrator } from '../features/voice/core/VoiceOrchestrator';
 import { VoiceRegistry } from '../features/voice/core/VoiceRegistry';
-import type { STTProvider, STTProviderId, TTSProvider, TTSProviderId } from '../features/voice/core/types';
+import type {
+  STTProvider,
+  STTProviderId,
+  TTSProvider,
+  TTSProviderId,
+} from '../features/voice/core/types';
 import {
   GEMINI,
   OPENROUTER,
@@ -45,7 +51,7 @@ type Step = 'ok' | ProviderErrorKind | Error;
 function fakeProvider(
   id: AIProviderId,
   script: Step[] = ['ok'],
-  extra: Partial<AIProviderConfig> = {}
+  extra: Partial<AIProviderConfig> = {},
 ): AIProvider & { requests: ChatRequest[] } {
   const requests: ChatRequest[] = [];
   let i = 0;
@@ -103,7 +109,12 @@ describe('AI Orchestrator — priority', () => {
     await ProviderSettings.setEnabled('gemini', false);
     const jevLike = fakeProvider('jev', ['ok'], { purpose: 'router' });
     const custom = fakeProvider('custom', ['ok'], { enabled: false });
-    const orch = orchestratorWith(fakeProvider('gemini'), jevLike, custom, fakeProvider('openrouter'));
+    const orch = orchestratorWith(
+      fakeProvider('gemini'),
+      jevLike,
+      custom,
+      fakeProvider('openrouter'),
+    );
     expect((await orch.chat({ messages: MESSAGES })).providerId).toBe('openrouter');
     expect(jevLike.requests).toHaveLength(0);
     expect(custom.requests).toHaveLength(0);
@@ -125,38 +136,46 @@ describe('AI Orchestrator — priority', () => {
     await orch.chat({ messages: MESSAGES });
     expect(nth(a.requests, 0).model).toBe('gemini-2.5-pro');
 
-    const res = await orch.chat({ messages: MESSAGES, providerId: 'openrouter', model: 'x/pinned' });
+    const res = await orch.chat({
+      messages: MESSAGES,
+      providerId: 'openrouter',
+      model: 'x/pinned',
+    });
     expect(res.providerId).toBe('openrouter');
     expect(nth(b.requests, 0).model).toBe('x/pinned');
   });
 });
 
 describe('AI Orchestrator — fallback', () => {
-  test.each<ProviderErrorKind>(['auth', 'rate_limit', 'server', 'timeout', 'network', 'missing_key'])(
-    '%s on the first provider → next provider answers',
-    async (kind) => {
-      const a = fakeProvider('gemini', [kind]);
-      const b = fakeProvider('openrouter');
-      const res = await orchestratorWith(a, b).chat({ messages: MESSAGES });
-      expect(res).toMatchObject({ providerId: 'openrouter', content: 'reply from openrouter' });
-    }
-  );
+  test.each<ProviderErrorKind>([
+    'auth',
+    'rate_limit',
+    'server',
+    'timeout',
+    'network',
+    'missing_key',
+  ])('%s on the first provider → next provider answers', async (kind) => {
+    const a = fakeProvider('gemini', [kind]);
+    const b = fakeProvider('openrouter');
+    const res = await orchestratorWith(a, b).chat({ messages: MESSAGES });
+    expect(res).toMatchObject({ providerId: 'openrouter', content: 'reply from openrouter' });
+  });
 
   test.each<Step>(['bad_request', 'invalid_response'])(
     '%s is not retried on another provider',
     async (kind) => {
       const b = fakeProvider('openrouter');
       await expect(
-        orchestratorWith(fakeProvider('gemini', [kind]), b).chat({ messages: MESSAGES })
+        orchestratorWith(fakeProvider('gemini', [kind]), b).chat({ messages: MESSAGES }),
       ).rejects.toMatchObject({ kind });
       expect(b.requests).toHaveLength(0);
-    }
+    },
   );
 
   test('a plain Error (e.g. fetch blew up) counts as network and falls back', async () => {
     const res = await orchestratorWith(
       fakeProvider('gemini', [new Error('socket hang up')]),
-      fakeProvider('openrouter')
+      fakeProvider('openrouter'),
     ).chat({ messages: MESSAGES });
     expect(res.providerId).toBe('openrouter');
   });
@@ -164,7 +183,7 @@ describe('AI Orchestrator — fallback', () => {
   test('all providers fail → one aggregated error listing each failure', async () => {
     const err = (await orchestratorWith(
       fakeProvider('gemini', ['rate_limit']),
-      fakeProvider('openrouter', ['server'])
+      fakeProvider('openrouter', ['server']),
     )
       .chat({ messages: MESSAGES })
       .catch((e: unknown) => e)) as ProviderError;
@@ -192,7 +211,7 @@ describe('AI Orchestrator — fallback', () => {
     await ProviderSettings.setAdvanced({ fallback: false });
     const b = fakeProvider('openrouter');
     await expect(
-      orchestratorWith(fakeProvider('gemini', ['server']), b).chat({ messages: MESSAGES })
+      orchestratorWith(fakeProvider('gemini', ['server']), b).chat({ messages: MESSAGES }),
     ).rejects.toThrow(/ผู้ให้บริการทุกรายล้มเหลว/);
     expect(b.requests).toHaveLength(0);
   });
@@ -220,7 +239,11 @@ describe('AI Orchestrator — fallback', () => {
     const a = fakeProvider('gemini');
     await orchestratorWith(a).chat({ messages: MESSAGES, temperature: 0.2 });
     // resetSettings() saved a model for gemini, so that wins over the config default
-    expect(nth(a.requests, 0)).toMatchObject({ timeoutMs: 12_000, temperature: 0.2, model: 'gemini-3-flash' });
+    expect(nth(a.requests, 0)).toMatchObject({
+      timeoutMs: 12_000,
+      temperature: 0.2,
+      model: 'gemini-3-flash',
+    });
   });
 });
 
@@ -238,7 +261,14 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
 
   test("Gemini's 400 API_KEY_INVALID is treated as auth → OpenRouter", async () => {
     mockFetch([
-      [GEMINI, () => json({ error: { code: 400, message: 'API key not valid.', status: 'API_KEY_INVALID' } }, 400)],
+      [
+        GEMINI,
+        () =>
+          json(
+            { error: { code: 400, message: 'API key not valid.', status: 'API_KEY_INVALID' } },
+            400,
+          ),
+      ],
       [OPENROUTER, () => openRouterText('ok')],
     ]);
     await expect(new Orchestrator().chat({ messages: MESSAGES })).resolves.toMatchObject({
@@ -253,12 +283,16 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
     ]);
     await aiOrchestrator.chat({ messages: MESSAGES });
     await aiOrchestrator.chat({ messages: MESSAGES });
-    expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai', 'openrouter.ai']);
+    expect(hosts()).toEqual([
+      'generativelanguage.googleapis.com',
+      'openrouter.ai',
+      'openrouter.ai',
+    ]);
   });
 
   describe('lastGood sticky behaviour (429)', () => {
     test('Gemini 429 → OpenRouter; the next call goes to OpenRouter first, Gemini is skipped', async () => {
-      const { hosts } = mockFetch([
+      const { hosts, calls } = mockFetch([
         [GEMINI, () => httpError(429, 'Resource has been exhausted')],
         [OPENROUTER, () => openRouterText('จาก OpenRouter')],
       ]);
@@ -266,11 +300,19 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
 
       const first = await orch.chat({ messages: MESSAGES });
       expect(first.providerId).toBe('openrouter');
-      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai']);
+      // โควต้าหมด (exhausted) → ลองรุ่นสำรองของ Gemini ก่อน (ADR-017) แล้วค่อย OpenRouter
+      expect(
+        calls.filter((c) => GEMINI.test(c.url.href)).map((c) => c.url.pathname.split('/')[3]),
+      ).toEqual([
+        'gemini-3-flash:generateContent',
+        'gemini-2.5-flash:generateContent',
+        'gemini-2.5-flash-lite:generateContent',
+      ]);
+      expect(hosts().at(-1)).toBe('openrouter.ai');
 
       const second = await orch.chat({ messages: MESSAGES });
       expect(second.providerId).toBe('openrouter');
-      expect(hosts().slice(2)).toEqual(['openrouter.ai']); // sticky: no Gemini attempt
+      expect(hosts().slice(4)).toEqual(['openrouter.ai']); // sticky: no Gemini attempt
       expect((await orch.pickProvider())?.config.id).toBe('openrouter');
     });
 
@@ -284,7 +326,11 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
       const orch = new Orchestrator();
       await orch.chat({ messages: MESSAGES }); // gemini 429 → openrouter (sticky)
       await orch.chat({ messages: MESSAGES }); // openrouter first despite priority
-      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'openrouter.ai', 'openrouter.ai']);
+      expect(hosts()).toEqual([
+        'generativelanguage.googleapis.com',
+        'openrouter.ai',
+        'openrouter.ai',
+      ]);
 
       openRouterDown = true;
       const res = await orch.chat({ messages: MESSAGES }); // sticky fails → back to priority order
@@ -301,17 +347,23 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
         [OPENROUTER, () => openRouterText('should not be used')],
       ]);
       const orch = new Orchestrator();
-      await expect(orch.chat({ messages: MESSAGES })).resolves.toMatchObject({ providerId: 'gemini' });
-      expect(hosts()).toEqual(['generativelanguage.googleapis.com', 'generativelanguage.googleapis.com']);
+      await expect(orch.chat({ messages: MESSAGES })).resolves.toMatchObject({
+        providerId: 'gemini',
+      });
+      expect(hosts()).toEqual([
+        'generativelanguage.googleapis.com',
+        'generativelanguage.googleapis.com',
+      ]);
       expect((await orch.pickProvider())?.config.id).toBe('gemini');
     });
   });
 
   test('a genuine 400 (bad request) stops the chain', async () => {
     const { hosts } = mockFetch([[GEMINI, () => httpError(400, 'model not found')]]);
-    await expect(
-      new Orchestrator().chat({ messages: MESSAGES })
-    ).rejects.toMatchObject({ kind: 'bad_request', status: 400 });
+    await expect(new Orchestrator().chat({ messages: MESSAGES })).rejects.toMatchObject({
+      kind: 'bad_request',
+      status: 400,
+    });
     expect(hosts()).toEqual(['generativelanguage.googleapis.com']);
   });
 
@@ -338,7 +390,7 @@ describe('AI Orchestrator — real adapters (Gemini → OpenRouter) over mocked 
     hang.mockImplementation(async (input, init) => {
       if (String(input).includes('openrouter')) return openRouterText('after timeout');
       return new Promise((_r, reject) =>
-        init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        init?.signal?.addEventListener('abort', () => reject(new Error('aborted'))),
       );
     });
     await expect(new Orchestrator().chat({ messages: MESSAGES })).resolves.toMatchObject({
@@ -394,12 +446,48 @@ function voiceWith(tts: TTSProvider[], stt: STTProvider[] = []) {
 
 describe('Voice Orchestrator — TTS priority + fallback', () => {
   test('persona voice provider first, with its voice/speed/pitch', async () => {
-    await ProviderSettings.setTTSFor(1, { providerId: 'openai', voiceId: 'nova', speed: 1.2, pitch: 0.9 });
+    await ProviderSettings.setTTSFor(1, {
+      providerId: 'openai',
+      voiceId: 'nova',
+      speed: 1.2,
+      pitch: 0.9,
+    });
     const expo = fakeTTS('expo');
     const openai = fakeTTS('openai');
     await voiceWith([expo, openai]).speak('hi', 1);
-    expect(openai.spoken).toEqual([{ text: 'hi', opts: { voiceId: 'nova', speed: 1.2, pitch: 0.9 } }]);
+    expect(openai.spoken).toEqual([
+      { text: 'hi', opts: { voiceId: 'nova', speed: 1.2, pitch: 0.9 } },
+    ]);
     expect(expo.spoken).toHaveLength(0);
+  });
+
+  test('คำตอบหลายประโยค: เจ้าเดิมพูดครบทุกประโยคตามลำดับ (Voice A — พูดทีละประโยค)', async () => {
+    await ProviderSettings.setTTSFor(1, { providerId: 'openai' });
+    const text = 'สวัสดีครับบอส พร้อมแล้วนะ. จะเริ่มเลยนะครับ. ขอบคุณครับ';
+    const chunks = splitSentences(text);
+    expect(chunks.length).toBeGreaterThan(1); // ต้องถูกแบ่งจริง ไม่งั้นเทสนี้ไม่มีความหมาย
+    const openai = fakeTTS('openai');
+    const expo = fakeTTS('expo');
+    await voiceWith([openai, expo]).speak(text, 1);
+    expect(openai.spoken.map((s) => s.text)).toEqual(chunks);
+    expect(expo.spoken).toHaveLength(0); // เจ้าแรกพูดได้หมด ไม่ต้อง fallback
+  });
+
+  test('คำตอบหลายประโยค: เจ้าเดิมล้มประโยคที่สอง → ตกไป Expo พูดประโยคนั้น (ไม่พูดค้างครึ่งคำตอบ)', async () => {
+    await ProviderSettings.setTTSFor(1, { providerId: 'openai' });
+    const text = 'สวัสดีครับบอส พร้อมแล้วนะ. จะเริ่มเลยนะครับ. ขอบคุณครับ';
+    const chunks = splitSentences(text);
+    const openai = fakeTTS('openai');
+    let calls = 0;
+    openai.speak = async (t, opts) => {
+      openai.spoken.push({ text: t, opts });
+      if (++calls >= 2) throw new ProviderError('openai', 'server', 'boom'); // ล้มตั้งแต่ประโยคที่สอง
+    };
+    const expo = fakeTTS('expo');
+    await voiceWith([openai, expo]).speak(text, 1);
+    expect(openai.spoken.map((s) => s.text)).toEqual(chunks); // พยายามทุกประโยค
+    // ประโยคที่ openai ล้ม Expo พูดแทนครบ (ไม่เงียบหาย)
+    expect(expo.spoken.map((s) => s.text)).toEqual(chunks.slice(1));
   });
 
   test('persona provider fails → TTS priority list → fallback uses its own default voice', async () => {
@@ -428,13 +516,15 @@ describe('Voice Orchestrator — TTS priority + fallback', () => {
   test('non-fallback error stops the chain; all failing → aggregated error', async () => {
     await ProviderSettings.setTTSFor(1, { providerId: 'openai' });
     const expo = fakeTTS('expo');
-    await expect(voiceWith([fakeTTS('openai', 'bad_request'), expo]).speak('hi', 1)).rejects.toMatchObject({
+    await expect(
+      voiceWith([fakeTTS('openai', 'bad_request'), expo]).speak('hi', 1),
+    ).rejects.toMatchObject({
       kind: 'bad_request',
     });
     expect(expo.spoken).toHaveLength(0);
 
     await expect(
-      voiceWith([fakeTTS('openai', 'server'), fakeTTS('expo', 'unsupported')]).speak('hi', 1)
+      voiceWith([fakeTTS('openai', 'server'), fakeTTS('expo', 'unsupported')]).speak('hi', 1),
     ).rejects.toThrow(/ผู้ให้บริการเสียงทุกรายล้มเหลว/);
     await expect(voiceWith([]).speak('hi', 1)).rejects.toMatchObject({ kind: 'unsupported' });
   });
@@ -461,9 +551,10 @@ describe('Voice Orchestrator — STT priority + fallback', () => {
     const deepgram = fakeSTT('deepgram', 'rate_limit');
     const assembly = fakeSTT('assemblyai');
     const whisper = fakeSTT('whisper');
-    const text = await voiceWith([], [fakeSTT('expo', 'unsupported'), deepgram, assembly, whisper]).listen(
-      'file:///rec.m4a'
-    );
+    const text = await voiceWith(
+      [],
+      [fakeSTT('expo', 'unsupported'), deepgram, assembly, whisper],
+    ).listen('file:///rec.m4a');
     expect(text).toBe('text from whisper');
     expect(deepgram.calls).toBe(1);
     expect(assembly.calls).toBe(0);

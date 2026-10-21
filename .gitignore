@@ -48,3 +48,6 @@ coverage/
 
 # build output ของ native module ใน ./modules (Gradle สร้างตอน build)
 modules/*/android/build/
+
+__pycache__/
+.env

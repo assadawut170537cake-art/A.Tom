@@ -10,7 +10,7 @@
  *   stt.openai = ...
  * ชื่อคีย์ = ชื่อใน SecureKeyStore (ดู secretKey()) · รับเฉพาะ prefix ที่อนุญาต (กันเขียนคีย์มั่วจากเน็ต)
  *
- * ⚠️ ชื่อ endpoint / รูปแบบ response ของ Supermemory อิงสเปก v3 (ไม่มีโค้ด server ในนี้) — ถ้า Supermemory
+ * ⚠️ ชื่อ endpoint / รูปแบบ response ของ Supermemory อิง OpenAPI v3 (`POST /v3/documents/list`) (ไม่มีโค้ด server ในนี้) — ถ้า Supermemory
  * เปลี่ยน แก้ที่ `search()` / `parseDocuments()` ในไฟล์นี้ที่เดียว
  */
 
@@ -19,7 +19,8 @@ import { request } from '../http/request';
 import { SecureKeyStore, type KeyStore } from '../storage/SecureKeyStore';
 import { isArray, isRecord, isString } from '../types/guards';
 
-export const SECRETS_SEARCH_ENDPOINT = 'https://api.supermemory.ai/v3/search';
+/** list ไม่ใช่ search — `/v3/search` ไม่รับคำค้นว่าง (400 "Search query cannot be empty") และค้นแบบ semantic อาจตกหล่น */
+export const SECRETS_SEARCH_ENDPOINT = 'https://api.supermemory.ai/v3/documents/list';
 /** space แยกสำหรับคีย์ — ไม่ใช่ core (ที่ sync ขึ้น prompt) */
 export const SECRETS_CONTAINER_TAG = 'project_atom_memory_base_4folders_atom_secrets';
 /** ชื่อคีย์ Supermemory เองใน SecureKeyStore (ใช้ดึง bootstrap) */
@@ -130,8 +131,8 @@ export class SecretSync {
       method: 'POST',
       timeoutMs: this.timeoutMs,
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      // q ว่าง + containerTags = เอาทุก document ใน space คีย์ · limit สูงพอสำหรับคีย์หลายสิบตัว
-      body: JSON.stringify({ q: '', containerTags: [this.containerTag], limit: 100 }),
+      // ทุก document ใน space คีย์ + เนื้อหา (ค่าเริ่มต้น list ไม่ส่ง content มา) · limit พอสำหรับคีย์หลายสิบตัว
+      body: JSON.stringify({ containerTags: [this.containerTag], includeContent: true, limit: 100 }),
     });
     const body: unknown = await res.json();
     return parseDocuments(body).flatMap(parseSecretLines);
@@ -150,11 +151,14 @@ export class SecretSync {
 /** ดึงข้อความของแต่ละ document จาก response ของ Supermemory (รองรับหลายรูปแบบ field ที่เจอได้) */
 export function parseDocuments(body: unknown): string[] {
   if (!isRecord(body)) return [];
-  const results = isArray(body.results)
-    ? body.results
-    : isArray(body.documents)
-      ? body.documents
-      : [];
+  // documents/list คืน `memories` · search คืน `results` · เผื่อ `documents`
+  const results = isArray(body.memories)
+    ? body.memories
+    : isArray(body.results)
+      ? body.results
+      : isArray(body.documents)
+        ? body.documents
+        : [];
   return results.flatMap((item): string[] => {
     if (!isRecord(item)) return [];
     if (isString(item.content) && item.content) return [item.content];

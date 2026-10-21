@@ -29,16 +29,18 @@ export interface ModuleHost {
 export const MODULE_LOADERS: Readonly<Record<string, ModuleFactory>> = {
   // 4.5.5.3 — สั่งงาน Mark 55 ผ่าน Memory Bus (Supabase)
   'pc-bridge': () => import('../features/pc-bridge').then((m) => m.default),
+  // CORE_AUDIT 5.1 — ดึงคีย์ + ส่งความจำขึ้น Supermemory (ปิดได้ · แกนยังจำในเครื่อง)
+  supermemory: () => import('../features/supermemory').then((m) => m.default),
 };
 
 /** module ที่โหลดตอนเปิดแอป — ค่าเปิด/ปิดที่บอสบันทึกไว้ยังมีผล (ModuleManager.register) */
-export const BOOT_MODULES: readonly string[] = ['pc-bridge'];
+export const BOOT_MODULES: readonly string[] = ['pc-bridge', 'supermemory'];
 
 /** โหลด {@link BOOT_MODULES} · ตัวที่ล้มแค่ log (ไม่ reject) */
 export async function loadBootModules(
   registry: ModuleHost = moduleManager,
   loaders: Readonly<Record<string, ModuleFactory>> = MODULE_LOADERS,
-  ids: readonly string[] = BOOT_MODULES
+  ids: readonly string[] = BOOT_MODULES,
 ): Promise<void> {
   for (const id of ids) {
     try {
@@ -56,7 +58,7 @@ export async function loadBootModules(
 export async function loadModule(
   id: string,
   registry: ModuleHost = moduleManager,
-  loaders: Readonly<Record<string, ModuleFactory>> = MODULE_LOADERS
+  loaders: Readonly<Record<string, ModuleFactory>> = MODULE_LOADERS,
 ): Promise<AtomModule> {
   const existing = registry.get(id);
   if (existing) return existing;

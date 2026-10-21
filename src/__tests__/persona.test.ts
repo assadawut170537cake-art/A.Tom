@@ -79,7 +79,9 @@ test('chat uses the persona prompt, keeps histories separate and speaks with the
   const res = await sendMessage('วันนี้เป็นไงบ้าง');
 
   expect(res.reply).toBe('สวัสดีครับบอส');
-  expect(res.route?.provider).toBe('llm');
+  // คุยธรรมดา (ไม่มีคำใบ้คำสั่ง) → ไม่เสีย request ถามตัวแยกประเภท · ADR-017
+  expect(res.route?.provider).toBe('rule');
+  expect(bodies).toHaveLength(1);
   const chatBody = bodies.find((b) => !b.systemInstruction?.parts[0].text.startsWith('Classify'));
   expect(chatBody?.systemInstruction?.parts[0].text).toContain(PERSONA_PROMPTS[2]);
 

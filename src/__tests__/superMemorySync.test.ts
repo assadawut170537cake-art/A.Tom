@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { startServices } from '../boot';
+import { SupermemoryModule } from '../features/supermemory/SupermemoryModule';
 import { redactSecrets } from '../core/http/errors';
 import { LocalMemoryAdapter } from '../core/memory/LocalMemoryAdapter';
 import {
@@ -207,23 +207,22 @@ describe('SuperMemorySyncService — fail-open', () => {
   });
 });
 
-describe('boot', () => {
-  test('startServices เรียก supermemory.start() · start() throw ก็ไม่ทำให้ boot ล้ม', async () => {
-    const start = jest.fn(() => {
-      throw new Error('boom');
+describe('module supermemory (CORE_AUDIT 5.1)', () => {
+  test('init = importOnce + start · dispose = stop · importOnce throw ไม่ทำให้ init ล้ม', async () => {
+    const start = jest.fn();
+    const stop = jest.fn();
+    const importOnce = jest.fn(async () => {
+      throw new Error('ดึงคีย์ไม่ได้');
     });
-    const report = await startServices({
-      modules: { start: async () => ({ ready: [], failed: [] }) },
-      memory,
-      dev: false,
-      installDevTools: jest.fn(),
-      supermemory: { start },
-    });
-    expect(start).toHaveBeenCalledTimes(1);
-    expect(report.memoryFacts).toBe(0);
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Supermemory'),
-      expect.any(Error),
-    );
+    const mod = new SupermemoryModule({ secrets: { importOnce }, sync: { start, stop } });
+    expect(mod.id).toBe('supermemory');
+    expect(mod.enabled).toBe(true); // ค่าเริ่มต้นเปิด = พฤติกรรมเดิม
+
+    await mod.init();
+    expect(importOnce).toHaveBeenCalledTimes(1);
+    expect(start).toHaveBeenCalledTimes(1); // importOnce ล้มก็ยัง start ต่อ
+
+    mod.dispose();
+    expect(stop).toHaveBeenCalledTimes(1); // ปิด module = หยุดส่งขึ้น Supermemory
   });
 });

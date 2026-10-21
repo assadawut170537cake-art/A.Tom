@@ -7,7 +7,7 @@
  * RuleClassifier (regex, ฟรี, ใช้ได้แม้ออฟไลน์)
  *   → AgentClassifier (pattern ของ agent ที่ลงทะเบียนไว้, ฟรี — ไม่มี agent = ข้าม)
  *     → JevClassifier (เฉพาะเมื่อเปิด Jev, confidence ≥ 0.7)
- *       → LLMClassifier (ถาม AI Orchestrator ให้ตอบ JSON)
+ *       → LLMClassifier (ถาม AI Orchestrator ให้ตอบ JSON — เฉพาะข้อความที่เข้า COMMAND_HINT · ADR-017)
  *         → default: chat
  * ```
  *
@@ -34,13 +34,7 @@ import { AgentHandler } from '../handlers/AgentHandler';
 import { ChatHandler } from '../handlers/ChatHandler';
 import { PCCommandHandler } from '../handlers/PCCommandHandler';
 import { SwitchAssistantHandler } from '../handlers/SwitchAssistantHandler';
-import type {
-  Classifier,
-  HandlerResult,
-  IntentHandlers,
-  RouterInput,
-  RouterOutput,
-} from './types';
+import type { Classifier, HandlerResult, IntentHandlers, RouterInput, RouterOutput } from './types';
 
 /** Jev answers below this confidence defer to the LLM classifier (0.7 itself is accepted). */
 export const JEV_MIN_CONFIDENCE = 0.7;
@@ -82,6 +76,8 @@ export class IntentRouter {
   }
 
   async route(input: RouterInput): Promise<RouterOutput> {
+    // แนบไฟล์มา = ถามเกี่ยวกับไฟล์ ("สรุปไฟล์นี้") — handler อื่นอ่านไฟล์ไม่ได้ ไม่ต้องเสีย request ให้ Jev/LLM เดา
+    if (input.attachments?.length) return { intent: 'chat', confidence: 1, provider: 'rule' };
     const text = input.text.trim();
     if (!text) return DEFAULT_ROUTE;
 

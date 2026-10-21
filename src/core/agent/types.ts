@@ -64,6 +64,11 @@ export interface AgentToolResult {
   output: string;
   /** true = ยังไม่ได้ทำ เพราะต้องให้บอสยืนยันก่อน (เรียกซ้ำด้วย `args.confirmed: true`) */
   needsConfirmation?: boolean | undefined;
+  /**
+   * true = ผลนี้มีเนื้อหาจากภายนอก/เว็บ (เช่น คลัง MCP สาธารณะ) → harness ถือว่า "เห็นของนอก" แล้ว
+   * คำสั่งที่แตะเครื่อง/PC/อัลตรอนหลังจากนี้ต้องให้บอสยืนยัน (กันคำสั่งแฝงจากเนื้อหาภายนอก)
+   */
+  external?: boolean | undefined;
 }
 
 export interface AgentStep {

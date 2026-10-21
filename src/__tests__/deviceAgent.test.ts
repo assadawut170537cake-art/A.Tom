@@ -131,7 +131,7 @@ describe('device agent: running', () => {
 
   test('device control switched off → points Boss to Marketplace, driver untouched', async () => {
     const r = await say('เปิดไฟฉาย', false);
-    expect(r.reply).toBe('การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Marketplace');
+    expect(r.reply).toBe('การควบคุมอุปกรณ์ถูกปิดอยู่ — เปิดได้ที่ ตั้งค่า › Modules › Marketplace');
     expect(r.driver.setTorch).not.toHaveBeenCalled();
   });
 

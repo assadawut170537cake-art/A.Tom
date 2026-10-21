@@ -102,7 +102,7 @@ describe('Gemini TTS — synthesize()', () => {
     mockFetch([ttsRoute(() => audioResponse('audio/wav', 'UklGRiQAAABXQVZF'))]);
     await gemini().speak('ทดสอบ');
     expect(write).toHaveBeenCalledWith('UklGRiQAAABXQVZF', { encoding: 'base64' });
-    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(/^file:\/\/\/cache\/tts-gemini-\d+\.wav$/));
+    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(/^file:\/\/\/cache\/tts-gemini-\d+-\d+\.wav$/));
   });
 
   test('raw PCM audio/L16 (Gemini 2.5 / 3.1) is wrapped in a WAV header with the given rate', async () => {
@@ -246,7 +246,7 @@ describe('Gemini TTS — voices, connection test, registration', () => {
     const { calls } = mockFetch([ttsRoute(() => audioResponse('audio/wav', 'UklGRg=='))]);
     await voiceOrchestrator.speak('สวัสดี', 1);
     expect(calls.map((c) => c.url.pathname)).toEqual([`/v1beta/models/${GEMINI_TTS_DEFAULT_MODEL}:generateContent`]);
-    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(/tts-gemini-\d+\.wav$/));
+    expect(createAudioPlayer).toHaveBeenCalledWith(expect.stringMatching(/tts-gemini-\d+-\d+\.wav$/));
   });
 });
 

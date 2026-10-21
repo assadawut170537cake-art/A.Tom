@@ -20,6 +20,9 @@ import { isBoolean, isRecord, isString } from '../../core/types/guards';
 import type { InboxTask } from './MemoryBusClient';
 import type { PcBridgeConfig, PcBridgeSettingsStore } from './settings';
 
+/** ข้อความแจ้งเตือนจาก PC ในแชท ขึ้นต้นด้วยนี้ (แท็บ "วันนี้" ใช้นับแจ้งเตือนของวันนี้) */
+export const NOTIFY_PREFIX = '📩 Mark 55: ';
+
 export const INBOX_INTERVAL_MS = 15_000;
 /** ข้อความยาวกว่านี้ตัดทิ้ง (แชท + TTS) */
 export const MAX_NOTIFY_LENGTH = 1000;
