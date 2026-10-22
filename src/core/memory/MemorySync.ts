@@ -101,7 +101,12 @@ export class MemorySync {
     this.createRemote = deps.createRemote ?? ((config) => new RemoteMemoryAdapter(config));
     this.deviceName = deps.deviceName ?? `A.T.O.M. (${Platform.OS})`;
     this.now = deps.now ?? Date.now;
-    this.state = { started: false, serverUrl: deps.defaultServerUrl ?? DEFAULT_SERVER_URL, device: null, lastCheck: null };
+    this.state = {
+      started: false,
+      serverUrl: deps.defaultServerUrl ?? DEFAULT_SERVER_URL,
+      device: null,
+      lastCheck: null,
+    };
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -170,7 +175,10 @@ export class MemorySync {
     const at = this.now();
     if (!this.state.serverUrl) return { ok: false, at, message: 'ใส่ Server URL ก่อน' };
     const token = this.isPaired ? await this.readToken() : null;
-    const remote = this.createRemote({ baseUrl: this.state.serverUrl, ...(token ? { token } : {}) });
+    const remote = this.createRemote({
+      baseUrl: this.state.serverUrl,
+      ...(token ? { token } : {}),
+    });
     let health: HealthResult;
     try {
       health = await remote.health();
@@ -178,11 +186,22 @@ export class MemorySync {
       return { ok: false, at, message: syncErrorText(e) };
     }
     const version = health.version ? ` · Mark 55 v${health.version}` : '';
-    if (!token) return { ok: true, at, version: health.version, message: `เชื่อมต่อได้${version} — จับคู่ต่อได้เลย` };
+    if (!token)
+      return {
+        ok: true,
+        at,
+        version: health.version,
+        message: `เชื่อมต่อได้${version} — จับคู่ต่อได้เลย`,
+      };
     try {
       const verify = await remote.verify();
       if (!verify.valid) {
-        return { ok: false, at, version: health.version, message: 'การจับคู่หมดอายุหรือถูกยกเลิก — กด "ยกเลิก Pair" แล้วจับคู่ใหม่' };
+        return {
+          ok: false,
+          at,
+          version: health.version,
+          message: 'การจับคู่หมดอายุหรือถูกยกเลิก — กด "ยกเลิก Pair" แล้วจับคู่ใหม่',
+        };
       }
       return { ok: true, at, version: health.version, message: `เชื่อมต่อแล้ว${version}` };
     } catch (e) {
@@ -192,7 +211,8 @@ export class MemorySync {
 
   /** แลกรหัส 6 หลักเป็น token → เก็บใน SecureStore → ส่ง fact ทั้งหมดในเครื่องขึ้นไปรอบแรก */
   async pair(pairingCode: string): Promise<PairedDevice> {
-    if (!this.state.serverUrl) throw new ProviderError('mark55', 'bad_request', 'ใส่ Server URL ก่อน');
+    if (!this.state.serverUrl)
+      throw new ProviderError('mark55', 'bad_request', 'ใส่ Server URL ก่อน');
     const remote = this.createRemote({ baseUrl: this.state.serverUrl });
     const { token, expiresAt } = await remote.pair(pairingCode, this.deviceName);
     try {
@@ -200,7 +220,11 @@ export class MemorySync {
     } catch (e) {
       // ไม่มีที่เก็บ token ปลอดภัย = ไม่จับคู่ (ห้ามตกไปเก็บใน AsyncStorage)
       console.error('[sync] เก็บ token ไม่สำเร็จ', e);
-      throw new ProviderError('mark55', 'unsupported', 'เก็บรหัสการจับคู่ในที่ปลอดภัยของเครื่องไม่สำเร็จ — ลองใหม่อีกครั้ง');
+      throw new ProviderError(
+        'mark55',
+        'unsupported',
+        'เก็บรหัสการจับคู่ในที่ปลอดภัยของเครื่องไม่สำเร็จ — ลองใหม่อีกครั้ง',
+      );
     }
     const device: PairedDevice = { deviceName: this.deviceName, expiresAt, pairedAt: this.now() };
     try {
@@ -222,10 +246,20 @@ export class MemorySync {
     await this.queue.reset();
     this.update({ device: null, lastCheck: null });
     try {
-      await Promise.all([this.secure.deleteItemAsync(MARK55_TOKEN_KEY, SECURE_OPTIONS), this.storage.removeItem(DEVICE_KEY)]);
+      await Promise.all([
+        this.secure.deleteItemAsync(MARK55_TOKEN_KEY, SECURE_OPTIONS),
+        this.storage.removeItem(DEVICE_KEY),
+      ]);
     } catch (e) {
       console.error('[sync] ลบข้อมูลการจับคู่ไม่สำเร็จ', e);
     }
+  }
+
+  /** การเชื่อมต่อ Mark 55 ปัจจุบันสำหรับช่องทางอื่น (เช่น ChatSync) — null = ยังไม่จับคู่/ไม่มี URL */
+  async connection(): Promise<{ baseUrl: string; token: string } | null> {
+    if (!this.isPaired || !this.state.serverUrl) return null;
+    const token = await this.readToken();
+    return token ? { baseUrl: this.state.serverUrl, token } : null;
   }
 
   private async readToken(): Promise<string | null> {

@@ -15,14 +15,18 @@ from types import FrameType
 
 try:
     from . import config
-    from .handlers import register_all_handlers
+    from .handlers import make_ultron_handlers, register_all_handlers
     from .memory_bus import MemoryWatcher
+    from .mobile_outbox import notify_mobile
     from .supabase_gateway import SupabaseGateway
+    from .ultron_sandbox import UltronSandbox
 except ImportError:  # รันเป็นสคริปต์ — โฟลเดอร์ของไฟล์นี้อยู่ใน sys.path อยู่แล้ว
     import config
-    from handlers import register_all_handlers
+    from handlers import make_ultron_handlers, register_all_handlers
     from memory_bus import MemoryWatcher
+    from mobile_outbox import notify_mobile
     from supabase_gateway import SupabaseGateway
+    from ultron_sandbox import UltronSandbox
 
 # ใช้ชื่อเดียวกับ watcher เพื่อให้ log ตอนเริ่ม/ปิดอยู่ใต้ mark55.memory_bus ตามที่ Boss กำหนด
 logger = logging.getLogger("mark55.memory_bus")
@@ -94,7 +98,9 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         watcher = MemoryWatcher(gateway, args.node_id, poll_interval=args.poll_interval)
-        register_all_handlers(watcher)
+        sandbox = UltronSandbox(config.ULTRON_ROOT, image=config.ULTRON_IMAGE, timeout=config.ULTRON_TIMEOUT)
+        ultron = make_ultron_handlers(sandbox, lambda device, text: notify_mobile(gateway, text, device))
+        register_all_handlers(watcher, ultron)
     except Exception:
         logger.exception("เริ่มระบบไม่สำเร็จ")
         return 1

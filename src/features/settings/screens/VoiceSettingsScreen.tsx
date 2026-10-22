@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, Switch, Text, View } from 'react-native';
 
 import {
   ProviderSettings,
@@ -7,12 +7,13 @@ import {
   type VoiceKind,
 } from '../../../core/storage/ProviderSettings';
 import { voiceRegistry } from '../../voice/core/VoiceRegistry';
+import { useStandbyStore } from '../../voice/live/standbyStore';
 import { STT_PROVIDERS, TTS_PROVIDERS, type VoiceProviderMeta } from '../../voice/voice.config';
 import { PriorityList } from '../components/PriorityList';
 import { STTProviderCard } from '../components/STTProviderCard';
 import { TTSProviderCard } from '../components/TTSProviderCard';
 import { SpeakerEnrollmentCard } from '../components/SpeakerEnrollmentCard';
-import { Section } from '../components/ui';
+import { Card, Section } from '../components/ui';
 import { mergeOrder, whileMounted } from '../utils';
 
 const META: { [K in VoiceKind]: VoiceProviderMeta<VoiceIdOf[K]>[] } = {
@@ -42,6 +43,26 @@ function useVoicePriority<K extends VoiceKind>(kind: K) {
   return { items: order.map((id) => ({ id, label: names.get(id) ?? id })), change };
 }
 
+/** โหมดเฝ้า (อัลตรอน) — ฟังตลอดแม้อยู่แอปอื่น · สั่งจากแชทได้ด้วย "เปิดโหมดเฝ้า" */
+function StandbyToggle() {
+  const enabled = useStandbyStore((s) => s.enabled);
+  useEffect(() => void useStandbyStore.getState().load(), []);
+  return (
+    <Card>
+      <View className="flex-row items-center justify-between">
+        <Text className="flex-1 text-sm text-white">ฟังตลอด (โหมดเฝ้า)</Text>
+        <Switch
+          value={enabled}
+          onValueChange={(on) => void useStandbyStore.getState().setEnabled(on)}
+          accessibilityLabel="โหมดเฝ้า"
+          trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#C0392B' }}
+          thumbColor="#fff"
+        />
+      </View>
+    </Card>
+  );
+}
+
 export function VoiceSettingsScreen() {
   const [dragging, setDragging] = useState(false);
   const ttsPriority = useVoicePriority('tts');
@@ -54,6 +75,12 @@ export function VoiceSettingsScreen() {
       scrollEnabled={!dragging}
       keyboardShouldPersistTaps="handled"
     >
+      <Section
+        title="โหมดเฝ้า"
+        hint="ไมค์ฟังตลอด (มีแจ้งเตือนค้าง) จนกว่าจะปิด · อยู่แอปอื่นให้เรียกชื่อก่อน เช่น “อัลตรอน ปรับเสียง 30” · ทุกประโยคที่ได้ยินถูกส่งถอดเสียง (เสียค่า STT)"
+      >
+        <StandbyToggle />
+      </Section>
       <Section title="เสียงของฉัน" hint="ให้ผู้ช่วยตอบเฉพาะเสียงของคุณ (ตัวกรองเสียงบนเครื่อง)">
         <SpeakerEnrollmentCard />
       </Section>

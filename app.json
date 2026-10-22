@@ -31,7 +31,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง"
+          "microphonePermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้ไมโครโฟนเพื่อฟังคำสั่งเสียง",
+          "enableBackgroundRecording": true
         }
       ],
       [
@@ -94,7 +95,14 @@
           "cameraPermission": "อนุญาตให้ $(PRODUCT_NAME) ใช้กล้องเพื่อดูและอ่านสิ่งที่คุณถ่าย",
           "photosPermission": "อนุญาตให้ $(PRODUCT_NAME) เลือกรูปภาพ"
         }
-      ]
-    ]
+      ],
+      "./plugins/withGregorianBuildLocale"
+    ],
+    "owner": "assadawut17",
+    "extra": {
+      "eas": {
+        "projectId": "78a273fe-5a21-43fb-b184-2eb408cf1290"
+      }
+    }
   }
 }

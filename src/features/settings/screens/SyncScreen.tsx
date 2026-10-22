@@ -3,6 +3,7 @@ import { Alert, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 
 import { memorySync, type MemorySync } from '../../../core/memory/MemorySync';
 import { syncErrorText } from '../../../core/memory/RemoteMemoryAdapter';
+import { secretSync } from '../../../core/memory/SecretSync';
 import { SUPERMEMORY_KEY_NAME } from '../../../core/memory/SuperMemorySync';
 import type { ConflictLogEntry, SyncState } from '../../../core/memory/SyncQueue';
 import { PERSONAS } from '../../jarvis/constants';
@@ -52,6 +53,7 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
   const [urlDraft, setUrlDraft] = useState(conn.serverUrl);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState<'test' | 'pair' | null>(null);
+  const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   useEffect(() => {
@@ -60,6 +62,25 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
 
   // URL ที่บันทึกไว้โหลดมาถึงทีหลัง render แรก (หรือถูกจัดรูปตอนบันทึก) → ใช้แทนค่าในช่อง
   const [shownUrl, setShownUrl] = useState(conn.serverUrl);
+
+  const pullSecrets = async () => {
+    setImporting(true);
+    try {
+      const result = await secretSync.importOnce(true); // ทับของเดิม — บอสตั้งใจดึงมาใช้
+      if (result.reason === 'no_supermemory_key') {
+        setNotice({ tone: 'error', text: 'ใส่ Supermemory API key ด้านล่างก่อน แล้วค่อยกดดึง' });
+      } else if (result.reason === 'error') {
+        setNotice({
+          tone: 'error',
+          text: 'ดึงคีย์ไม่สำเร็จ — เช็กอินเทอร์เน็ตและ API key ของ Supermemory',
+        });
+      } else {
+        setNotice({ tone: 'info', text: `ดึงคีย์มาใส่เครื่องแล้ว ${result.imported} รายการ` });
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
   if (shownUrl !== conn.serverUrl) {
     setShownUrl(conn.serverUrl);
     setUrlDraft(conn.serverUrl);
@@ -304,6 +325,21 @@ export function SyncScreen({ sync = memorySync }: { sync?: MemorySync }) {
             placeholder="sm_…"
             keyUrl="https://console.supermemory.ai"
           />
+        </Card>
+      </Section>
+      <Section
+        title="ดึง API key จาก Supermemory"
+        hint="เก็บคีย์ของบอสไว้ใน Supermemory (บรรทัดละ ชื่อคีย์ = ค่า เช่น ai.gemini = AIza…) แล้วกดดึงมาใส่เครื่อง — ไม่ต้องกรอกใหม่ทุกครั้งที่ build"
+      >
+        <Card>
+          <View className="flex-row">
+            <SmallButton
+              label={importing ? 'กำลังดึง…' : 'ดึงคีย์มาใส่เครื่อง'}
+              tone="primary"
+              disabled={importing}
+              onPress={pullSecrets}
+            />
+          </View>
         </Card>
       </Section>
     </ScrollView>

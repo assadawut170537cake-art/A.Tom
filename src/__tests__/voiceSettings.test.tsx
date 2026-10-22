@@ -73,7 +73,9 @@ describe('Voice settings screen — layout', () => {
     // 9 + 8 toggles (Azure appears in both sections)
     for (const p of TTS_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
     for (const p of STT_PROVIDERS) expect(screen.getAllByLabelText(`เปิดใช้ ${p.name}`).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('switch')).toHaveLength(17);
+    // 17 providers + สวิตช์โหมดเฝ้า
+    expect(screen.getAllByRole('switch')).toHaveLength(18);
+    expect(screen.getByLabelText('โหมดเฝ้า')).toBeTruthy();
     // keyless on-device providers don't ask for a key: 8 TTS + 7 STT key fields
     expect(screen.getAllByLabelText('API key')).toHaveLength(15);
     // Gemini TTS can share the Gemini LLM key — its field says so

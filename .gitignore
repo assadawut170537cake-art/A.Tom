@@ -48,6 +48,8 @@ coverage/
 .claude/
 .env
 
-# module build artifacts
+# build output ของ native module ใน ./modules (Gradle สร้างตอน build)
+modules/*/android/build/
 modules/**/build/
 modules/**/.gradle/
+

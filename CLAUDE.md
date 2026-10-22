@@ -202,7 +202,11 @@
 - **MCP:** Streamable HTTP JSON-RPC ผ่าน fetch (ไม่มี dep ใหม่) · รายการ server = AsyncStorage `atom.mcp.v1.servers` · token = SecureStore `mcp.<id>` · server ใหม่**ปิดไว้ก่อน** · tool id `mcp.<server>.<tool>` · https เท่านั้น (ยกเว้น localhost)
 - **Skills:** = คู่มือขั้นตอน (ไม่รันโค้ด) เก็บ `atom.skills.v1` · ทักษะที่ AI สร้างเอง (`learnFrom`) **ปิดไว้รอบอสอนุมัติ** เพราะเนื้อหาเข้า prompt
 - **Device:** ปิดเป็นค่าเริ่มต้น (`atom.device.v1.enabled`) · `defaultDriver` = `Linking` + expo-brightness + expo-clipboard (ADR-015 ระดับ A) · ความสว่าง Android ขอสิทธิ์ WRITE_SETTINGS ครั้งแรก — ไม่ได้สิทธิ์ = ปรับแค่หน้าต่างแอป · เสียง (STREAM_MUSIC) + ไฟฉาย = native module ของเราเอง `modules/atom-device` (Kotlin, Android เท่านั้น, autolink จาก `./modules`) — ไม่มี module (Expo Go / iOS / jest) = "ยังไม่รองรับ" · Kotlin ห้าม throw กรณีที่รู้ล่วงหน้า (expo ห่อเป็นข้อความอังกฤษ) → คืนค่าแล้วให้ JS แปลงเป็นไทย · WiFi = เปิดหน้าตั้งค่า (OS ไม่ให้แอปสลับเอง) · URL scheme อันตราย (tel/sms/javascript/file/…) ถูกบล็อก
-- ยังไม่ได้ต่อเข้า conversation/IntentRouter — เรียกผ่าน `createAppAgent()` เมื่อพร้อม
+- **Device ระดับ B** (`AtomAccessibilityService.kt` + manifest/xml ใน `modules/atom-device` — merge เข้า app เอง ไม่ต้อง config plugin): `device.launch` (เปิดแอปตามชื่อ, ไม่ต้องใช้ accessibility · ต้องมี `<queries>` LAUNCHER) · `device.nav` · `device.tap` · `device.type` · `device.read_screen` · `device.accessibility_settings` — บอสต้องเปิดเองที่ ตั้งค่าเครื่อง › การช่วยเหลือพิเศษ › "A.T.O.M. ควบคุมเครื่อง"
+- ระดับ B ทำกับ **แอปหน้าสุด** → สั่งในแชทของเรา = กดในแอปเรา · ใช้ "เปิดแอป X แล้วกด Y" (tapText รอจอวาดได้ 6s, `AsyncFunction` ฝั่ง Kotlin) · ปุ่มที่เข้า `RISKY_TAP` (ซื้อ/โอน/ลบ/ส่ง/ยืนยัน/…) → `needsConfirmation` → agent จำไว้ 60s ให้พิมพ์ "ยืนยัน" / "ยกเลิก" · ฟังก์ชันระดับ B ใน `AtomDeviceNative` เป็น optional (APK เก่าไม่มี = "ยังไม่รองรับ" ไม่ crash)
+- ห้ามใช้คำว่า "เครื่อง" ในคำสั่ง agent ที่ขึ้นต้นด้วย เปิด/ปิด (เช่น "เปิดสิทธิ์ควบคุมเครื่อง") — RuleClassifier แย่งเป็น `pc_command` → ใช้ "มือถือ"
+- **AgentHarness ต่อเข้าแชทแล้ว** ผ่าน agent "งาน" (`src/modules/agents/task-agent.ts`, intent `agent` — ไม่เพิ่ม intent): "จัดการว่า …" / "ฝากงาน: …" / "สั่งงานว่า …" / "task: …" · "เปิดแอป X แล้ว<ไม่ใช่ กด/แตะ/คลิก>…" → `createAppAgent({ maxSteps: 8 })` + persona prompt + `TASK_GUIDE` · ขั้นเดียว / "เปิดแอป X แล้วกด Y" ยังเป็น agent "อุปกรณ์" (regex ไม่เสีย LLM) → `registerTaskAgent()` ต้องมาก่อน `registerDeviceAgent()`
+- harness: tool คืน `needsConfirmation` → หยุด loop (`stopReason: 'needs_confirmation'` + `pending`) · `args.confirmed` จาก LLM ถูกตัดทิ้งเสมอ (ยืนยันได้แค่บอส) · คำสั่งที่รอเก็บใน `deviceConfirmations` (`confirmations.ts`) ใช้ร่วมกับ agent อุปกรณ์ → "ยืนยัน"/"ยกเลิก" ใช้ได้ทั้งสองทาง
 
 ### Personas ข้ามอุปกรณ์ + ควบคุมเครื่องเต็มรูปแบบ — ADR-015
 - อะตอม = agent ประจำแอปนี้ ↔ Mark 55 บน PC (ตัวเดียวกัน คุยกันตลอด) · ไฟรเดย์ = แอป Gemini / **Gemini Spark** (โหมด agent ในแอป Gemini) ↔ Gemini Enterprise / Antigravity · จาร์วิส = เข้าประชุม + สายเข้า = สั่งงาน ↔ **Hermes** (ดูแล PC) · อัลตรอน = เบื้องหลัง (Foreground Service) ↔ โปรแกรมไหนก็ได้ที่ต่อ API · ตารางเต็มใน `docs/DECISIONS.md` ADR-015
@@ -218,6 +222,7 @@
 - pattern ของ agent ต้องแคบ (ขึ้นต้นประโยค + คำเชื่อมเช่น "ว่า"/":") เพราะมาก่อน LLM · Rule มาก่อน → คำสั่งที่มี "เปิด/ปิด…คอม/เครื่อง" โดน `pc_command` แย่ง
 - agent ล้ม → AgentHandler ตอบข้อความไทย (ไม่ throw) · UI ครอบ `AgentErrorBoundary` ผ่าน `AgentHost` · โหลด UI ล้มไม่ cache (ลองใหม่ได้)
 - ลงทะเบียน agent ตอน boot (`registerSampleAgents()` ใน `bootApp()`) · test ใช้ `new AgentRegistry()` แยก
+- **agent "อุปกรณ์"** (`src/modules/agents/device-agent.ts`, `registerDeviceAgent()`): "ปรับเสียง 30" / "ความสว่าง 50%" / "เปิด/ปิดไฟฉาย" / "คัดลอกว่า …" / "เปิดแอป LINE แล้วกด แชท" / "ย้อนกลับ" / "กดปุ่ม …" / "พิมพ์ว่า …" / "อ่านหน้าจอ" / "ยืนยัน" → `deviceControl.call()` ตรง ๆ (regex ไม่ผ่าน LLM) · ต้องมีตัวเลขหรือเปิด/ปิดเสมอ (กันแย่งประโยคคุย) · เลขเป็นคำไทย ("สามสิบ", "ครึ่ง", "เต็ม") แปลงด้วย `parseThaiNumber()` (`thaiNumber.ts`, 0–100 เท่านั้น)
 
 ### Sync กับ Mark 55 (4.5.4.2–4.5.4.3) — สเปกเต็ม `docs/SYNC_PROTOCOL.md`
 - `memorySync` (core/memory/MemorySync.ts) = ตัวเดียวทั้งแอป: Server URL · pair/unpair · testConnection · เป็นเจ้าของ `SyncQueue` · boot เรียก `start()`
@@ -234,12 +239,20 @@
 - ⚠️ ชื่อ field ของ API อิง wire format ใน spec (ไม่มีโค้ด server ใน repo) — ถ้า Mark 55 ใช้ชื่ออื่น แก้ที่ RemoteMemoryAdapter ที่เดียว
 - release build Android เปิด http ไว้ด้วย config plugin `plugins/withCleartextTraffic.js` (ใช้ expo/config-plugins ที่มากับ expo · ไม่ต้องเพิ่ม expo-build-properties) — การจำกัด http ให้แค่ LAN ทำในโค้ด (`normalizeServerUrl`)
 - Build APK: `npx eas-cli build -p android --profile preview` (eas.json) หรือ local `npx expo prebuild -p android` แล้ว `cd android && ./gradlew assembleRelease` · package `com.atom.assistant` (เปลี่ยนแล้วแอปเดิมอัปเดตทับไม่ได้) · local build เซ็นด้วย debug keystore ของ template
+- `plugins/withGregorianBuildLocale.js`: Windows ภูมิภาคไทย → Java ได้ปี พ.ศ. (2569) → AGP เขียนวันที่ลง zip แบบ MS-DOS (รับแค่ 1980–2107) ไม่ได้ → `VerifyException (no error message)` ที่ `mergeReleaseJavaResource` · plugin เติม `-Duser.language=en -Duser.country=US` ใน `org.gradle.jvmargs` · ห้ามลบ ไม่งั้น build บนเครื่อง Boss ล้ม
 - `plugins/withAndroidProjectName.js`: Gradle 9 ห้ามชื่อโปรเจกต์ขึ้นต้น/ลงท้ายด้วย "." ("A.T.O.M.") → ตั้ง rootProject.name = slug · ห้ามลบ ไม่งั้น build Android ล้ม
 
 ### Supermemory (ส่ง fact ขึ้น space ร่วมของทีม)
 - `superMemorySync` (core/memory/SuperMemorySync.ts) ฟัง `localMemory.subscribe()` → `POST /v3/documents` · containerTag `project_atom_memory_base_4folders_atom_core` (ไม่ใช่ `atom_core` เปล่า ๆ — คนละ space)
 - key: SecureKeyStore `supermemory.apiKey` เท่านั้น (ใส่ที่ ตั้งค่า › Sync) · ไม่มี key = ไม่ส่ง · ห้ามใช้ `EXPO_PUBLIC_*` (ถูกฝังใน APK)
 - fail-open: ไม่ throw ไม่ retry ส่งไม่ผ่านก็ทิ้ง · ไม่ส่งการลบ (ต้องใช้ document id ที่เครื่องไม่ได้จด) · `applyRemote` ไม่แจ้ง listener → ของจาก Mark 55 ไม่ถูกส่งซ้ำ
+
+### ดึง API key จาก Supermemory (เติมคีย์ให้บอสอัตโนมัติ — Boss ขอ)
+- `secretSync` (`core/memory/SecretSync.ts`): boot เรียก `importOnce()` · กดเองได้ที่ ตั้งค่า › Sync (ปุ่ม "ดึงคีย์มาใส่เครื่อง" = `importOnce(true)` ทับของเดิม)
+- บอสเก็บคีย์ใน Supermemory space `SECRETS_CONTAINER_TAG` (`...atom_secrets` — คนละ space กับ core ที่ sync ขึ้น prompt) เนื้อหาบรรทัดละ `<ชื่อคีย์> = <ค่า>` เช่น `ai.gemini = AIza…` · ชื่อคีย์ = secretKey() ของ SecureKeyStore
+- รับเฉพาะ prefix `ai. / tts. / stt. / mcp. / pcbridge.` (`ALLOWED_KEY_PREFIXES`) — กันเขียน `mark55.auth.token` / `supermemory.apiKey` ทับจากเน็ต · bootstrap ด้วย `supermemory.apiKey` ที่บอสใส่เองที่ ตั้งค่า › Sync
+- คีย์ **ไม่** เข้า prompt (ไหลเข้า SecureStore เท่านั้น — คนละทางกับ memory fact) · ไม่ commit ลง git · fail-open (ไม่มีคีย์/เน็ตล่ม = ข้าม)
+- ⚠️ endpoint/response ของ Supermemory อิงสเปก v3 (`POST /v3/search`) — เปลี่ยนแก้ที่ `SecretSync.search()` / `parseDocuments()` ที่เดียว
 
 ### Mark 55 Bus — `pc-bridge` (4.5.5.3) · SQL `mark55/sql/002_mobile_rpc.sql`
 - คนละช่องทางกับ Sync (Fastify, memory facts): Bus = สั่งงานให้ Mark 55 รัน ผ่านตาราง `memory_tasks` บน Supabase
@@ -248,6 +261,11 @@
 - เพิ่มคำสั่ง: handler ใน `mark55/handlers.py` → INSERT `mobile_instructions` → แถวใน `PC_COMMANDS` (features/pc-bridge/commands.ts)
 - module ตอบข้อความไทยเองทุกกรณี (ไม่ throw) — ถ้า throw ProviderError แชทจะแนะนำ "ตั้งค่า › AI" ซึ่งผิดที่ · รอผล 8s แล้วตอบว่า "ส่งแล้ว" (งานรอในคิวจนกว่า Mark 55 จะเปิด)
 - ⚠️ "เช็กเครื่อง" เฉย ๆ ไม่ผ่าน RuleClassifier (ต้องมี เปิด/ปิด/สั่ง + คอม/เครื่อง) → ขึ้นกับ LLM classifier · พิมพ์ "สั่งคอมเช็กสถานะ" ชัวร์กว่า · "ปิดคอม" = ยังไม่รองรับ (ไม่มี handler)
+- **PC → มือถือ** (`sql/003_mobile_inbox.sql` · `mark55/mobile_outbox.py`): Mark 55 INSERT งาน `target = MOBILE:<device>` / `MOBILE_ALL` · instruction `NOTIFY` (`{text, speak}`) / `DEVICE_TOOL` (`{tool: "device.*", text, args}`) · แอปดึงด้วย `mobile_claim_inbox` (SKIP LOCKED · ค้างเกิน 1 วัน = FAILED expired) แล้วส่งผล `mobile_finish_task`
+- แอป: `PcInbox` (features/pc-bridge) poll ทุก 15s · ต่อเข้าแชท/เสียง/อุปกรณ์ที่ `src/modules/pc-inbox.ts` (`pcInbox.start()` ใน boot) · NOTIFY พูดเฉพาะตอน mood = idle (กันไมค์ได้ยินตัวเองตอนไลฟ์/เฝ้า) · DEVICE_TOOL ตัด `args.confirmed` + ใช้ `deviceConfirmations` ร่วม → "ยืนยัน" ในแชท · ไม่มี push จริง (FCM = dependency ใหม่ ต้องขอ Boss)
+- **อัลตรอน sandbox** (`mark55/ultron_sandbox.py` · `sql/004_ultron.sql` · agent `src/modules/agents/ultron-agent.ts`): "อัลตรอน ทำว่า …" / "รันในแซนด์บ็อกซ์ว่า …" → LLM **บนมือถือ** เขียน Python (`ULTRON_CODE_PROMPT`) → `ULTRON_RUN` → Docker (`--network none --read-only --cap-drop ALL` user nobody · 512 MB · 120 s) → ผลกลับทาง NOTIFY (ต้องมี 003) · "ปลด" = ย้ายไป released/ (ไม่รันบนเครื่องจริง) · "ทำลาย" = ลบ · ไม่บอกรหัส = ล่าสุด · โหมดเฝ้าตัดชื่อออก → ใช้ "อัลตรอน รันในแซนด์บ็อกซ์ว่า …"
+- container cloud มี Docker (`dockerd &` แล้วรอ) → `MARK55_TEST_DOCKER=1 python -m unittest mark55.test_ultron_sandbox` · Postgres ต้องอยู่นอก /tmp/claude-0 (สิทธิ์ 700) เช่น /var/tmp
+- SQL ทดสอบกับ Postgres เปล่าได้ (`mark55/sql/tests/`) — container cloud มี Postgres 16 (`/usr/lib/postgresql/16/bin`)
 - Jest ไม่แปลง `import()` แบบ dynamic → test loader ด้วย factory ของตัวเอง (`MODULE_LOADERS` จริงทดสอบได้แค่ว่ามี key)
 
 ### เสียงสด Realtime (speech-to-speech)
@@ -270,11 +288,22 @@
 - gate ล้มเหลว/โหลดโมเดลไม่ได้ = **ปล่อยเสียงผ่าน** (ตัวกรองคือความสะดวก ไม่ใช่ความปลอดภัย)
 - `live/SystemSpeechSession.ts` + `SystemRecognizer.ts` = ฟังด้วยตัวรู้จำเสียงของระบบ (expo-speech-recognition) · `useVoiceChat` เลือก realtime → system → classic
 
+### ห้องแชทเดียวกัน PC ↔ มือถือ (ADR-015 — Boss ยืนยัน: อยากได้ "ห้องแชทเดียวกัน" ไม่ใช่ส่งข้อความหากัน)
+- ซิงก์ประวัติแชทข้ามเครื่องผ่าน Mark 55 ตัวเดียวกับ Shared Memory (append-only ไม่มี conflict/tombstone) · ตัวตน = `id` ของข้อความ
+- `core/chat/`: `chatSyncTypes.ts` (`SyncMessage` · ซิงก์เฉพาะ role `user`/`assistant` — `system` เป็นของเฉพาะเครื่อง) · `RemoteChatAdapter.ts` (`GET/POST /api/v1/chat/sync`) · `ChatSync.ts` (คิวค้าง `atom.chat.sync.{queue,cursor}` · poll 20s · backoff 5s→5m · ไม่จับคู่ = ไม่ทำอะไร)
+- ต่อแอปที่ `features/chat/chatSyncBridge.ts` (`startChatSync()` ใน boot): ข้อความใหม่ในเครื่อง → `setLocalMessageSink` → `chatSync.enqueue` · ของเครื่องอื่น → `store.mergeRemoteMessages` (ไม่ผ่าน `pushMessage` จึงไม่ส่งวน) · จับคู่/ยกเลิกจับคู่ตาม `memorySync.subscribe` (จับคู่ครั้งแรก = ส่งแชทที่มีอยู่ขึ้นรอบแรก)
+- `memorySync.connection()` = `{baseUrl, token}` ปัจจุบัน (ช่องทางอื่นใช้ร่วม) · unpair → `chatSync.reset()` (แชทในเครื่องไม่หาย)
+- ⚠️ ชื่อ field wire อิง spec (ไม่มีโค้ด server) — Mark 55 ใช้ชื่ออื่นแก้ที่ `RemoteChatAdapter`/`chatSyncTypes` ที่เดียว · เรียงข้อความตาม `createdAt` (นาฬิกาเครื่องที่พิมพ์) เท่ากัน = ตาม id
+- PC→มือถือ (NOTIFY/DEVICE_TOOL ใน pc-inbox) ยังอยู่ = ใช้เป็น "แจ้งเตือน" ต่างหากจากห้องแชท
+
 ### คุยด้วยเสียงแบบไลฟ์ (Live Voice)
 - `features/voice/live/LiveVoiceSession.ts` = state machine ล้วน (DI: recorder / ensureMic / transcribe / respond / stopSpeech / timers) · ต่อเข้าแอปที่ `features/jarvis/hooks/useLiveVoice.ts` (expo-audio `useAudioRecorder` + `voiceOrchestrator.listen()` + `sendMessage()`)
 - เข้าโหมด: **กดค้างที่ Orb** หรือ **ปุ่มไมค์ในช่องพิมพ์** · ออก: แตะ Orb / ปุ่มไมค์อีกครั้ง / สลับแท็บ · ระหว่างไลฟ์ช่องพิมพ์ส่งไม่ได้ (กันสองรอบแย่งกันพูด)
 - VAD จาก metering (dBFS) poll ทุก 100ms: ดัง ≥ `SPEECH_THRESHOLD_DB` (-40) = พูด · เงียบ `SILENCE_END_MS` (1.2s) = จบ · สั้นกว่า `MIN_SPEECH_MS` (0.4s) = เสียงรบกวน · ยาวสุด `MAX_UTTERANCE_MS` (30s) · ไม่มีใครพูด `IDLE_TIMEOUT_MS` (30s) = ออกเอง · เงียบนำหน้า `PRE_SPEECH_RESET_MS` (8s) = ทิ้งไฟล์อัดใหม่
 - ⚠️ ค่า dBFS ต่างกันตามเครื่อง: Android = peak (`maxAmplitude`), iOS = average power → ถ้าเครื่องจริงตัดประโยคเร็ว/ไม่ยอมจบ ปรับ `SPEECH_THRESHOLD_DB` ที่เดียว
+- **ฟังต่อตอนอยู่แอปอื่นได้:** expo-audio `enableBackgroundRecording: true` (app.json) + `allowsBackgroundRecording: true` ตอน start → Android = `AudioRecordingService` (Foreground Service type microphone + แจ้งเตือนค้าง) · ใช้คู่ระดับ B: กดค้าง Orb → สลับไปแอปอื่น → พูด "กดปุ่ม …" · ยังออกเองเมื่อเงียบ 30s (`IDLE_TIMEOUT_MS`)
+- **โหมดเฝ้า (อัลตรอน · ADR-015 ขั้น 4):** `useStandbyStore` (`features/voice/live/standbyStore.ts`, AsyncStorage `atom.voice.v1.standby`) · เปิด = `keepAlive` (ไม่ออกเองเมื่อเงียบ) + แอปไม่อยู่หน้าสุด → `requireWakeWord` (ต้องขึ้นต้นด้วยชื่อ persona — `stripWakeWord()` ใน `wakeWord.ts`, ไม่สลับ persona) · สั่ง: ตั้งค่า › เสียง (สวิตช์) / agent "โหมดเฝ้า" ("เปิดโหมดเฝ้า" / "ปิดโหมดเฝ้า" / "ฟังตลอด") · บันทึกว่าเปิด → เปิดหน้าหลักแล้วฟังเอง · แตะ Orb / session ล้ม → ปิดโหมดเฝ้าตาม · unmount (สลับแท็บ) ไม่ปิด
+- โหมดเฝ้าใช้ Foreground Service ของ expo-audio (ไม่ใช่ของเราเอง) · ตรวจคำปลุกหลัง STT → ทุกประโยคที่ดังพอเสียค่า STT · Android อาจฆ่าแอปเมื่อแบตต่ำ/โหมดประหยัด (ต้องทดสอบบนเครื่อง)
 - ระหว่างผู้ช่วยพูด **ไม่อัดเสียง** (กันได้ยินตัวเอง) — ยังไม่มี barge-in · recorder หยุดแล้วคืน `allowsRecording: false` ทุกครั้ง (iOS playAndRecord ทำเสียง TTS เบา)
 - หยุดระหว่างรอ AI → `sendMessage({ onSpeaking })` คืน false = ไม่พูดคำตอบ · งาน async รอบเก่าทิ้งด้วย `runId` guard
 - ถอดเสียงว่าง → ฟังใหม่เงียบ ๆ · STT ไม่ได้ตั้งค่า (`missing_key`/`unsupported`) → ออกจากโหมด + ข้อความไทยชี้ ตั้งค่า › เสียง · ไมค์ไม่ได้สิทธิ์ → ข้อความจาก `ensureMicPermission()`
@@ -324,7 +353,7 @@
 13. ✅ **Voice Persona Map default** (A2) — `DEFAULT_PERSONA_VOICE_MAP` (นิยามใน `core/storage/ProviderSettings.ts`, re-export ที่ `voice.config.ts`) · `resolveVoiceFor()` = shared voice → ค่าที่ตั้ง → default · default ใช้ Expo Speech แยกด้วย pitch/speed เท่านั้น (ไม่ใส่ voiceId เพราะ identifier ต่างกันตามเครื่อง)
     เดิม: — ถ้ายังไม่ได้ตั้ง Persona Voice Map ทุก persona พูดด้วยเสียง Expo Speech ค่าเริ่มต้นเดียวกัน
     (`resolveVoiceFor()` คืน `undefined` → ตกไปที่ Expo Speech ไม่ส่ง voice/speed/pitch) → ควรมีค่าเริ่มต้นต่อ persona
-14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ⚠️ GLSL ใหม่ยังไม่ได้ลองบน GPU จริง (ผ่านบน WebGL SwiftShader แล้ว)
+14. ✅ **Orb แยก shape/animation** (A3) — `ORB_VARIANTS` ใน `orbHtml.ts` (facet / spin / sharp / gloss / stutter / pulse) ส่งเข้า shader เป็น uniform · `setOrbPersona(p)` สลับ variant · ✅ Boss ทดสอบบนเครื่องจริงแล้ว (2026-10-19) — แต่ละ persona รูปทรงต่างกัน
     facet เดิมปัดมุมเป็นขั้น → รัศมีกระโดด เกิดรอยแฉกในแสงเรือง (อะตอม/อัลตรอน) → แก้เป็นรูป 9 เหลี่ยมที่ต่อเนื่อง
     เดิม: — ตอนนี้ `setOrbPersona()` เปลี่ยนแค่สี shader/animation เหมือนกันทั้ง 4 ตัว → ต้องการรูปทรง/การเคลื่อนไหวเฉพาะ persona
 15. ✅ **สี Atom vs Ultron ต่างชัด** (A4) — Atom `#E67E22` · Ultron `#C0392B` (contrast บนดำ ≥ 3:1 มี test) · Boss อนุมัติเปลี่ยน lock Phase 2 แล้ว

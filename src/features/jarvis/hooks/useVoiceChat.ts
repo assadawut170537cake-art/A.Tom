@@ -46,5 +46,5 @@ export function useVoiceChat(): LiveVoiceControls {
   useWakeWord(!active, start);
 
   const current = realtime.active ? realtime : system.active ? system : classic;
-  return { state: current.state, active, start, stop };
+  return { state: current.state, active, standby: classic.standby, start, stop };
 }

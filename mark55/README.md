@@ -25,6 +25,10 @@ PENDING ──claim──▶ IN_PROGRESS ──handler สำเร็จ──�
 | `supabase_gateway.py` | อ่าน/เขียนตาราง · ทุก transition เป็น UPDATE แบบมีเงื่อนไข · error → log ไม่ crash |
 | `handlers.py` | `HANDLER_REGISTRY` — instruction → handler ที่ main.py ลงทะเบียน |
 | `sql/001_init.sql` | schema: ตาราง `memory_tasks` + `memory_tasks_test` · trigger ประทับเวลา · RLS |
+| `sql/003_mobile_inbox.sql` | PC → มือถือ: RPC `mobile_claim_inbox` / `mobile_finish_task` (งาน `NOTIFY` / `DEVICE_TOOL`) |
+| `ultron_sandbox.py` | sandbox ของอัลตรอน — Docker แยกเครือข่าย/จำกัดทรัพยากร · ปลด / ทำลาย |
+| `sql/004_ultron.sql` | คำสั่ง `ULTRON_RUN` / `ULTRON_RELEASE` / `ULTRON_DESTROY` + payload 16 KB |
+| `mobile_outbox.py` | ส่งงานหามือถือ (`notify_mobile` / `device_tool` + CLI) |
 | `sql/002_mobile_rpc.sql` | ช่องทางมือถือ: `mobile_devices` (hash ของ token) · `mobile_instructions` · RPC `mobile_submit_task` / `mobile_get_task` / `mobile_register_device` |
 | `test_memory_bus.py` | unittest — mock (CI) + live (Supabase จริง, เลือกรัน) |
 | `.env.example` | แม่แบบ `.env` |
@@ -58,6 +62,35 @@ PENDING ──claim──▶ IN_PROGRESS ──handler สำเร็จ──�
 
 - สั่งได้เฉพาะ instruction ในตาราง `mobile_instructions` · 20 งาน/นาที/เครื่อง · อ่านได้เฉพาะงานของเครื่องตัวเอง
 - เพิ่มคำสั่ง: `insert into mobile_instructions values ('MY_JOB', 'คำอธิบาย');` + handler (ข้อ 6) + `PC_COMMANDS` ในแอป
+
+### PC → มือถือ (Mark 55 ส่งข้อความ/คำสั่งหาแอป)
+
+1. รัน `sql/003_mobile_inbox.sql` ใน SQL Editor (รันซ้ำได้) — เพิ่ม RPC `mobile_claim_inbox` / `mobile_finish_task` ให้แอป (ตารางยังปิดสำหรับ anon)
+2. ส่งจาก Mark 55:
+   ```bash
+   python mobile_outbox.py notify "build เสร็จแล้วครับบอส"          # แสดงในแชท + พูด
+   python mobile_outbox.py notify "เตือนประชุม 3 โมง" --silent      # แสดงอย่างเดียว
+   python mobile_outbox.py device device.volume --text 20           # ปรับเสียงมือถือ
+   ```
+   หรือในโค้ด: `notify_mobile(gateway, "…")` / `device_tool(gateway, "device.flashlight", text="on")`
+3. แอปดึงทุก ~15 วินาทีตอนเปิดอยู่ (รวมตอนเปิดโหมดเฝ้าแล้วสลับไปแอปอื่น) · แอปปิดอยู่ = ได้รับตอนเปิดใหม่ · ค้างเกิน 1 วัน = หมดอายุ (FAILED `expired`)
+
+- `target = MOBILE:<device_id>` (ค่าเริ่มต้น `boss-phone`) หรือ `MOBILE_ALL` · watcher บน PC ไม่ดึงงานพวกนี้
+- `DEVICE_TOOL` รับเฉพาะ `device.*` · บอสต้องเปิด ตั้งค่า › Marketplace › ควบคุมอุปกรณ์ · ปุ่มเสี่ยง (ซื้อ/โอน/ลบ/ส่ง) ยังต้องให้บอสพิมพ์ "ยืนยัน" บนมือถือ (`confirmed` จาก PC ถูกตัดทิ้ง)
+- ทดสอบ SQL กับ Postgres เปล่า: `sql/tests/003_mobile_inbox_test.sql` (ห้ามรันบนโปรเจกต์จริง)
+
+### อัลตรอน — sandbox (ADR-015 ขั้น 4)
+
+1. ติดตั้ง **Docker Desktop** บน Mark 55 แล้วเปิดไว้ · ดึง image ครั้งแรก: `docker pull python:3.12-slim`
+2. รัน `sql/004_ultron.sql` ใน SQL Editor (เพิ่มคำสั่ง ULTRON_* + ขยาย payload เป็น 16 KB) — ต้องรัน `003` ด้วย ไม่งั้นผลไม่เด้งกลับมือถือ
+3. เปิด watcher ใหม่ (`python main.py`) — handler ของอัลตรอนลงทะเบียนเอง
+4. บนมือถือ: "อัลตรอน ทำว่า สุ่มเลข 6 หลัก 5 ชุด" → AI บนมือถือเขียนโค้ด → Mark 55 รันใน sandbox → ผลเด้งในแชท → "ปลด" หรือ "ทำลาย"
+
+- sandbox = Docker `--network none` · `--read-only` · `--cap-drop ALL` · user nobody · RAM 512 MB · 1 CPU · 128 process · หมดเวลา 120 s
+- ไฟล์อยู่ที่ `~/.mark55/ultron/pending/<id>/` (เปลี่ยนด้วย `MARK55_ULTRON_ROOT`) · **ปลด** = ย้ายไป `released/<id>/` (ไม่ได้รันอะไรบนเครื่องจริง — บอสเอาไปใช้เอง) · **ทำลาย** = ลบทิ้ง
+- ไม่บอกรหัส = ตัวล่าสุด · บอก 4 ตัวแรกพอ (`ปลด 1a2b`)
+- ตั้งค่า: `MARK55_ULTRON_IMAGE` (ค่าเริ่มต้น `python:3.12-slim`) · `MARK55_ULTRON_TIMEOUT` (วินาที)
+- ทดสอบกับ Docker จริง: `MARK55_TEST_DOCKER=1 python -m unittest mark55.test_ultron_sandbox`
 - ยกเลิกเครื่อง: `update mobile_devices set revoked = true where device_id = 'boss-phone';` · ออกใหม่ = เรียก register ซ้ำ
 
 ## 4. วิธีรัน
