@@ -1,0 +1,82 @@
+name: Build iOS IPA (Sideload)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pc-assistant
+      - main
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+
+jobs:
+  build-ipa:
+    name: Build Unsigned IPA for Sideloadly
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Node Dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Prebuild iOS Native Project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
+      - name: Build Xcode Archive (Unsigned)
+        run: |
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -n 1)
+          SCHEME=$(xcodebuild -list -workspace "$WORKSPACE" -json | jq -r '.workspace.schemes[0]')
+          echo "Detected Workspace: $WORKSPACE"
+          echo "Detected Scheme: $SCHEME"
+
+          xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/atom.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/atom.xcarchive/Products/Applications/*.app Payload/
+          zip -r -y ATOM_Assistant_v1.0.1.ipa Payload
+          ls -lh ATOM_Assistant_v1.0.1.ipa
+
+      - name: Upload to GitHub Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ATOM_Assistant_v1.0.1_iOS_IPA
+          path: ATOM_Assistant_v1.0.1.ipa
+          retention-days: 14
+
+      - name: Upload to Cloud for Direct Link
+        continue-on-error: true
+        run: |
+          SERVER=$(curl -s https://api.gofile.io/servers | jq -r '.data.servers[0].name // "store1"')
+          RESPONSE=$(curl -s -F "file=@ATOM_Assistant_v1.0.1.ipa" "https://${SERVER}.gofile.io/contents/uploadfile")
+          echo "Upload result: $RESPONSE"
+          DOWNLOAD_URL=$(echo "$RESPONSE" | jq -r '.data.downloadPage // ""')
+          echo "### 📱 iOS IPA Download Ready" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$DOWNLOAD_URL" ] && [ "$DOWNLOAD_URL" != "null" ]; then
+            echo "Direct link: $DOWNLOAD_URL" >> $GITHUB_STEP_SUMMARY
+          fi
