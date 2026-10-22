@@ -66,6 +66,8 @@ export interface HandlerResult {
   agentScreen?: { agentId: string } | undefined;
   /** รูปที่แนบกับคำตอบ — มีเฉพาะผลจาก AgentHandler */
   imageUri?: string | undefined;
+  /** การ์ดกราฟิกแสดงผล (Visual Card เช่น สภาพอากาศ นัดหมาย แจ้งเตือน) */
+  visualCard?: any | undefined;
 }
 
 export interface IntentHandler<I extends Intent = Intent> {

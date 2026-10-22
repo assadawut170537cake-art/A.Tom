@@ -44,6 +44,8 @@ export interface AgentRunResult {
   showScreen?: boolean | undefined;
   /** รูปที่แนบกับคำตอบ (file:// ในเครื่อง) — แสดงใต้ข้อความในแชท */
   imageUri?: string | undefined;
+  /** การ์ดกราฟิกแสดงผล (Visual Card เช่น สภาพอากาศ นัดหมาย แจ้งเตือน) */
+  visualCard?: any | undefined;
 }
 
 export interface AgentScreenProps {

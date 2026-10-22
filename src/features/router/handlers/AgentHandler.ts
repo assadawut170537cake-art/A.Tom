@@ -28,6 +28,7 @@ export class AgentHandler implements IntentHandler<'agent'> {
         persona,
         ...(result.showScreen && agent.hasScreen ? { agentScreen: { agentId } } : {}),
         ...(result.imageUri ? { imageUri: result.imageUri } : {}),
+        ...(result.visualCard ? { visualCard: result.visualCard } : {}),
       };
     } catch (e) {
       const reason = redactSecrets(e instanceof Error ? e.message : String(e));

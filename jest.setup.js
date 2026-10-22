@@ -107,3 +107,9 @@ jest.mock('expo-file-system', () => {
   }
   return { Paths: { cache: { uri: 'file:///cache' } }, File };
 });
+
+jest.mock('expo-contacts', () => ({
+  requestPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  getContactsAsync: jest.fn(async () => ({ data: [] })),
+  Fields: { Name: 'name', PhoneNumbers: 'phoneNumbers', Emails: 'emails' },
+}));

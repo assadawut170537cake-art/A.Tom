@@ -65,6 +65,7 @@ export async function sendMessage(text: string, opts: SendOptions = {}): Promise
       content: result.reply,
       persona: result.persona,
       imageUri: result.imageUri,
+      visualCard: result.visualCard,
     });
     // agent ขอเปิด UI → เปิด Agent Panel (เฉพาะรอบล่าสุด — รอบเก่าที่จบช้าต้องไม่เปิดทับ)
     if (result.agentScreen && isLatest()) useAgentPanelStore.getState().open(result.agentScreen.agentId);

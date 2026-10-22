@@ -43,5 +43,11 @@ yarn-error.*
 # test coverage reports
 coverage/
 
-# local IDE
+# local IDE and agent
 .idea/
+.claude/
+.env
+
+# module build artifacts
+modules/**/build/
+modules/**/.gradle/

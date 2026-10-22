@@ -3,6 +3,7 @@ import { Image, Text, View } from 'react-native';
 
 import { PERSONAS, USER_NAME } from '../../constants';
 import type { Message } from '../../types';
+import { VisualCardRenderer } from '../cards/VisualCardRenderer';
 
 const formatTime = (ts: number) => {
   const d = new Date(ts);
@@ -42,6 +43,11 @@ export const ChatBubble = memo(function ChatBubble({ message }: ChatBubbleProps)
         }
       >
         <Text className="text-[15px] leading-6 text-white">{message.content}</Text>
+        {message.visualCard ? (
+          <View style={{ marginTop: 8 }}>
+            <VisualCardRenderer card={message.visualCard} />
+          </View>
+        ) : null}
         {message.imageUri ? (
           <Image
             source={{ uri: message.imageUri }}

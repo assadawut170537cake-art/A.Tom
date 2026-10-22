@@ -29,6 +29,7 @@ import { setupNotifications } from './features/assistant/notifications';
 import { registerVoiceProviders } from './features/voice';
 import { registerRouteEscortAgent } from './modules/agents/route-escort';
 import { registerSampleAgents } from './modules/agents/sample-agent';
+import { registerSystemDeviceAgent } from './modules/agents/system-device-agent';
 import { loadBootModules } from './modules/loader';
 
 export interface BootReport {
@@ -72,6 +73,7 @@ export function bootApp(): Promise<BootReport> {
   registerSampleAgents();
   registerRouteEscortAgent();
   registerAssistantAgents();
+  registerSystemDeviceAgent();
   void loadAssistantData().catch((e: unknown) =>
     console.error('[boot] โหลดผู้ช่วยที่สร้างเองไม่สำเร็จ', e),
   );
