@@ -272,7 +272,10 @@ class TestMemoryBus(unittest.TestCase):
         self.assertEqual(failed.status, TaskStatus.FAILED)
         self.assertEqual(failed.result, {"exception": "RuntimeError: disk full"})
         self.assertEqual(done.status, TaskStatus.COMPLETED)
-        self.assertEqual(done.result, {"status": "HEALTHY", "task_id": healthy.task_id})
+        self.assertEqual(done.result["status"], "HEALTHY")
+        self.assertEqual(done.result["task_id"], healthy.task_id)
+        self.assertIn("summary", done.result)
+        self.assertIn("telemetry", done.result)
         self.assertEqual(sorted(HANDLER_REGISTRY), ["EXECUTE_BUILD", "RUN_DIAGNOSTICS"])
 
     def test_gateway_exception_continues_polling(self) -> None:
