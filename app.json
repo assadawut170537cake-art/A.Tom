@@ -2,7 +2,7 @@
   "expo": {
     "name": "A.T.O.M.",
     "slug": "atom",
-    "version": "1.0.3",
+    "version": "0.5.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.atom.assistant",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#05060a",
         "foregroundImage": "./assets/android-icon-foreground.png",
