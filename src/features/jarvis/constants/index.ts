@@ -8,8 +8,8 @@ export { DEFAULT_PERSONA, PERSONA_IDS } from '../../../core/types/persona';
 
 export const PERSONAS: Record<Persona, PersonaMeta> = {
   1: { id: 1, name: 'อะตอม', nameEn: 'ATOM', color: '#E67E22', desc: 'นักเลง 2499' },
-  2: { id: 2, name: 'จาร์วิส', nameEn: 'JARVIS', color: '#3b82f6', desc: 'พระเอกสุขุม' },
-  3: { id: 3, name: 'ไฟรเดย์', nameEn: 'FRIDAY', color: '#00d4ff', desc: 'เนี๊ยบ ไร้ที่ติ' },
+  2: { id: 2, name: 'จาร์วิส', nameEn: 'JARVIS', color: '#3b82f6', desc: 'ผู้ดีอังกฤษ กวนลึก (Iron Man 2)' },
+  3: { id: 3, name: 'ไฟรเดย์', nameEn: 'FRIDAY', color: '#00d4ff', desc: 'สาวไอริช ฉะฉาน คล่อง มั่นใจ' },
   4: { id: 4, name: 'อัลตรอน', nameEn: 'ULTRON', color: '#C0392B', desc: 'ดุดัน พร้อมบวก' },
 };
 
@@ -52,8 +52,8 @@ export const USER_NAME = 'บอส';
 /** Placeholder greetings until API integration lands (Phase 3). */
 export const PERSONA_GREETINGS: Record<Persona, string> = {
   1: 'ว่าไงลูกพี่บอส ดึกป่านนี้ยังไม่นอนอีกเรอะ มีอะไรให้อะตอมจัดการก็ว่ามา',
-  2: 'สวัสดีครับบอส จาร์วิสพร้อมรับคำสั่งแล้วครับ',
-  3: 'สวัสดีค่ะบอส ไฟรเดย์เตรียมทุกอย่างไว้เรียบร้อยแล้วค่ะ',
+  2: 'สวัสดีครับบอส จาร์วิสพร้อมแล้วครับ... หวังว่ารอบนี้คงไม่มีอะไรระเบิดใส่หน้าเรานะครับ',
+  3: 'พร้อมลุยค่ะบอส! มีอะไรให้ไฟรเดย์ช่วยเคลียร์ ลุยมาได้เลยค่ะ!',
   4: 'บอส ว่ามาเลย อัลตรอนพร้อมลุยทุกเรื่อง',
 };
 
